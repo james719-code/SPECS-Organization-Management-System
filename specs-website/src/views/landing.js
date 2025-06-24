@@ -19,12 +19,12 @@ function getCachedImageUrl(fileId) {
         // This requests a smaller, optimized version of the image.
         // Parameters: width, height, gravity, quality
         const newUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, 400, 0, 'center', 75);
-        cache[fileId] = newUrl.href; // Store the URL string
+        cache[fileId] = newUrl; // Store the URL string
         localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
-        return newUrl.href;
+        return newUrl;
     } catch (error) {
         console.warn("Could not access or write to image cache.", error);
-        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, 400, 0, 'center', 75).href;
+        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, 400, 0, 'center', 75);
     }
 }
 
