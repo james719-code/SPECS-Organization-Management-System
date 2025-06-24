@@ -1,7 +1,7 @@
 import { account, databases } from '../appwrite.js'; // Make sure this uses the Web SDK
 
-const COLLECTION_ID_STUDENTS = '685767a8002f47cbef39';
-const DATABASE_ID = '685399d600072f4385eb';
+const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 
 export default function renderLogin() {
   const app = document.getElementById('app');
@@ -15,7 +15,7 @@ export default function renderLogin() {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 90vh; /* Changed from 100vh for a bit of space */
+        min-height: 90vh;
         padding: 1rem;
       }
 
@@ -92,12 +92,23 @@ export default function renderLogin() {
         color: #ccc;
       }
 
-      #error-message {
-        color: #ff4d4d; /* A brighter red for dark backgrounds */
+      /* --- UPDATED: Status message for loader and errors --- */
+      #status-message {
+        color: #9CA3AF; /* Default color for loader text */
         text-align: center;
         margin-top: 1rem;
-        min-height: 1.2rem;
+        min-height: 5rem; /* Reserve space for the loader */
         font-weight: bold;
+        font-family: monospace; /* Essential for ASCII art */
+        font-size: 1rem;
+        line-height: 1.1; /* Make the bars look tighter */
+        white-space: pre; /* CRITICAL: Respects newlines and spaces */
+      }
+
+      #status-message.error {
+        color: #ff4d4d; /* A brighter red for dark backgrounds */
+        min-height: 1.2rem; /* Revert height for simple error text */
+        white-space: normal; /* Allow error text to wrap */
       }
 
       /* --- MEDIA QUERY FOR LARGER SCREENS --- */
@@ -128,18 +139,57 @@ export default function renderLogin() {
         
         <button type="submit">Login</button>
 
-        <div id="error-message"></div>
+        <div id="status-message"></div>
 
         <p>Don't have an account? <a href="#signup">Sign up</a></p>
       </form>
     </main>
   `;
 
-  // --- Form Handler with Conditional Redirection ---
+  // --- Form Handler with Music Graph Loader ---
   
   const loginForm = document.getElementById('login-form');
   const submitButton = loginForm.querySelector('button[type="submit"]');
-  const errorMessageDiv = document.getElementById('error-message');
+  const statusMessageDiv = document.getElementById('status-message');
+  let loaderInterval = null;
+
+  // --- ASCII Music Graph Loader Function ---
+  const startLoader = () => {
+    // --- Configurable Parameters ---
+    const numBars = 20;    // How many bars in the visualizer
+    const maxHeight = 4;   // Max height of a bar in characters
+    const barChar = '█';   // The character used to draw the bar
+    const emptyChar = ' '; // The character for empty space above the bar
+
+    // --- Prepare the container ---
+    statusMessageDiv.classList.remove('error'); // Ensure it's not styled as an error
+    
+    loaderInterval = setInterval(() => {
+      // 1. Generate an array of random heights for the current animation frame
+      const heights = Array.from({ length: numBars }, () => Math.floor(Math.random() * (maxHeight + 1)));
+
+      let output = "Authenticating...\n"; // The text to display above the visualizer
+
+      // 2. Build the visualizer string from the top row down
+      for (let y = maxHeight; y >= 1; y--) {
+        let rowString = "";
+        for (let x = 0; x < numBars; x++) {
+          // If the bar at this position is tall enough to reach the current row, draw it
+          rowString += (heights[x] >= y) ? barChar : emptyChar;
+        }
+        output += rowString + '\n'; // Add the completed row and a newline
+      }
+
+      // 3. Update the DOM with the new frame
+      statusMessageDiv.textContent = output;
+      
+    }, 100); // Animation speed (100ms = 10 frames per second)
+  };
+
+  // --- Stop Loader and Clear ---
+  const stopLoader = () => {
+    clearInterval(loaderInterval);
+  };
 
   loginForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -147,46 +197,49 @@ export default function renderLogin() {
     const email = e.target.email.value;
     const password = e.target.password.value;
     
-    errorMessageDiv.textContent = '';
+    // --- Start UI loading state ---
+    statusMessageDiv.textContent = '';
     submitButton.disabled = true;
     submitButton.textContent = 'Logging in...';
+    startLoader(); // Start the ASCII animation
 
     try {
-      // 1. Log in the user to create a session
+      // 1. Login user
       await account.createEmailPasswordSession(email, password);
       
-      // 2. Get the current user's data to check their email verification status
+      // 2. Get user data
       const user = await account.get();
 
-      // 3. IMPORTANT: Check if the user's *email* is verified
+      // 3. Check email verification
       if (!user.emailVerification) {
         await account.deleteSession('current'); 
-        throw new Error("Your email has not been verified. Please check your inbox for the verification link.");
+        throw new Error("Your email has not been verified. Please check your inbox.");
       }
 
-      // 4. *** NEW LOGIC: Check admin verification status from the database ***
-      // We fetch the user's corresponding profile document.
+      // 4. Check admin verification status from profile
       const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
       
-      // 5. Redirect based on type and verification status
+      // 5. Redirect based on profile status
       if (profile.type === 'admin') {
-        // Admins can go directly to their page
         window.location.hash = 'adminpage';
       } else if (profile.type === 'student' && profile.verified) {
-        // A student who HAS been verified by an admin
         window.location.hash = 'dashboard';
       } else {
-        // Any other case (e.g., a student who is NOT verified by an admin)
         window.location.hash = 'pending-verification';
       }
 
     } catch (err) {
-      errorMessageDiv.textContent = err.message;
-      // It's good practice to ensure the session is cleared if any error occurs after login
-      if (err.code !== 401) { // 401 is a login failure, no session was created
+      stopLoader(); // Stop animation before showing error
+      statusMessageDiv.textContent = err.message;
+      statusMessageDiv.classList.add('error'); 
+
+      if (err.code !== 401) {
           try { await account.deleteSession('current'); } catch (_) {}
       }
     } finally {
+      // This will only fully run if an error occurs, otherwise the redirect happens first.
+      // But it's good practice to have it.
+      stopLoader(); 
       submitButton.disabled = false;
       submitButton.textContent = 'Login';
     }

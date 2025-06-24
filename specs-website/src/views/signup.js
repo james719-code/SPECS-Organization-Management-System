@@ -1,8 +1,8 @@
 import { account, databases } from '../appwrite.js';
 import { ID } from "appwrite"; // Make sure you're using the Web SDK
 
-const COLLECTION_ID_STUDENTS = '685767a8002f47cbef39';
-const DATABASE_ID = '685399d600072f4385eb';
+const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 
 export default function renderSignup() {
   const app = document.getElementById('app');

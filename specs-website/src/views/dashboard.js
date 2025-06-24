@@ -1,20 +1,24 @@
 // --- IMPORTS ---
-import { account, databases, storage } from "../appwrite.js";
-import {ID} from "appwrite";
+import { account, databases } from "../appwrite.js";
+import { Query } from "appwrite";
 import renderFinanceView from "./renderpages/finance.js";
 import renderFilesView from "./renderpages/files.js";
 import renderEventsView from "./renderpages/events.js";
 import renderSettingsView from "./renderpages/settings.js";
 
 // --- DATABASE CONFIG ---
-const DATABASE_ID = "685399d600072f4385eb";
-const COLLECTION_ID_STUDENTS = "685767a8002f47cbef39";
+const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
+const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
+const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
+const FILES_PAGE_LIMIT = 10;
 
 // --- MAIN DASHBOARD COMPONENT ---
 export default async function renderDashboard() {
   const app = document.getElementById("app");
 
   try {
+    // --- Phase 1: Get Core User Data ---
     const user = await account.get();
     const profile = await databases.getDocument(
       DATABASE_ID,
@@ -22,6 +26,31 @@ export default async function renderDashboard() {
       user.$id
     );
     
+    // --- Phase 2: Concurrently Fetch Initial Data for Views ---
+    const [filesResponse, eventsResponse, studentsResponse] = await Promise.all([
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
+            Query.orderDesc('$createdAt'),
+            Query.limit(FILES_PAGE_LIMIT)
+        ]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
+            Query.orderDesc('date_to_held')
+        ]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)])
+    ]);
+
+    const initialFilesData = {
+        files: filesResponse.documents,
+        total: filesResponse.total,
+    };
+    
+    // The initial data for the events view is now the full list of documents
+    const initialEventsData = eventsResponse.documents;
+
+    const userLookup = studentsResponse.documents.reduce((map, student) => {
+        map[student.$id] = student.fullname || student.username;
+        return map;
+    }, {});
+
 
     app.innerHTML = `
       <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,14 +75,12 @@ export default async function renderDashboard() {
         .dashboard-layout {
           display: grid; 
           grid-template-columns: 250px 1fr; 
-          grid-template-rows: auto 1fr; /* Header is auto-sized, content takes the rest */
+          grid-template-rows: auto 1fr;
           grid-template-areas: "drawer header" "drawer content"; 
           min-height: 100vh; 
           color: var(--text-primary);
-          
-          /* --- MODIFIED FOR FIXED LAYOUT --- */
-          height: 100vh;       /* Constrain layout to viewport height */
-          overflow: hidden;     /* Prevent the entire page from scrolling */
+          height: 100vh;
+          overflow: hidden;
         }
         
         .dashboard-header {
@@ -93,11 +120,10 @@ export default async function renderDashboard() {
         .nav-drawer a.active { border-left-color: var(--accent-blue); background-color: var(--bg-dark); color: var(--text-primary); }
         .nav-drawer svg { width: 20px; height: 20px; }
         
-        /* --- MODIFIED FOR FIXED LAYOUT --- */
         .dashboard-content { 
           grid-area: content; 
           padding: 2rem; 
-          overflow-y: auto; /* This now makes ONLY the content area scrollable */
+          overflow-y: auto;
         }
         
         .content-card { 
@@ -107,7 +133,6 @@ export default async function renderDashboard() {
           padding: 2rem; 
         }
 
-        /* --- RESPONSIVE LAYOUT STYLES --- */
         @media (max-width: 768px) {
           .dashboard-layout {
             grid-template-columns: 1fr; 
@@ -164,31 +189,41 @@ export default async function renderDashboard() {
     const mobileMenuToggle = document.getElementById("mobile-menu-toggle");
     const layoutEl = document.querySelector(".dashboard-layout");
 
-    const renderContent = (viewName) => {
+    const renderContent = async (viewName) => {
+      contentEl.innerHTML = `<div class="content-card"><p>Loading...</p></div>`;
       navLinks.forEach((link) => link.classList.remove("active"));
       const activeLink = document.querySelector(
         `.nav-drawer a[data-view="${viewName}"]`
       );
       if (activeLink) activeLink.classList.add("active");
 
-      switch (viewName) {
-        case "finance":
-          contentEl.innerHTML = renderFinanceView();
-          break;
-        case "files":
-          contentEl.innerHTML = renderFilesView();
-          break;
-        case "events":
-          contentEl.innerHTML = renderEventsView();
-          break;
-        case "settings":
-          const settingsView = renderSettingsView(user, profile);
-          contentEl.innerHTML = settingsView.html;
-          settingsView.afterRender();
-          break;
-        default:
-          contentEl.innerHTML = renderFinanceView();
-          if (activeLink) activeLink.classList.add("active");
+      try {
+        switch (viewName) {
+          case "finance":
+            await renderFinanceView(userLookup, user);
+            break;
+          case "files":
+            const filesView = renderFilesView(initialFilesData, userLookup, user);
+            contentEl.innerHTML = filesView.html;
+            filesView.afterRender();
+            break;
+          case "events":
+            // Pass the pre-fetched data to the render function
+            const eventsView = renderEventsView(initialEventsData, user, userLookup);
+            contentEl.innerHTML = eventsView.html;
+            eventsView.afterRender();
+            break;
+          case "settings":
+            const settingsView = renderSettingsView(user, profile);
+            contentEl.innerHTML = settingsView.html;
+            settingsView.afterRender();
+            break;
+          default:
+            await renderFinanceView(userLookup, user);
+        }
+      } catch (error) {
+          console.error(`Error rendering ${viewName} view:`, error);
+          contentEl.innerHTML = `<div class="content-card"><h2>Error</h2><p>Could not load the ${viewName} page.</p></div>`;
       }
     };
 
