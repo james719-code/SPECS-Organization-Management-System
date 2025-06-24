@@ -190,7 +190,7 @@ function getLandingHTML() {
           <div class="hero-content">
             <h1>Society of Programmers and Enthusiasts in Computer Science</h1>
             <p class="subtitle">(SPECS)</p>
-            <p>A modern hub for student projects, events, and collaboration within the PSU-CCJE community.</p>
+            <p>A page for Computer Science students for updates on events within the SPECS Organization.</p>
             <button id="start-btn">View Upcoming Events</button>
           </div>
         </section>
