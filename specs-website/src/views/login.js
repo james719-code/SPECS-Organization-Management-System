@@ -1,4 +1,4 @@
-import { account, databases } from '../appwrite.js'; // Make sure this uses the Web SDK
+import { account, databases } from '../appwrite.js';
 
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -92,23 +92,22 @@ export default function renderLogin() {
         color: #ccc;
       }
 
-      /* --- UPDATED: Status message for loader and errors --- */
       #status-message {
-        color: #9CA3AF; /* Default color for loader text */
+        color: #9CA3AF; 
         text-align: center;
         margin-top: 1rem;
-        min-height: 5rem; /* Reserve space for the loader */
+        min-height: 5rem; 
         font-weight: bold;
-        font-family: monospace; /* Essential for ASCII art */
+        font-family: monospace; 
         font-size: 1rem;
-        line-height: 1.1; /* Make the bars look tighter */
-        white-space: pre; /* CRITICAL: Respects newlines and spaces */
+        line-height: 1.1; 
+        white-space: pre;
       }
 
       #status-message.error {
-        color: #ff4d4d; /* A brighter red for dark backgrounds */
-        min-height: 1.2rem; /* Revert height for simple error text */
-        white-space: normal; /* Allow error text to wrap */
+        color: #ff4d4d; 
+        min-height: 1.2rem; 
+        white-space: normal;
       }
 
       /* --- MEDIA QUERY FOR LARGER SCREENS --- */
@@ -156,21 +155,21 @@ export default function renderLogin() {
   // --- ASCII Music Graph Loader Function ---
   const startLoader = () => {
     // --- Configurable Parameters ---
-    const numBars = 20;    // How many bars in the visualizer
-    const maxHeight = 4;   // Max height of a bar in characters
-    const barChar = '█';   // The character used to draw the bar
-    const emptyChar = ' '; // The character for empty space above the bar
+    const numBars = 20;   
+    const maxHeight = 4;   
+    const barChar = '█';   
+    const emptyChar = ' '; 
 
     // --- Prepare the container ---
-    statusMessageDiv.classList.remove('error'); // Ensure it's not styled as an error
+    statusMessageDiv.classList.remove('error');
     
     loaderInterval = setInterval(() => {
-      // 1. Generate an array of random heights for the current animation frame
+      // Generate an array of random heights for the current animation frame
       const heights = Array.from({ length: numBars }, () => Math.floor(Math.random() * (maxHeight + 1)));
 
-      let output = "Authenticating...\n"; // The text to display above the visualizer
+      let output = "Authenticating...\n";
 
-      // 2. Build the visualizer string from the top row down
+      // Build the visualizer string from the top row down
       for (let y = maxHeight; y >= 1; y--) {
         let rowString = "";
         for (let x = 0; x < numBars; x++) {
@@ -180,7 +179,7 @@ export default function renderLogin() {
         output += rowString + '\n'; // Add the completed row and a newline
       }
 
-      // 3. Update the DOM with the new frame
+      // Update the DOM with the new frame
       statusMessageDiv.textContent = output;
       
     }, 100); // Animation speed (100ms = 10 frames per second)
@@ -204,22 +203,22 @@ export default function renderLogin() {
     startLoader(); // Start the ASCII animation
 
     try {
-      // 1. Login user
+      // Login user
       await account.createEmailPasswordSession(email, password);
       
-      // 2. Get user data
+      // Get user data
       const user = await account.get();
 
-      // 3. Check email verification
+      // Check email verification
       if (!user.emailVerification) {
         await account.deleteSession('current'); 
         throw new Error("Your email has not been verified. Please check your inbox.");
       }
 
-      // 4. Check admin verification status from profile
+      // Check admin verification status from profile
       const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
       
-      // 5. Redirect based on profile status
+      // Redirect based on profile status
       if (profile.type === 'admin') {
         window.location.hash = 'adminpage';
       } else if (profile.type === 'student' && profile.verified) {
@@ -237,8 +236,6 @@ export default function renderLogin() {
           try { await account.deleteSession('current'); } catch (_) {}
       }
     } finally {
-      // This will only fully run if an error occurs, otherwise the redirect happens first.
-      // But it's good practice to have it.
       stopLoader(); 
       submitButton.disabled = false;
       submitButton.textContent = 'Login';

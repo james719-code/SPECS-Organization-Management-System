@@ -15,9 +15,7 @@ function getCachedImageUrl(fileId) {
         if (cache[fileId]) {
             return cache[fileId];
         }
-        // --- MODIFIED: Use getFilePreview instead of getFileView ---
-        // This requests a smaller, optimized version of the image.
-        // Parameters: width, height, gravity, quality
+
         const newUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, 400, 0, 'center', 75);
         cache[fileId] = newUrl; // Store the URL string
         localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
@@ -29,7 +27,7 @@ function getCachedImageUrl(fileId) {
 }
 
 
-// --- HTML TEMPLATE FUNCTIONS (No changes here) ---
+// --- HTML TEMPLATE FUNCTIONS ---
 function createGuestEventCard(eventDoc) {
     const imageUrl = getCachedImageUrl(eventDoc.image_file);
     const eventDate = new Date(eventDoc.date_to_held);
@@ -65,11 +63,10 @@ function createGuestEventCard(eventDoc) {
     `;
 }
 
-// --- MODIFIED: Now renders an initial loading state ---
+// --- Renders an initial loading state ---
 function getLandingHTML() {
     return `
     <style>
-      /* --- [STYLES ARE UNCHANGED, OMITTED FOR BREVITY] --- */
       :root {
           --bg-dark: #111827;
           --surface-dark: #1F2937;
@@ -110,7 +107,7 @@ function getLandingHTML() {
       #start-btn { font-size: 1.1rem; font-weight: bold; padding: 0.8rem 2.5rem; border: 1px solid var(--accent-blue); border-radius: 50px; color: var(--text-primary); background-color: transparent; cursor: pointer; transition: all 0.3s ease; }
       #start-btn:hover { background-color: var(--accent-blue); }
 
-      /* --- Events Section (GRID LAYOUT) --- */
+      /* --- Events Section --- */
       .events-section { background-color: var(--surface-dark); padding: 5rem 2rem; }
       .events-section h2 { font-size: 2.5rem; font-weight: 700; margin-bottom: 3rem; }
       .events-grid {
@@ -214,7 +211,7 @@ function getLandingHTML() {
   `;
 }
 
-// --- [UNCHANGED] Handles loading images ---
+// --- Handles loading images ---
 function initializeImageLoader() {
     const placeholders = document.querySelectorAll('.image-placeholder');
     const fallbackIconSVG = `
@@ -241,7 +238,7 @@ function initializeImageLoader() {
     });
 }
 
-// --- NEW: Asynchronous function to fetch and render events ---
+// --- Asynchronous function to fetch and render events ---
 async function fetchAndRenderEvents() {
     const container = document.getElementById('events-grid-container');
     try {
@@ -258,7 +255,7 @@ async function fetchAndRenderEvents() {
             container.innerHTML = '<p class="no-events-message">No upcoming events scheduled at the moment. Please check back soon!</p>';
         }
 
-        // IMPORTANT: We must re-run the image loader for the newly added cards.
+        // We must re-run the image loader for the newly added cards.
         initializeImageLoader();
 
     } catch (error) {
@@ -267,17 +264,16 @@ async function fetchAndRenderEvents() {
     }
 }
 
-// --- MODIFIED: Main render function ---
+// --- Main render function ---
 export default function renderLanding() {
-  // 1. Render the static HTML shell of the page immediately.
+  // Render the static HTML shell of the page immediately.
   document.getElementById("app").innerHTML = getLandingHTML();
 
-  // 2. Attach event listeners for existing elements.
+  // Attach event listeners for existing elements.
   document.getElementById("start-btn").addEventListener("click", () => {
     document.getElementById("events").scrollIntoView({ behavior: "smooth" });
   });
 
-  // 3. Kick off the asynchronous fetch for the events.
-  // This will not block the rest of the page from being interactive.
+  // Kick off the asynchronous fetch for the events.
   fetchAndRenderEvents();
 }

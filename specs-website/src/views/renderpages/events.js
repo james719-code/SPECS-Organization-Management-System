@@ -52,7 +52,7 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
 function getEventsHTML(eventList, userLookup, currentUserId) {
     return `
     <style>
-        /* --- EVENT VIEW STYLES (MODIFIED FOR GRID LAYOUT) --- */
+        /* --- EVENT VIEW STYLES  --- */
         .events-view-container h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem; }
         
         #event-cards-container {

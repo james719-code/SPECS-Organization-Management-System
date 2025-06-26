@@ -1,4 +1,3 @@
-// This component doesn't need any Appwrite services, it's purely informational.
 
 export default function renderCheckEmailPage() {
   const app = document.getElementById('app');

@@ -1,7 +1,7 @@
 // views/adminpage.js
 import { account, databases } from '../appwrite.js';
 import renderSettingsView from './renderpages/settings.js';
-import renderAccountsView from './renderAdmin/accounts.js'; // <-- Import the new component
+import renderAccountsView from './renderAdmin/accounts.js';
 
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -124,7 +124,7 @@ export default async function renderAdminPage() {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 renderContent(e.currentTarget.dataset.view);
-                layoutEl.classList.remove('drawer-open'); // Close drawer on selection
+                layoutEl.classList.remove('drawer-open');
             });
         });
 
@@ -134,7 +134,7 @@ export default async function renderAdminPage() {
             window.location.hash = 'login';
         });
 
-        renderContent('accounts'); // Initial render
+        renderContent('accounts'); 
 
     } catch (err) {
         console.error("Failed to render admin page:", err);

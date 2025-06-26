@@ -293,7 +293,6 @@ function attachDetailViewListeners(currentUser, userLookup) {
                 const inputType = (field === 'price' || field === 'quantity') ? 'number' : (field === 'date' ? 'datetime-local' : 'text');
                 const value = field === 'date' ? new Date(originalValue).toISOString().slice(0, 16) : originalValue;
                 
-                // --- MODIFIED: Add min="1" attribute for price and quantity inputs ---
                 const minAttribute = (field === 'price' || field === 'quantity') ? 'min="1"' : '';
 
                 cell.innerHTML = `<input type="${inputType}" value="${value}" step="${field === 'price' ? '0.01' : '1'}" ${minAttribute} />`;
@@ -326,7 +325,7 @@ function attachDetailViewListeners(currentUser, userLookup) {
                 let value = input.value;
                 if (field === 'price' || field === 'quantity') {
                     value = (field === 'price') ? parseFloat(value) : parseInt(value);
-                    if (isNaN(value) || value < 1) hasError = true; // Check if less than 1
+                    if (isNaN(value) || value < 1) hasError = true;
                 }
                 const dateKey = collectionId === COLLECTION_ID_REVENUE ? 'date_earned' : 'date_buy';
                 dataToUpdate[field === 'date' ? dateKey : field] = value;
@@ -348,7 +347,7 @@ function attachDetailViewListeners(currentUser, userLookup) {
                     const key = field === 'date' ? dateKey : field;
                     cell.dataset.originalValue = dataToUpdate[key];
                 });
-                row.querySelector('.cancel-btn').click(); // Programmatically click cancel to revert UI
+                row.querySelector('.cancel-btn').click();
             } catch (error) {
                 console.error('Update failed:', error);
                 alert('Update failed.');
@@ -364,8 +363,7 @@ function attachOverviewListeners(currentUser, userLookup, initialData) {
     const mainContainer = document.getElementById('finance-view-container');
     const modalFabContainer = document.getElementById('finance-modal-fab-container');
     if (!mainContainer || !modalFabContainer) return;
-
-    // --- MODIFIED: Removed .form-row and added min="1" to inputs ---
+    
     modalFabContainer.innerHTML = `
         <button id="showAddTransactionModalBtn" class="fab" title="Add Transaction">+</button>
         <div id="addTransactionModal" class="modal-overlay">

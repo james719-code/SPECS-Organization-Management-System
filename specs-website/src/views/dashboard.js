@@ -18,7 +18,7 @@ export default async function renderDashboard() {
   const app = document.getElementById("app");
 
   try {
-    // --- Phase 1: Get Core User Data ---
+    // Get Core User Data ---
     const user = await account.get();
     const profile = await databases.getDocument(
       DATABASE_ID,
@@ -26,7 +26,7 @@ export default async function renderDashboard() {
       user.$id
     );
     
-    // --- Phase 2: Concurrently Fetch Initial Data for Views ---
+    // Concurrently Fetch Initial Data for Views ---
     const [filesResponse, eventsResponse, studentsResponse] = await Promise.all([
         databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
             Query.orderDesc('$createdAt'),

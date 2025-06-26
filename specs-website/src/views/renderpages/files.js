@@ -44,7 +44,7 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
     
     return `
     <style>
-        /* --- CORE & CARD STYLES (MOSTLY UNCHANGED) --- */
+        /* --- CORE & CARD STYLES --- */
         .files-view-container h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem; }
         .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
         .form-group label { color: var(--text-secondary); font-weight: 500; margin-bottom: 0.5rem; font-size: 0.9rem; }
@@ -69,7 +69,7 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
         .file-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
         .load-more-container { text-align: center; margin-top: 2rem; }
         
-        /* --- NEW: SEARCH BAR STYLES --- */
+        /* --- SEARCH BAR STYLES --- */
         .search-container {
             margin-bottom: 2rem;
         }
@@ -191,7 +191,6 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
             }
         } catch (error) {
             console.error('File search failed:', error);
-            // Provide a more helpful error message directly in the UI
             if (error.code === 400 && error.message.includes('index')) {
                 gridContainer.innerHTML = `<p style="color: var(--status-red);"><strong>Search Configuration Error:</strong><br>A full-text index is required on the 'fileName' and 'description' attributes in the Files collection. Please ask the administrator to add them in the Appwrite console.</p>`;
             } else {

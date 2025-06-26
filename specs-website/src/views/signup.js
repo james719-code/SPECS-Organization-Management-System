@@ -7,7 +7,6 @@ const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 export default function renderSignup() {
   const app = document.getElementById('app');
 
-  // The form's inner fields are now wrapped in a div for responsive grid layout
   app.innerHTML = `
     <style>
       /* --- Proper Mobile-First Responsive CSS --- */
@@ -200,12 +199,12 @@ export default function renderSignup() {
 
     if (password !== password2) {
       alert("Passwords do not match. Please try again.");
-      return; // Stop the function execution
+      return;
     }
 
     if (!email.endsWith('@parsu.edu.ph')) {
       alert("Invalid email. Please use your official @parsu.edu.ph email.");
-      return; // Stop the function execution
+      return;
     }
     // --- End Validation ---
 
@@ -214,30 +213,26 @@ export default function renderSignup() {
 
     //change this later to use the Database Service
     try {
-      // 1. Create the user account. We pass 'fullname' here for the account's root name.
+      // Create User Account
       const user = await account.create(ID.unique(), email, password, fullname);
 
-      // 2. Create a session to confirm the user is logged in
+      // Session CreationS
       await account.createEmailPasswordSession(email, password);
 
-      // 3. Create a profile document in the 'Student Profiles' collection.
-      // The Document ID will be the same as the User's Account ID for easy linking.
+      // Create a profile document in the 'Student Profiles' collection
       await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_STUDENTS,
-        user.$id, // Use the new user's ID as the document ID
+        user.$id,
         {
-          // The data payload must match your attributes
           username,
-          fullname, // Storing it here in the profile document as well
+          fullname, 
           yearLevel,
-          gender,   // This string value ('male'/'female') matches the Enum
-          // We don't need to send 'type' or 'verified' because the database
-          // will apply the default values ('student' and false) automatically.
+          gender,
         }
       );
 
-      // 4. Send verification email (this flow remains the same)
+      // Send verification email
       const verificationUrl = window.location.origin + '/#verify-email';
       await account.createVerification(verificationUrl);
       window.location.hash = 'check-email';

@@ -7,12 +7,6 @@ const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES;
 const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
 
-/**
- * Returns the HTML for the settings page, now with corrected conditional rendering.
- * @param {object} user - The Appwrite user object.
- * @param {object} profile - The user's profile document.
- * @returns {string} HTML string for the view.
- */
 function getSettingsHTML(user, profile) {
     const isStudent = profile.type === 'student';
 
@@ -53,7 +47,6 @@ function getSettingsHTML(user, profile) {
 
     return `
     <style>
-        /* --- [STYLES ARE UNCHANGED, OMITTED FOR BREVITY] --- */
         .settings-container h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-dark); }
         .settings-section { background-color: var(--surface-dark); border: 1px solid var(--border-dark); border-radius: 8px; padding: 2rem; margin-bottom: 2rem; }
         .settings-section h3 { font-size: 1.25rem; font-weight: 600; margin-top: 0; margin-bottom: 1.5rem; color: var(--text-primary); }
