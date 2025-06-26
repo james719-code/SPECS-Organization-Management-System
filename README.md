@@ -42,8 +42,8 @@ Follow these instructions to set up your own local development environment, incl
 #### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/your-organization/the-repo-name.git
-cd the-repo-name
+git clone https://github.com/james719-code/SPECS-Organization-Management-System.git
+cd SPECS-Organization-Management-System/specs-website
 ```
 
 #### Step 2: Install Frontend Dependencies
