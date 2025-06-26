@@ -1,10 +1,3 @@
-Of course. Here is a proper, production-quality `README.md` file.
-
-It is structured to be clear, professional, and easy for a new developer to follow. It includes a project overview, a detailed step-by-step guide for setting up a personal development environment (including the Appwrite backend), and a standard contribution workflow.
-
-You can create a new file named `README.md` in the root of your project and paste the following content into it.
-
----
 
 # SPECS Student & Admin Portal
 
