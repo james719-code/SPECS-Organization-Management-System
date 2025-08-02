@@ -1,8 +1,11 @@
 // main.js
-import './style.css';
+// Import our custom CSS
+import './main.scss'
+
+// Import all of Bootstrap’s JS
+import * as bootstrap from 'bootstrap'
 
 import { account, databases } from './appwrite.js';
-import { Query } from 'appwrite';
 import renderLanding from './views/landing.js';
 import renderLogin from './views/login.js';
 import renderSignup from './views/signup.js';
@@ -54,7 +57,7 @@ async function router() {
     return;
   }
 
-  let currentUser = null;
+  let currentUser;
   try {
     currentUser = await account.get();
   } catch (error) {

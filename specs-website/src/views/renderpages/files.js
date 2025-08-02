@@ -1,6 +1,7 @@
-// renderpages/files.js
+// --- IMPORTS ---
 import { databases, storage } from '../../appwrite.js';
 import { Query, ID } from 'appwrite';
+import { Modal } from 'bootstrap';
 
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -9,216 +10,254 @@ const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;
 const FILES_PAGE_LIMIT = 10;
 
 /**
- * Creates the HTML for a single file card.
+ * Creates the HTML for a single, redesigned file card.
+ * Features: Better layout, hover effects, and graceful text truncation.
  */
 function createFileCard(fileDoc, userLookup, currentUserId) {
     const downloadUrl = storage.getFileDownload(BUCKET_ID_UPLOADS, fileDoc.fileID);
     const uploaderName = userLookup[fileDoc.uploader] || 'Unknown User';
     const canDelete = fileDoc.uploader === currentUserId;
 
+    const shortDescription = fileDoc.description && fileDoc.description.length > 80
+        ? `${fileDoc.description.substring(0, 80)}...`
+        : fileDoc.description || 'No description provided.';
+
     return `
-        <div class="file-card">
-            <div class="file-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
-            </div>
-            <h4 class="file-name">${fileDoc.fileName}</h4>
-            <p class="file-description">${fileDoc.description || 'No description provided.'}</p>
-            <div class="file-meta">
-                <span>Uploaded by: <strong>${uploaderName}</strong></span>
-                <span>On: ${new Date(fileDoc.$createdAt).toLocaleDateString()}</span>
-            </div>
-            <div class="file-actions">
-                <a href="${downloadUrl}" class="btn download-btn" target="_blank">Download</a>
-                ${canDelete ? `<button class="btn danger-btn delete-file-btn" data-doc-id="${fileDoc.$id}" data-file-id="${fileDoc.fileID}">Delete</button>` : ''}
+        <div class="col">
+            <div class="card file-card h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="file-icon mb-3">
+                        <i class="bi-file-earmark-text"></i>
+                    </div>
+                    <h5 class="card-title" title="${fileDoc.fileName}">
+                        <span>${fileDoc.fileName}</span>
+                    </h5>
+                    <p class="card-text small text-body-secondary flex-grow-1">${shortDescription}</p>
+                    <div class="mt-auto pt-3">
+                        <a href="${downloadUrl}" class="btn btn-sm btn-primary w-100 mb-2" target="_blank">
+                            <i class="bi-download me-1"></i> Download
+                        </a>
+                        ${canDelete ? `
+                        <button class="btn btn-sm btn-outline-danger w-100 delete-file-btn" data-doc-id="${fileDoc.$id}" data-file-id="${fileDoc.fileID}">
+                            <i class="bi-trash me-1"></i> Delete
+                        </button>` : ''}
+                    </div>
+                </div>
+                <div class="card-footer small text-body-secondary">
+                    <div title="Uploaded by ${uploaderName}">
+                        <i class="bi-person me-2"></i> ${uploaderName}
+                    </div>
+                    <div title="Upload date: ${new Date(fileDoc.$createdAt).toLocaleString()}">
+                        <i class="bi-calendar3 me-2"></i> ${new Date(fileDoc.$createdAt).toLocaleDateString()}
+                    </div>
+                </div>
             </div>
         </div>
     `;
 }
 
+
 /**
- * Returns the main HTML structure for the Files view, now including a search bar.
+ * Returns the main HTML structure for the Files view, including CSS for the new card design.
  */
 function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
     const showLoadMore = fileList.length < totalFiles;
-    const loadMoreButton = showLoadMore ? `<div class="load-more-container"><button id="loadMoreFilesBtn" class="btn primary-btn">Load More</button></div>` : '';
-    
+    const loadMoreButton = showLoadMore ? `
+        <div class="text-center mt-4" id="loadMoreContainer">
+            <button id="loadMoreFilesBtn" class="btn btn-primary">Load More</button>
+        </div>` : '';
+
+    let filesGridContent;
+    let gridClasses = "row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xxl-5 g-4";
+
+    if (fileList.length > 0) {
+        filesGridContent = fileList.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
+    } else {
+        gridClasses += " flex-grow-1 align-items-center justify-content-center";
+        filesGridContent = `
+            <div class="col-12">
+                <div class="text-center text-muted py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-cloud-arrow-up" style="font-size: 6rem; color: var(--bs-gray-400);"></i>
+                    </div>
+                    <h2 class="fw-light">Your File Storage is Empty</h2>
+                    <p class="lead text-body-secondary">Ready to get started? Upload your first file.</p>
+                    <p>Click the <span class="btn btn-primary pe-none rounded-circle mx-1"><i class="bi-plus-lg"></i></span> button to share a document.</p>
+                </div>
+            </div>
+        `;
+    }
+
     return `
     <style>
-        /* --- CORE & CARD STYLES --- */
-        .files-view-container h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 1rem; }
-        .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
-        .form-group label { color: var(--text-secondary); font-weight: 500; margin-bottom: 0.5rem; font-size: 0.9rem; }
-        .form-group input, .form-group textarea { background-color: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-dark); padding: 0.75rem 1rem; border-radius: 6px; font-size: 1rem; }
-        .form-group textarea { resize: vertical; min-height: 80px; }
-        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-        .btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; padding: 0.75rem 1.5rem; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s; }
-        .primary-btn { background-color: var(--accent-blue); color: var(--text-primary); }
-        .primary-btn:hover { background-color: var(--accent-blue-hover); }
-        .primary-btn:disabled { background-color: var(--border-dark); cursor: not-allowed; }
-        .danger-btn { background-color: var(--status-red); color: white; }
-        .danger-btn:hover { background-color: #B91C1C; }
-        .download-btn { background-color: #4B5563; color: white; text-decoration: none; }
-        .download-btn:hover { background-color: #6B7280; }
-        .file-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
-        .file-card { background-color: var(--surface-dark); border: 1px solid var(--border-dark); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .file-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
-        .file-icon svg { width: 36px; height: 36px; color: var(--accent-blue); margin-bottom: 1rem; }
-        .file-name { margin: 0 0 0.5rem 0; font-size: 1.1rem; color: var(--text-primary); word-break: break-all; }
-        .file-description { font-size: 0.9rem; color: var(--text-secondary); flex-grow: 1; margin-bottom: 1rem; }
-        .file-meta { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
-        .file-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
-        .load-more-container { text-align: center; margin-top: 2rem; }
-        
-        /* --- SEARCH BAR STYLES --- */
-        .search-container {
-            margin-bottom: 2rem;
+        .file-card {
+            border: 1px solid var(--bs-border-color-translucent);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            border-radius: .75rem;
         }
-        #fileSearchInput {
-            width: 100%;
-            padding: 0.8rem 1.2rem;
-            font-size: 1rem;
-            background-color: var(--surface-dark);
-            border: 1px solid var(--border-dark);
-            color: var(--text-primary);
-            border-radius: 6px;
-            box-sizing: border-box;
+        .file-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
         }
-        #fileSearchInput:focus {
-             outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        .file-card .card-body {
+            text-align: center;
         }
-
-        /* --- STYLES FOR FAB & MODAL --- */
-        .fab { position: fixed; bottom: 2rem; right: 2rem; width: 56px; height: 56px; border-radius: 50%; background-color: var(--accent-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; transition: transform 0.2s ease, background-color 0.2s ease; z-index: 999; }
-        .fab:hover { background-color: var(--accent-blue-hover); transform: scale(1.05); }
-        .fab svg { width: 28px; height: 28px; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
-        .modal-overlay.open { opacity: 1; visibility: visible; }
-        .modal-content { background-color: var(--surface-dark); padding: 2.5rem 2rem 2rem 2rem; border-radius: 8px; max-width: 500px; width: 90%; position: relative; transform: scale(0.95); transition: transform 0.3s ease; }
-        .modal-overlay.open .modal-content { transform: scale(1); }
-        .modal-content h3 { margin-top: 0; font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; }
-        .modal-close-btn { position: absolute; top: 0.75rem; right: 0.75rem; background: transparent; border: none; color: var(--text-secondary); font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0.25rem; }
-        .modal-close-btn:hover { color: var(--text-primary); }
+        .file-card .file-icon {
+            font-size: 3rem;
+            color: var(--bs-primary);
+        }
+        .file-card .card-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            height: 48px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .file-card .card-title span {
+             white-space: normal;
+        }
+        .file-card .card-footer {
+            background-color: var(--bs-tertiary-bg);
+            border-top: 1px solid var(--bs-border-color-translucent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+        }
     </style>
-    <div class="files-view-container">
-        <h1>Files</h1>
-        
-        <div class="search-container">
-            <input type="search" id="fileSearchInput" placeholder="Search by file name or description...">
+    <div class="files-view-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
+        <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4">
+            <h1 class="mb-3 mb-md-0">Files</h1>
+            <form id="fileSearchForm">
+                <input type="search" id="fileSearchInput" class="form-control" style="max-width: 400px;" placeholder="Search files and press Enter...">
+            </form>
         </div>
-
-        <div class="file-cards-grid" id="file-cards-container">
-            ${fileList.length > 0 ? fileList.map(doc => createFileCard(doc, userLookup, currentUserId)).join('') : '<p>No uploaded files yet. Press the (+) button to get started!</p>'}
+        <div class="${gridClasses}" id="file-cards-container">
+            ${filesGridContent}
         </div>
         ${loadMoreButton}
         
-        <button id="showUploadModalBtn" class="fab" title="Upload New File">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#uploadFileModal" title="Upload New File">
+            <i class="bi bi-plus-lg fs-4"></i>
         </button>
 
-        <div id="uploadFileModal" class="modal-overlay">
-            <div class="modal-content">
-                <button id="closeUploadModalBtn" class="modal-close-btn">×</button>
-                <h3>Upload a New File</h3>
+        <div class="modal fade" id="uploadFileModal" tabindex="-1" aria-labelledby="uploadFileModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
                 <form id="uploadFileForm">
-                    <div class="form-group"><label for="newFileName">File Name</label><input type="text" id="newFileName" name="fileName" placeholder="e.g., Minutes Format" required></div>
-                    <div class="form-group"><label for="newFileDescription">Description (Optional)</label><textarea id="newFileDescription" name="description" placeholder="A short description of the file."></textarea></div>
-                    <div class="form-group"><label for="fileUpload">File</label><input type="file" id="fileUpload" name="file" required></div>
-                    <button type="submit" class="btn primary-btn">Upload File</button>
+                    <div class="modal-header"><h5 class="modal-title" id="uploadFileModalLabel">Upload a New File</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label for="newFileName" class="form-label">File Name</label><input type="text" id="newFileName" class="form-control" placeholder="e.g., Q1 Meeting Minutes" required></div>
+                        <div class="mb-3"><label for="newFileDescription" class="form-label">Description (Optional)</label><textarea id="newFileDescription" class="form-control" rows="3" placeholder="A short description of the file's content."></textarea></div>
+                        <div class="mb-3"><label for="fileUpload" class="form-label">File</label><input type="file" id="fileUpload" class="form-control" required></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Upload File</button></div>
                 </form>
-            </div>
+            </div></div>
         </div>
     </div>
     `;
 }
 
+
 /**
- * Attaches all event listeners for the files view, now including search.
+ * Fetches the first page of files and re-renders the grid or empty state.
+ */
+async function refreshFileList(gridContainer, userLookup, currentUserId, renderEmptyState) {
+    const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
+        Query.orderDesc('$createdAt'),
+        Query.limit(FILES_PAGE_LIMIT)
+    ]);
+
+    if (response.documents.length > 0) {
+        gridContainer.className = 'row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xxl-5 g-4';
+        gridContainer.innerHTML = response.documents.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
+    } else {
+        renderEmptyState('initial');
+    }
+}
+
+
+/**
+ * Attaches all event listeners for the files view.
  */
 function attachEventListeners(currentUser, userLookup, totalFiles) {
-    let loadedFilesCount = document.querySelectorAll('.file-card').length;
+    let loadedFilesCount = document.querySelectorAll('#file-cards-container .col').length;
     const currentUserId = currentUser.$id;
+    const uploadModal = new Modal(document.getElementById('uploadFileModal'));
+
+    const viewContainer = document.querySelector('.files-view-container');
+    if (!viewContainer) {
+        console.error("Files view container not found.");
+        return;
+    }
     const gridContainer = document.getElementById('file-cards-container');
-    const loadMoreContainer = document.querySelector('.load-more-container');
-    
-    const renderFileList = (files) => {
-        if (files.length > 0) {
-            gridContainer.innerHTML = files.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
-        } else {
-            gridContainer.innerHTML = '<p>No files found matching your search.</p>';
+
+    const renderEmptyState = (type, searchTerm = '') => {
+        let icon, title, text;
+        if (type === 'initial') {
+            icon = 'bi-cloud-arrow-up';
+            title = 'Your File Storage is Empty';
+            text = `Click the <span class="btn btn-primary pe-none rounded-circle mx-1"><i class="bi-plus-lg"></i></span> button to upload your first file.`;
+        } else { // 'search'
+            icon = 'bi-search';
+            title = 'No Files Found';
+            text = `Your search for "<strong>${searchTerm}</strong>" didn't match any files. Try different keywords.`;
         }
-    };
-    
-    const debounce = (func, delay) => {
-        let timeoutId;
-        return (...args) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                func.apply(this, args);
-            }, delay);
-        };
+        gridContainer.className = 'row flex-grow-1 align-items-center justify-content-center';
+        gridContainer.innerHTML = `
+            <div class="col-12">
+                <div class="text-center text-muted py-5">
+                    <div class="mb-4"><i class="bi ${icon}" style="font-size: 6rem; color: var(--bs-gray-400);"></i></div>
+                    <h2 class="fw-light">${title}</h2>
+                    <p class="lead text-body-secondary">${text}</p>
+                </div>
+            </div>`;
     };
 
+    const searchForm = document.getElementById('fileSearchForm');
     const searchInput = document.getElementById('fileSearchInput');
     const performSearch = async (searchTerm) => {
-        gridContainer.innerHTML = '<p>Searching...</p>';
-        if (loadMoreContainer) loadMoreContainer.style.display = 'none';
+        const loadMoreContainer = document.getElementById('loadMoreContainer');
+        if (loadMoreContainer) {
+            loadMoreContainer.style.display = searchTerm ? 'none' : 'block';
+        }
+
+        gridContainer.className = 'row flex-grow-1 align-items-center justify-content-center';
+        gridContainer.innerHTML = `<div class="col-auto"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"><span class="visually-hidden">Searching...</span></div></div>`;
 
         try {
-            if (searchTerm) {
-                // To search both name and description, we run two queries concurrently
-                const [nameMatches, descMatches] = await Promise.all([
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.search('fileName', searchTerm)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.search('description', searchTerm)])
-                ]);
+            if (!searchTerm) {
+                await refreshFileList(gridContainer, userLookup, currentUserId, renderEmptyState);
+                const refreshedCount = gridContainer.querySelectorAll('.col').length;
+                if (loadMoreContainer) {
+                    loadMoreContainer.style.display = refreshedCount < totalFiles && refreshedCount > 0 ? 'block' : 'none';
+                }
+                return;
+            }
+            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.search('fileName', searchTerm)]);
 
-                // Merge and de-duplicate the results using a Map
-                const allMatches = new Map();
-                nameMatches.documents.forEach(doc => allMatches.set(doc.$id, doc));
-                descMatches.documents.forEach(doc => allMatches.set(doc.$id, doc));
-                
-                const uniqueResults = Array.from(allMatches.values());
-                uniqueResults.sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
-
-                renderFileList(uniqueResults);
+            if (response.documents.length > 0) {
+                gridContainer.className = 'row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xxl-5 g-4';
+                gridContainer.innerHTML = response.documents.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
             } else {
-                // If search is cleared, reset to the initial paginated view
-                const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
-                    Query.orderDesc('$createdAt'),
-                    Query.limit(FILES_PAGE_LIMIT)
-                ]);
-                renderFileList(response.documents);
-                if (loadMoreContainer) loadMoreContainer.style.display = 'block';
+                renderEmptyState('search', searchTerm);
             }
         } catch (error) {
             console.error('File search failed:', error);
-            if (error.code === 400 && error.message.includes('index')) {
-                gridContainer.innerHTML = `<p style="color: var(--status-red);"><strong>Search Configuration Error:</strong><br>A full-text index is required on the 'fileName' and 'description' attributes in the Files collection. Please ask the administrator to add them in the Appwrite console.</p>`;
-            } else {
-                gridContainer.innerHTML = '<p>An error occurred during search. Please try again.</p>';
-            }
+            gridContainer.className = 'row';
+            gridContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Search failed. Please ensure a search index is configured.</div></div>`;
         }
     };
 
-    if (searchInput) {
-        const debouncedSearch = debounce(performSearch, 400);
-        searchInput.addEventListener('input', (e) => {
-            debouncedSearch(e.target.value.trim());
+    if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            performSearch(searchInput.value.trim());
         });
     }
 
-    // --- MODAL HANDLING LOGIC ---
-    const modal = document.getElementById('uploadFileModal');
-    const fab = document.getElementById('showUploadModalBtn');
-    const closeModalBtn = document.getElementById('closeUploadModalBtn');
-    if (modal && fab && closeModalBtn) {
-        fab.addEventListener('click', () => modal.classList.add('open'));
-        closeModalBtn.addEventListener('click', () => modal.classList.remove('open'));
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.classList.remove('open');
-        });
-    }
-
-    // --- FILE UPLOAD LOGIC ---
     const uploadForm = document.getElementById('uploadFileForm');
     if (uploadForm) {
         uploadForm.addEventListener('submit', async (e) => {
@@ -226,77 +265,99 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
             const submitBtn = uploadForm.querySelector('button[type="submit"]');
             const fileInput = document.getElementById('fileUpload');
             if (!fileInput.files[0]) { alert('Please select a file.'); return; }
+
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Uploading...';
+            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Uploading...`;
+
             try {
+                if (gridContainer.classList.contains('justify-content-center')) {
+                    gridContainer.className = 'row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xxl-5 g-4';
+                    gridContainer.innerHTML = '';
+                }
+
                 const file = fileInput.files[0];
                 const uploadedFile = await storage.createFile(BUCKET_ID_UPLOADS, ID.unique(), file);
-                await databases.createDocument(DATABASE_ID, COLLECTION_ID_FILES, ID.unique(), {
-                    fileName: document.getElementById('newFileName').value,
-                    description: document.getElementById('newFileDescription').value,
+                const newFileDoc = await databases.createDocument(DATABASE_ID, COLLECTION_ID_FILES, ID.unique(), {
+                    fileName: document.getElementById('newFileName').value.trim(),
+                    description: document.getElementById('newFileDescription').value.trim(),
                     uploader: currentUserId,
                     fileID: uploadedFile.$id,
                 });
-                alert('File uploaded successfully!');
-                window.location.reload();
+
+                gridContainer.insertAdjacentHTML('afterbegin', createFileCard(newFileDoc, userLookup, currentUserId));
+                totalFiles++;
+                loadedFilesCount++;
+                uploadModal.hide();
+                uploadForm.reset();
+
             } catch (error) {
                 console.error('File upload failed:', error);
                 alert('Upload failed. Please try again.');
+            } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Upload File';
             }
         });
     }
 
-    // --- FILE DELETION LOGIC ---
-    if (gridContainer) {
-        gridContainer.addEventListener('click', async (e) => {
-            const deleteBtn = e.target.closest('.delete-file-btn');
-            if (!deleteBtn) return;
-            if (!confirm('Are you sure you want to delete this file?')) return;
-            const docId = deleteBtn.dataset.docId;
-            const fileId = deleteBtn.dataset.fileId;
+    viewContainer.addEventListener('click', async (e) => {
+        const deleteBtn = e.target.closest('.delete-file-btn');
+        if (deleteBtn) {
+            if (!confirm('Are you sure you want to permanently delete this file?')) return;
+
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
             try {
-                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, docId);
-                await storage.deleteFile(BUCKET_ID_UPLOADS, fileId);
-                deleteBtn.closest('.file-card').remove();
+                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, deleteBtn.dataset.docId);
+                await storage.deleteFile(BUCKET_ID_UPLOADS, deleteBtn.dataset.fileId);
+                deleteBtn.closest('.col').remove();
+                totalFiles--;
+                loadedFilesCount--;
+
+                if (gridContainer.children.length === 0) {
+                    renderEmptyState('initial');
+                    document.getElementById('loadMoreContainer')?.remove();
+                }
             } catch (error) {
                 console.error('Failed to delete file:', error);
                 alert('Could not delete the file.');
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = `<i class="bi-trash me-1"></i> Delete`;
             }
-        });
-    }
+            return;
+        }
 
-    // --- PAGINATION LOGIC ---
-    const loadMoreBtn = document.getElementById('loadMoreFilesBtn');
-    if (loadMoreBtn) {
-        loadMoreBtn.addEventListener('click', async () => {
+        const loadMoreBtn = e.target.closest('#loadMoreFilesBtn');
+        if (loadMoreBtn) {
+            const originalText = loadMoreBtn.textContent;
             loadMoreBtn.disabled = true;
-            loadMoreBtn.textContent = 'Loading...';
+            loadMoreBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Loading...`;
             try {
                 const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
                     Query.orderDesc('$createdAt'),
                     Query.limit(FILES_PAGE_LIMIT),
                     Query.offset(loadedFilesCount)
                 ]);
-                const newFiles = response.documents;
-                const newCardsHTML = newFiles.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
+                const newCardsHTML = response.documents.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
                 gridContainer.insertAdjacentHTML('beforeend', newCardsHTML);
-                loadedFilesCount += newFiles.length;
+                loadedFilesCount += response.documents.length;
+
                 if (loadedFilesCount >= totalFiles) {
                     loadMoreBtn.parentElement.remove();
-                } else {
-                    loadMoreBtn.disabled = false;
-                    loadMoreBtn.textContent = 'Load More';
                 }
             } catch (error) {
                 console.error("Failed to load more files:", error);
                 loadMoreBtn.textContent = 'Error. Try Again?';
-                loadMoreBtn.disabled = false;
+            } finally {
+                if (loadMoreBtn && loadMoreBtn.parentElement) {
+                    loadMoreBtn.disabled = false;
+                    loadMoreBtn.textContent = originalText;
+                }
             }
-        });
-    }
+        }
+    });
 }
+
 
 /**
  * Main render function for the Files view.

@@ -1,58 +1,37 @@
+// views/check-email.js
 
 export default function renderCheckEmailPage() {
   const app = document.getElementById('app');
+
   app.innerHTML = `
-    <style>
-      .status-container {
-        text-align: center;
-        padding: 4rem 1rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 80vh;
-        color: white;
-      }
-      .status-container h2 {
-        font-size: 2.2rem;
-        margin-bottom: 1.5rem;
-      }
-      .status-container .icon {
-          font-size: 4rem;
-          margin-bottom: 2rem;
-          color: #007bff;
-      }
-      .status-container p {
-        font-size: 1.2rem;
-        max-width: 600px;
-        line-height: 1.6;
-        color: #ccc;
-      }
-      .status-container a {
-        margin-top: 2rem;
-        display: inline-block;
-        padding: 0.8rem 1.5rem;
-        background-color: #007bff;
-        color: white;
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: bold;
-        transition: background-color 0.2s;
-      }
-      .status-container a:hover {
-          background-color: #0056b3;
-      }
-    </style>
-    <div class="status-container">
-        <div class="icon">📧</div>
-        <h2>Check Your Inbox!</h2>
-        <p>
-            We've sent a verification link to your email address.
-        </p>
-        <p>
-            Please click the link in that email to activate your account. If you don't see it, be sure to check your spam or junk folder.
-        </p>
-        <a href="#login">Return to Login</a>
+    <div class="container d-flex flex-column justify-content-center" style="min-height: 100vh;">
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6 col-xl-5">
+
+          <div class="card shadow-lg text-center">
+            <div class="card-body p-4 p-md-5">
+              
+              <div class="mb-4">
+                <i class="bi-envelope-check-fill text-primary" style="font-size: 4rem;"></i>
+              </div>
+
+              <h2 class="card-title h3 fw-bold">Check Your Inbox!</h2>
+              <p class="card-text text-body-secondary">
+                We've sent a verification link to your email address. Please click the link in that email to activate your account.
+              </p>
+              <p class="small text-muted mt-3">
+                If you don't see the email, be sure to check your spam or junk folder.
+              </p>
+
+              <div class="d-grid mt-4">
+                <a href="#login" class="btn btn-primary">Return to Login</a>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   `;
 }

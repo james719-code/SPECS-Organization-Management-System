@@ -1,234 +1,219 @@
-
 # SPECS Student & Admin Portal
 
 A modern web application built with Vanilla JavaScript and Appwrite to serve as a central hub for the Society of Programmers and Enthusiasts in Computer Science (SPECS). It provides features for event management, file sharing, financial tracking, and user administration.
 
+---
+
 ## ✨ Features
 
--   **User Authentication:** Secure login, signup, and email verification flow.
--   **Role-Based Access:** Distinct dashboard views and permissions for `students` and `admins`.
--   **Student Dashboard:**
-    -   **File Sharing:** Upload, download, and search for shared documents.
-    -   **Event Calendar:** View and search for upcoming organization events.
-    -   **Finance Overview:** A dashboard to track revenues and expenses for various activities (with role-based access).
-    -   **Profile Settings:** Update personal information and upload documents like resumes and class schedules.
--   **Admin Panel:**
-    -   **User Management:** A dedicated interface to view, search, accept (verify), and delete student accounts.
-    -   **Admin Settings:** A simplified settings page for admin profile management.
--   **Public Landing Page:** A welcoming page that showcases upcoming events to visitors.
--   **Responsive Design:** A modern, mobile-friendly layout for both the public site and the internal dashboards.
+### ✅ General
+- **User Authentication:** Secure login/signup with university email validation and email verification.
+- **Role-Based Access:** Separated dashboards and permissions for `students` and `admins`.
+- **Public Landing Page:** Displays upcoming events, past events, FAQ, and contact info.
+
+### 🎓 Student Dashboard
+- **Finance Overview:** Track revenue and expenses.
+- **File Sharing:** Browse and download shared documents.
+- **Event Calendar:** View upcoming events.
+- **Student Directory:** Filterable list of non-officer students.
+- **Payment Tracking:** See pending and past payments.
+- **Profile Settings:** Update personal info and upload documents (e.g. resume, schedule).
+
+### 🛠️ Admin Panel
+- **Dashboard Stats:** Overview of accounts, events, files, and visual stats.
+- **Account Management:** Approve/verify/delete student accounts.
+- **Event Management:** Add/edit/delete events, mark them as ended, add collaborators.
+- **Payment Management:** Assign and manage payments (individually or bulk).
+- **Admin Settings:** Update profile and credentials.
+
+---
 
 ## 🛠️ Tech Stack
 
--   **Frontend:** Vanilla JavaScript (ES6+), HTML5, CSS3
--   **Backend:** [Appwrite Cloud](https://appwrite.io/) (Backend as a Service)
--   **Build Tool:** [Vite](https://vitejs.dev/)
+- **Frontend:** Vanilla JavaScript (ES6+), HTML5, SASS/SCSS
+- **UI:** Bootstrap 5, Bootstrap Icons
+- **Backend:** Appwrite Cloud (BaaS)
+- **Build Tool:** Vite
 
 ---
 
 ## 🚀 Getting Started for Developers
 
-Follow these instructions to set up your own local development environment, including a fresh Appwrite Cloud backend. This allows you to develop and test features in isolation without affecting a production database.
-
 ### Prerequisites
 
--   [Node.js](httpss://nodejs.org/) (v18.x or later recommended)
--   [npm](https://www.npmjs.com/) (usually comes with Node.js)
--   [Git](https://git-scm.com/) for version control
--   An [Appwrite Cloud](https://cloud.appwrite.io/) account (the free tier is more than sufficient).
+- [Node.js](https://nodejs.org/) (v18+)
+- [npm](https://www.npmjs.com/)
+- [Git](https://git-scm.com/)
+- [Appwrite Cloud](https://cloud.appwrite.io/) account
 
-### Development Setup: Step-by-Step
+### Step-by-Step Setup
 
-#### Step 1: Clone the Repository
+#### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/james719-code/SPECS-Organization-Management-System.git
 cd SPECS-Organization-Management-System/specs-website
-```
+````
 
-#### Step 2: Install Frontend Dependencies
+#### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-#### Step 3: Set Up Your Appwrite Cloud Project
+#### 3. Set Up Appwrite Backend
 
-This is the most critical step. You will create your own backend on Appwrite that mirrors the required structure of the application.
+1. **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/)
+2. **Add Web Platform:** Name it, set hostname as `localhost`.
+3. **Create Database & Collections:**
 
-1.  **Create a New Project**
-    -   Log in to your [Appwrite Cloud account](https://cloud.appwrite.io).
-    -   Click **Create Project** and give it a name (e.g., `specs-dev-yourname`).
+    * Create a database (e.g. `Main Database`)
+    * Create collections: `accounts`, `non_officer_students`, `events`, `files`, `payments`, `revenue`, `expenses`
+    * Set proper permissions and attributes as [outlined here](#collection-schemas)
+4. **Create Storage Buckets:**
 
-2.  **Add a Web Platform**
-    -   Inside your new project, navigate to the **Platforms** section from the left menu.
-    -   Click **Add Platform** and choose **New Web App**.
-    -   Give it a name (e.g., "Local Dev").
-    -   For the **Hostname**, enter `localhost`. This is crucial for local development.
+    * `Event Images`
+    * `User Uploads`
+    * `Resumes`
+    * `Schedules`
 
-3.  **Create the Database and Collections**
-    -   Navigate to the **Databases** section.
-    -   Click **Create Database** and name it `Main Database`.
-    -   **Inside this database, create the following collections one by one.** You must use the exact **Attribute Keys** and **Types** for the code to work correctly.
+#### 4. Environment Setup
 
-    <details>
-    <summary><strong>📋 Click to view required Collection schemas</strong></summary>
+Create `.env.local` in the root and copy this template:
 
-    ---
-    **1. Collection: `students`**
-    - **Purpose:** Stores user profile data.
-    - **Permissions:** For `Create`, `Read`, `Update`, `Delete`, grant the `users` role.
-    - **Attributes:**
-      | Key | Type | Required | Default |
-      | :-- | :--- | :---: | :---: |
-      | `username` | String | ✅ | |
-      | `fullname` | String | ✅ | |
-      | `yearLevel`| String | | |
-      | `gender` | String | ✅ | |
-      | `type` | String | ✅ | `student` |
-      | `verified` | Boolean | ✅ | `false` |
-      | `haveResume`| Boolean| ✅ | `false` |
-      | `resumeId` | String | | |
-      | `haveSchedule`|Boolean| ✅ | `false` |
-      | `scheduleId`| String | | |
-      | `email` | String | ✅ | |
+```ini
+# .env.local
+VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
+VITE_APPWRITE_PROJECT_ID="<YOUR_NEW_PROJECT_ID>"
 
-    ---
-    **2. Collection: `events`**
-    - **Purpose:** Stores event information.
-    - **Permissions:** Grant `users` the `Create` role. For `Read`, grant `any`.
-    - **Attributes:**
-      | Key | Type | Required |
-      | :-- | :--- | :---: |
-      | `event_name` | String | ✅ |
-      | `date_to_held`| Datetime | ✅ |
-      | `image_file` | String | ✅ |
-      | `description`| String | |
-      | `added_by` | String | ✅ |
-    - **Indexes:** Create a **full-text** index on the `event_name` and `description` attributes.
+VITE_DATABASE_ID="<YOUR_NEW_DATABASE_ID>"
+VITE_COLLECTION_ID_STUDENTS="<YOUR_STUDENTS_COLLECTION_ID>"
+VITE_COLLECTION_NON_OFFICER_STUDENT="<YOUR_NON_OFFICER_STUDENTS_COLLECTION_ID>"
+VITE_COLLECTION_ID_EVENTS="<YOUR_EVENTS_COLLECTION_ID>"
+VITE_COLLECTION_ID_FILES="<YOUR_FILES_COLLECTION_ID>"
+VITE_COLLECTION_ID_PAYMENTS="<YOUR_PAYMENTS_COLLECTION_ID>"
+VITE_COLLECTION_ID_REVENUE="<YOUR_REVENUE_COLLECTION_ID>"
+VITE_COLLECTION_ID_EXPENSES="<YOUR_EXPENSES_COLLECTION_ID>"
 
-    ---
-    **3. Collection: `files`**
-    - **Purpose:** Stores metadata for shared files.
-    - **Permissions:** Grant `users` the `Create` and `Read` roles.
-    - **Attributes:**
-      | Key | Type | Required |
-      | :-- | :--- | :---: |
-      | `fileName` | String | ✅ |
-      | `description`| String | |
-      | `uploader` | String | ✅ |
-      | `fileID` | String | ✅ |
-    - **Indexes:** Create a **full-text** index on the `fileName` and `description` attributes.
+VITE_BUCKET_ID_EVENT_IMAGES="<YOUR_EVENT_IMAGES_BUCKET_ID>"
+VITE_BUCKET_ID_UPLOADS="<YOUR_UPLOADS_BUCKET_ID>"
+VITE_BUCKET_ID_RESUMES="<YOUR_RESUMES_BUCKET_ID>"
+VITE_BUCKET_ID_SCHEDULES="<YOUR_SCHEDULES_BUCKET_ID>"
+```
 
-    ---
-    **4. Collection: `revenue` & `expenses`**
-    - **Purpose:** Financial tracking. For a secure setup, use role-based permissions (see note below).
-    - **Attributes for `revenue`:**
-      | Key | Type | Required | Default |
-      | :-- | :--- | :---: | :---: |
-      | `name` | String | ✅ | |
-      | `price` | Double | ✅ | |
-      | `quantity` | Integer | ✅ | |
-      | `date_earned`| Datetime | ✅ | |
-      | `recorder` | String | ✅ | |
-      | `isEvent` | Boolean | ✅ | `false` |
-      | `event` | String | | |
-      | `activity` | String | | |
-    - **Attributes for `expenses`:**
-      | Key | Type | Required | Default |
-      | :-- | :--- | :---: | :---: |
-      | `name` | String | ✅ | |
-      | `price` | Double | ✅ | |
-      | `quantity` | Integer | ✅ | |
-      | `date_buy` | Datetime | ✅ | |
-      | `recorder` | String | ✅ | |
-      | `isEvent` | Boolean | ✅ | `false` |
-      | `event` | String | | |
-      | `activity_name` | String | | |
-      
-    > **Note on Finance Permissions:** For production, it is highly recommended to use **Team-based permissions** for the `revenue` and `expenses` collections. Create a team (e.g., `finance-officers`), add authorized users, and grant `Read/Write` permissions to that team ID instead of a general role.
-
-    </details>
-
-4.  **Create Storage Buckets**
-    -   Navigate to the **Storage** section.
-    -   Click **Create Bucket** for each of the following, enabling **File-Level Permissions** for all of them.
-        -   `Event Images`
-        -   `User Uploads`
-        -   `Resumes`
-        -   `Schedules`
-
-#### Step 4: Configure Your Local Environment
-
-Connect your local frontend to the Appwrite backend you just created.
-
-1.  Create a file named `.env.local` in the root of the project.
-2.  Copy and paste the template below into this new file.
-3.  **Fill in every `<...>` placeholder with the actual IDs from your Appwrite project.** You can find these in your Appwrite project's Settings, Database, and Storage pages.
-
-    ```ini
-    # .env.local - Fill this with your own project IDs
-
-    # Get from your Appwrite Project Settings
-    VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
-    VITE_APPWRITE_PROJECT_ID="<YOUR_NEW_PROJECT_ID>"
-
-    # Get from your "Main Database" settings page
-    VITE_DATABASE_ID="<YOUR_NEW_DATABASE_ID>"
-
-    # Get from the settings page of each collection you created
-    VITE_COLLECTION_ID_STUDENTS="<YOUR_STUDENTS_COLLECTION_ID>"
-    VITE_COLLECTION_ID_EVENTS="<YOUR_EVENTS_COLLECTION_ID>"
-    VITE_COLLECTION_ID_FILES="<YOUR_FILES_COLLECTION_ID>"
-    VITE_COLLECTION_ID_REVENUE="<YOUR_REVENUE_COLLECTION_ID>"
-    VITE_COLLECTION_ID_EXPENSES="<YOUR_EXPENSES_COLLECTION_ID>"
-
-    # Get from the settings page of each bucket you created
-    VITE_BUCKET_ID_EVENT_IMAGES="<YOUR_EVENT_IMAGES_BUCKET_ID>"
-    VITE_BUCKET_ID_UPLOADS="<YOUR_UPLOADS_BUCKET_ID>"
-    VITE_BUCKET_ID_RESUMES="<YOUR_RESUMES_BUCKET_ID>"
-    VITE_BUCKET_ID_SCHEDULES="<YOUR_SCHEDULES_BUCKET_ID>"
-    ```
-
-    > **⚠️ Important:** The `.env.local` file is ignored by Git, so your secret keys will not be committed.
-
-#### Step 5: Run the Development Server
+#### 5. Run the Development Server
 
 ```bash
 npm run dev
 ```
 
-Your application will now be running on `http://localhost:5173` (or similar), fully connected to your personal Appwrite Cloud backend. You can now create your own `student` and `admin` accounts to test all features.
+Open your browser to [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🤝 Contribution Workflow
+## 📚 Collection Schemas
 
-We welcome contributions! Please follow this workflow to submit your changes.
+<details>
+<summary><strong>📋 Click to expand</strong></summary>
 
-1.  **Create a New Branch**
-    Create a feature branch from the `main` branch.
-    ```bash
-    # Example: git checkout -b feature/add-user-profile-picture
-    git checkout -b <type>/<short-description>
-    ```
+### 🧑‍🎓 `accounts`
 
-2.  **Make Your Changes**
-    Implement your new feature or bug fix. Write clean, readable code and test it against your local Appwrite instance.
+| Key          | Type    | Required | Default   |
+| ------------ | ------- | -------- | --------- |
+| username     | String  | ✅        |           |
+| fullname     | String  | ✅        |           |
+| yearLevel    | String  | ✅        |           |
+| gender       | String  | ✅        |           |
+| type         | String  | ✅        | `student` |
+| verified     | Boolean | ✅        | `false`   |
+| haveResume   | Boolean | ✅        | `false`   |
+| resumeId     | String  |          |           |
+| haveSchedule | Boolean | ✅        | `false`   |
+| scheduleId   | String  |          |           |
+| email        | String  | ✅        |           |
 
-3.  **Commit Your Changes**
-    Commit your work with a clear and descriptive commit message.
-    ```bash
-    git commit -m "feat: Implement user profile picture uploads"
-    ```
+---
 
-4.  **Push to Your Fork**
-    If you are working on a fork, push your feature branch to your forked repository on GitHub.
-    ```bash
-    git push origin feature/add-user-profile-picture
-    ```
+### 👥 `non_officer_students`
 
-5.  **Open a Pull Request**
-    Go to the main project repository on GitHub and open a new Pull Request from your feature branch to the main repository's `main` branch. Provide a clear description of your changes. The project administrator will then review your code.
+| Key     | Type   | Required |
+| ------- | ------ | -------- |
+| name    | String | ✅        |
+| email   | String | ✅        |
+| section | String | ✅        |
+
+---
+
+### 📅 `events`
+
+| Key            | Type           | Required | Default |
+| -------------- | -------------- | -------- | ------- |
+| event\_name    | String         | ✅        |         |
+| date\_to\_held | Datetime       | ✅        |         |
+| image\_file    | String         | ✅        |         |
+| description    | String         |          |         |
+| added\_by      | String         | ✅        |         |
+| event\_ended   | Boolean        | ✅        | `false` |
+| collab         | String (Array) |          |         |
+
+* **Index:** Full-text on `event_name`
+
+---
+
+### 📂 `files`
+
+| Key         | Type   | Required |
+| ----------- | ------ | -------- |
+| fileName    | String | ✅        |
+| description | String |          |
+| uploader    | String | ✅        |
+| fileID      | String | ✅        |
+
+* **Index:** Full-text on `fileName`
+
+---
+
+### 💰 `payments`
+
+| Key         | Type    | Required | Default |
+| ----------- | ------- | -------- | ------- |
+| student\_id | String  | ✅        |         |
+| is\_event   | Boolean | ✅        | `false` |
+| event       | String  |          |         |
+| activity    | String  |          |         |
+| price       | Double  | ✅        |         |
+| item\_name  | String  | ✅        |         |
+| quantity    | Integer | ✅        | `1`     |
+| isPaid      | Boolean | ✅        | `false` |
+
+---
+
+### 📈 `revenue` & `expenses`
+
+**`revenue` Attributes:**
+
+* name, price, quantity, date\_earned, recorder, isEvent, event, activity
+
+**`expenses` Attributes:**
+
+* name, price, quantity, date\_buy, recorder, isEvent, event, activity\_name
+
+</details>
+
+---
+
+## 🤝 Contribution Guide
+
+1. **Create Branch:**
+   `git checkout -b <type>/<feature-name>`
+
+2. **Make Changes**
+   Implement your feature or fix.
+
+3. **Commit Message Convention:**
+   `git commit -m "feat: Add payment list page"`
+
+4. **Push & PR:**
+   Push your branch and open a pull request targeting `main`.
 
 ---

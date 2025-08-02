@@ -4,15 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
+    "sass": "^1.89.2",
     "vite": "^6.3.5"
   },
   "dependencies": {
     "appwrite": "^18.1.1",
+    "bootstrap": "^5.3.7",
+    "bootstrap-icons": "^1.13.1",
+    "chart.js": "^4.5.0",
     "dotenv": "^16.5.0",
     "node-appwrite": "^17.0.0"
   }

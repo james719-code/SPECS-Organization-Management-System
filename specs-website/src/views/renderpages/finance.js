@@ -1,6 +1,9 @@
-// renderpages/finance.js
+// --- IMPORTS ---
 import { databases } from '../../appwrite.js';
 import { Query, ID } from 'appwrite';
+// Import required components from libraries
+import { Modal } from 'bootstrap';
+import Chart from 'chart.js/auto';
 
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -12,19 +15,44 @@ const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 let financeChart = null;
 const formatCurrency = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
 
-// --- SCRIPT LOADING HELPER ---
-function loadScript(src) {
-    return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
-            return resolve();
-        }
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-        document.head.appendChild(script);
-    });
+const STORAGE_KEY_DATE_RANGE = 'finance_date_range_v2';
+
+/**
+ * Gets the stored date range from localStorage.
+ * Defaults to the last 12 months if nothing is stored.
+ * @returns {{startYear: number, startMonth: number, endYear: number, endMonth: number}}
+ */
+function getStoredDateRange() {
+    const stored = localStorage.getItem(STORAGE_KEY_DATE_RANGE);
+    if (stored) {
+        try {
+            return JSON.parse(stored);
+        } catch (e) { /* Fallback to default */ }
+    }
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 11);
+
+    return {
+        startYear: startDate.getFullYear(),
+        startMonth: startDate.getMonth(),
+        endYear: endDate.getFullYear(),
+        endMonth: endDate.getMonth()
+    };
 }
+
+/**
+ * Saves the selected date range to localStorage.
+ * @param {number} startYear
+ * @param {number} startMonth
+ * @param {number} endYear
+ * @param {number} endMonth
+ */
+function setStoredDateRange(startYear, startMonth, endYear, endMonth) {
+    const data = JSON.stringify({ startYear, startMonth, endYear, endMonth });
+    localStorage.setItem(STORAGE_KEY_DATE_RANGE, data);
+}
+
 
 // --- HTML TEMPLATE: Detail View (with CRUD) ---
 function getDetailViewHTML(groupName, revenues, expenses) {
@@ -41,10 +69,10 @@ function getDetailViewHTML(groupName, revenues, expenses) {
             <td data-field="price" data-original-value="${item.price}"><span>${formatCurrency(item.price)}</span></td>
             <td>${formatCurrency(item.price * item.quantity)}</td>
             <td class="actions">
-                <button class="btn action-btn edit-btn" title="Edit Item">Edit</button>
-                <button class="btn danger-btn action-btn delete-btn" title="Delete Item">Delete</button>
-                <button class="btn save-btn action-btn" style="display:none;" title="Save Changes">Save</button>
-                <button class="btn cancel-btn action-btn" style="display:none;" title="Cancel Edit">Cancel</button>
+                <button class="btn btn-sm btn-outline-primary edit-btn" title="Edit Item">Edit</button>
+                <button class="btn btn-sm btn-outline-danger delete-btn" title="Delete Item">Delete</button>
+                <button class="btn btn-sm btn-primary save-btn" style="display:none;" title="Save Changes">Save</button>
+                <button class="btn btn-sm btn-secondary cancel-btn" style="display:none;" title="Cancel Edit">Cancel</button>
             </td>
         </tr>
         `;
@@ -52,166 +80,87 @@ function getDetailViewHTML(groupName, revenues, expenses) {
 
     return `
         <div class="finance-detail-view">
-            <button id="backToFinanceMainBtn" class="btn primary-btn">← Back to Overview</button>
-            <h2>Details for: ${groupName}</h2>
-            
-            <div class="details-section">
-                <h3>Revenues</h3>
-                <div class="table-wrapper">
-                    <table>
+            <button id="backToFinanceMainBtn" class="btn btn-primary mb-4">← Back to Overview</button>
+            <h2 class="mb-3">Details for: ${groupName}</h2>
+            <div class="card mb-4">
+                <div class="card-header"><h3 class="h5 mb-0">Revenues</h3></div>
+                <div class="card-body"><div class="table-responsive">
+                    <table class="table table-striped table-hover">
                         <thead><tr><th>Date</th><th>Name</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
                         <tbody>
-                            ${revenues.length > 0 ? revenues.map(r => createRow(r, 'revenue')).join('') : '<tr><td colspan="6">No revenues for this activity.</td></tr>'}
+                            ${revenues.length > 0 ? revenues.map(r => createRow(r, 'revenue')).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">No revenues for this activity.</td></tr>'}
                         </tbody>
                     </table>
-                </div>
+                </div></div>
             </div>
-
-            <div class="details-section">
-                <h3>Expenses</h3>
-                 <div class="table-wrapper">
-                    <table>
+            <div class="card">
+                <div class="card-header"><h3 class="h5 mb-0">Expenses</h3></div>
+                <div class="card-body"><div class="table-responsive">
+                    <table class="table table-striped table-hover">
                         <thead><tr><th>Date</th><th>Name</th><th>Qty</th><th>Price</th><th>Total</th><th>Actions</th></tr></thead>
                         <tbody>
-                             ${expenses.length > 0 ? expenses.map(e => createRow(e, 'expense')).join('') : '<tr><td colspan="6">No expenses for this activity.</td></tr>'}
+                            ${expenses.length > 0 ? expenses.map(e => createRow(e, 'expense')).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">No expenses for this activity.</td></tr>'}
                         </tbody>
                     </table>
-                </div>
+                </div></div>
             </div>
         </div>
     `;
 }
+
 
 // --- HTML TEMPLATE: Activity Card ---
 function createActivityCard(activity) {
     const net = activity.totalRevenue - activity.totalExpense;
-    const netClass = net >= 0 ? 'positive' : 'negative';
+    const netClass = net >= 0 ? 'text-success' : 'text-danger';
+    const badgeClass = activity.isEvent ? 'bg-info' : 'bg-secondary';
 
     return `
-        <div class="finance-activity-card" data-group-key="${activity.key}" data-group-name="${activity.name}" data-is-event="${activity.isEvent}">
-            <div class="card-header">
-                <span class="activity-type-badge ${activity.isEvent ? 'event' : 'activity'}">${activity.isEvent ? 'Event' : 'Activity'}</span>
-                <h3 class="activity-name">${activity.name}</h3>
-            </div>
-            <div class="card-body">
-                <div class="financial-summary">
-                    <div class="summary-item revenue">
-                        <span>Revenue</span>
-                        <strong>${formatCurrency(activity.totalRevenue)}</strong>
-                    </div>
-                    <div class="summary-item expense">
-                        <span>Expense</span>
-                        <strong>${formatCurrency(activity.totalExpense)}</strong>
-                    </div>
-                    <div class="summary-item net">
-                        <span>Net</span>
-                        <strong class="${netClass}">${formatCurrency(net)}</strong>
+        <div class="col">
+            <div class="card h-100 finance-activity-card" data-group-key="${activity.key}" data-group-name="${activity.name}" data-is-event="${activity.isEvent}" style="cursor:pointer;">
+                <div class="card-header">
+                    <span class="badge ${badgeClass}">${activity.isEvent ? 'Event' : 'Activity'}</span>
+                    <h5 class="card-title mt-2 mb-0">${activity.name}</h5>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="d-flex justify-content-around text-center py-2">
+                        <div><small class="text-body-secondary">REVENUE</small><p class="h5 fw-bold">${formatCurrency(activity.totalRevenue)}</p></div>
+                        <div><small class="text-body-secondary">EXPENSE</small><p class="h5 fw-bold">${formatCurrency(activity.totalExpense)}</p></div>
+                        <div><small class="text-body-secondary">NET</small><p class="h5 fw-bold ${netClass}">${formatCurrency(net)}</p></div>
                     </div>
                 </div>
-            </div>
-            <div class="card-footer">
-                <span>Last update: ${new Date(activity.lastDate).toLocaleDateString()}</span>
+                <div class="card-footer text-end"><small class="text-body-secondary">Last update: ${new Date(activity.lastDate).toLocaleDateString()}</small></div>
             </div>
         </div>
     `;
 }
 
-// --- HTML TEMPLATE: Main Finance View Structure ---
-function getFinanceHTMLShell() {
-    return `
-    <style>
-        /* --- SHARED STYLES --- */
-        .btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; padding: 0.75rem 1.5rem; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s; }
-        .primary-btn { background-color: var(--accent-blue); color: var(--text-primary); }
-        .primary-btn:hover { background-color: var(--accent-blue-hover); }
-        .danger-btn { background-color: var(--status-red); color: white; }
-        .danger-btn:hover { background-color: #B91C1C; }
-        .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
-        .form-group label { color: var(--text-secondary); font-weight: 500; margin-bottom: 0.5rem; font-size: 0.9rem; }
-        .form-group input, .form-group select { background-color: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-dark); padding: 0.75rem 1rem; border-radius: 6px; font-size: 1rem; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-
-        /* --- FINANCE VIEW CONTAINER --- */
-        #finance-view-container { width: 100%; }
-        .finance-overview-container h1, .finance-detail-view h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem; }
-        .chart-container { background-color: var(--surface-dark); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
-        .finance-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap; }
-        #financeSearchInput { flex-grow: 1; min-width: 250px; padding: 0.8rem 1.2rem; font-size: 1rem; background-color: var(--surface-dark); border: 1px solid var(--border-dark); color: var(--text-primary); border-radius: 6px; }
-        
-        /* --- ACTIVITY CARD GRID --- */
-        #finance-cards-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
-        .finance-activity-card { cursor: pointer; background-color: var(--surface-dark); border: 1px solid var(--border-dark); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; }
-        .finance-activity-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-dark); }
-        .activity-type-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 12px; text-transform: uppercase; }
-        .activity-type-badge.event { background-color: var(--accent-blue); color: white; }
-        .activity-type-badge.activity { background-color: #4B5563; color: white; }
-        .activity-name { font-size: 1.2rem; margin: 0.5rem 0 0 0; }
-        .card-body { padding: 1.5rem; flex-grow: 1; }
-        .financial-summary { display: flex; justify-content: space-between; text-align: center; }
-        .summary-item span { font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem; }
-        .summary-item strong { font-size: 1.1rem; }
-        .summary-item .positive { color: #22C55E; }
-        .summary-item .negative { color: var(--status-red); }
-        .card-footer { background-color: var(--bg-dark); padding: 0.75rem 1.5rem; font-size: 0.8rem; color: var(--text-secondary); text-align: right; }
-
-        /* --- ENHANCED DETAIL VIEW STYLES --- */
-        .finance-detail-view #backToFinanceMainBtn { margin-bottom: 2rem; }
-        .finance-detail-view h2 { margin-top: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-dark); }
-        .details-section { margin-top: 2rem; background-color: var(--surface-dark); padding: 1.5rem; border-radius: 8px; }
-        .details-section h3 { font-size: 1.25rem; margin-top: 0; margin-bottom: 1rem; color: var(--accent-blue); }
-        .table-wrapper { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--border-dark); vertical-align: middle; }
-        th { background-color: var(--bg-dark); font-weight: 600; color: var(--text-secondary); }
-        tbody tr:nth-child(even) { background-color: var(--bg-dark); }
-        tbody tr:hover { background-color: #374151; }
-        td.actions { display: flex; gap: 0.5rem; }
-        .action-btn { font-size: 0.8rem; padding: 0.4rem 0.8rem; }
-        td input { width: 95%; background-color: #374151; border: 1px solid var(--accent-blue); color: white; padding: 0.5rem; border-radius: 4px;}
-        tr.editing-row td > span { display: none; }
-        
-        /* --- MODAL & FAB --- */
-        .fab { position: fixed; bottom: 2rem; right: 2rem; width: 56px; height: 56px; border-radius: 50%; background-color: var(--accent-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer; z-index: 999; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease; }
-        .modal-overlay.open { opacity: 1; visibility: visible; }
-        .modal-content { background-color: var(--surface-dark); padding: 2.5rem 2rem 2rem 2rem; border-radius: 8px; max-width: 500px; width: 90%; }
-        .modal-content h3 { margin-top: 0; }
-        /* .form-row { display: flex; gap: 1rem; } --- REMOVED this class as it's no longer used */
-        /* .form-row .form-group { flex: 1; } --- REMOVED this class as it's no longer used */
-        .hidden { display: none; }
-    </style>
-    <div id="finance-view-container">
-        <!-- Main content (overview or detail) will be rendered here -->
-    </div>
-    <div id="finance-modal-fab-container">
-        <!-- Modals and FABs go here so they don't get wiped out -->
-    </div>
-    `;
-}
 
 // --- DATA PROCESSING & RENDERING LOGIC ---
-function processDataForChart(revenues, expenses) {
-    const dailyNet = {};
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+function processDataForChart(revenues, expenses, firstDayOfRange, lastDayOfRange) {
+    const monthlyNet = {};
+    const cursorDate = new Date(firstDayOfRange);
 
-    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-        dailyNet[d.toISOString().split('T')[0]] = 0;
+    // Initialize all months in the range with 0
+    while (cursorDate <= lastDayOfRange) {
+        const key = `${cursorDate.getFullYear()}-${String(cursorDate.getMonth()).padStart(2, '0')}`;
+        monthlyNet[key] = 0;
+        cursorDate.setMonth(cursorDate.getMonth() + 1);
     }
 
-    revenues.forEach(r => {
-        const day = new Date(r.date_earned).toISOString().split('T')[0];
-        if (dailyNet[day] !== undefined) { dailyNet[day] += r.price * r.quantity; }
-    });
+    // Helper to process an item
+    const processItem = (item, multiplier) => {
+        const date = new Date(item.date_earned || item.date_buy);
+        const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+        if (monthlyNet[key] !== undefined) {
+            monthlyNet[key] += (item.price * item.quantity) * multiplier;
+        }
+    };
 
-    expenses.forEach(e => {
-        const day = new Date(e.date_buy).toISOString().split('T')[0];
-        if (dailyNet[day] !== undefined) { dailyNet[day] -= e.price * e.quantity; }
-    });
+    revenues.forEach(r => processItem(r, 1));
+    expenses.forEach(e => processItem(e, -1));
 
-    return { labels: Object.keys(dailyNet), data: Object.values(dailyNet) };
+    return { labels: Object.keys(monthlyNet), data: Object.values(monthlyNet) };
 }
 
 function renderChart(chartData) {
@@ -222,13 +171,17 @@ function renderChart(chartData) {
     financeChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: chartData.labels.map(l => new Date(l).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })),
+            labels: chartData.labels.map(l => {
+                const [year, month] = l.split('-');
+                return new Date(year, month).toLocaleString('en-US', { month: 'short', year: '2-digit' });
+            }),
             datasets: [{
-                label: `Daily Net (${formatCurrency(0).replace(/0\.00/g, '')})`,
+                label: `Monthly Net (${formatCurrency(0).replace(/0\.00/g, '')})`,
                 data: chartData.data,
-                backgroundColor: chartData.data.map(d => d >= 0 ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
-                borderColor: chartData.data.map(d => d >= 0 ? 'rgba(59, 130, 246, 1)' : 'rgba(239, 68, 68, 1)'),
-                borderWidth: 1
+                backgroundColor: chartData.data.map(d => d >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+                borderColor: chartData.data.map(d => d >= 0 ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)'),
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: { scales: { y: { beginAtZero: false } }, responsive: true, maintainAspectRatio: false }
@@ -244,12 +197,8 @@ function groupTransactions(revenues, expenses, eventLookup) {
 
         if (!activities[key]) {
             activities[key] = {
-                key,
-                name: isEvent ? (eventLookup[item.event] || 'Unknown Event') : key,
-                isEvent,
-                totalRevenue: 0,
-                totalExpense: 0,
-                lastDate: new Date(0),
+                key, name: isEvent ? (eventLookup[item.event] || 'Unknown Event') : key, isEvent,
+                totalRevenue: 0, totalExpense: 0, lastDate: new Date(0),
             };
         }
         const date = new Date(type === 'revenue' ? item.date_earned : item.date_buy);
@@ -275,16 +224,13 @@ function attachDetailViewListeners(currentUser, userLookup) {
         const docId = row.dataset.docId;
         const collectionId = row.dataset.collectionId;
 
-        // DELETE
         if (target.classList.contains('delete-btn')) {
             if (!confirm('Are you sure you want to permanently delete this item?')) return;
             try {
                 await databases.deleteDocument(DATABASE_ID, collectionId, docId);
                 row.remove();
-                alert('Item deleted.');
             } catch (error) { console.error('Delete failed:', error); alert('Could not delete item.'); }
         }
-        // EDIT
         else if (target.classList.contains('edit-btn')) {
             row.classList.add('editing-row');
             row.querySelectorAll('td[data-field]').forEach(cell => {
@@ -292,15 +238,11 @@ function attachDetailViewListeners(currentUser, userLookup) {
                 const originalValue = cell.dataset.originalValue;
                 const inputType = (field === 'price' || field === 'quantity') ? 'number' : (field === 'date' ? 'datetime-local' : 'text');
                 const value = field === 'date' ? new Date(originalValue).toISOString().slice(0, 16) : originalValue;
-                
-                const minAttribute = (field === 'price' || field === 'quantity') ? 'min="1"' : '';
-
-                cell.innerHTML = `<input type="${inputType}" value="${value}" step="${field === 'price' ? '0.01' : '1'}" ${minAttribute} />`;
+                cell.innerHTML = `<input type="${inputType}" class="form-control form-control-sm" value="${value}" step="${field === 'price' ? '0.01' : '1'}" min="1" />`;
             });
             row.querySelector('.edit-btn, .delete-btn').style.display = 'none';
             row.querySelector('.save-btn, .cancel-btn').style.display = 'inline-flex';
         }
-        // CANCEL
         else if (target.classList.contains('cancel-btn')) {
             row.classList.remove('editing-row');
             row.querySelectorAll('td[data-field]').forEach(cell => {
@@ -312,7 +254,6 @@ function attachDetailViewListeners(currentUser, userLookup) {
             row.querySelector('.edit-btn, .delete-btn').style.display = 'inline-flex';
             row.querySelector('.save-btn, .cancel-btn').style.display = 'none';
         }
-        // SAVE
         else if (target.classList.contains('save-btn')) {
             target.disabled = true;
             target.textContent = 'Saving...';
@@ -324,7 +265,7 @@ function attachDetailViewListeners(currentUser, userLookup) {
                 const field = cell.dataset.field;
                 let value = input.value;
                 if (field === 'price' || field === 'quantity') {
-                    value = (field === 'price') ? parseFloat(value) : parseInt(value);
+                    value = (field === 'price') ? parseFloat(value) : parseInt(value, 10);
                     if (isNaN(value) || value < 1) hasError = true;
                 }
                 const dateKey = collectionId === COLLECTION_ID_REVENUE ? 'date_earned' : 'date_buy';
@@ -332,85 +273,139 @@ function attachDetailViewListeners(currentUser, userLookup) {
             });
 
             if (hasError) {
-                alert('Invalid number format. Price and quantity must be at least 1.');
-                target.disabled = false;
-                target.textContent = 'Save';
+                alert('Invalid number. Price and quantity must be at least 1.');
+                target.disabled = false; target.textContent = 'Save';
                 return;
             }
 
             try {
                 await databases.updateDocument(DATABASE_ID, collectionId, docId, dataToUpdate);
-                alert('Update successful!');
                 row.querySelectorAll('td[data-field]').forEach(cell => {
-                    const field = cell.dataset.field;
-                    const dateKey = collectionId === COLLECTION_ID_REVENUE ? 'date_earned' : 'date_buy';
-                    const key = field === 'date' ? dateKey : field;
+                    const key = cell.dataset.field === 'date' ? (collectionId === COLLECTION_ID_REVENUE ? 'date_earned' : 'date_buy') : cell.dataset.field;
                     cell.dataset.originalValue = dataToUpdate[key];
                 });
-                row.querySelector('.cancel-btn').click();
+                row.querySelector('.cancel-btn').click(); // Simulate cancel to restore view
             } catch (error) {
                 console.error('Update failed:', error);
                 alert('Update failed.');
             } finally {
-                target.disabled = false;
-                target.textContent = 'Save';
+                target.disabled = false; target.textContent = 'Save';
             }
         }
     });
 }
 
+
 function attachOverviewListeners(currentUser, userLookup, initialData) {
     const mainContainer = document.getElementById('finance-view-container');
     const modalFabContainer = document.getElementById('finance-modal-fab-container');
     if (!mainContainer || !modalFabContainer) return;
-    
+
+    const currentYear = new Date().getFullYear();
+    const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i)
+        .map(y => `<option value="${y}">${y}</option>`).join('');
+    const monthOptions = Array.from({ length: 12 }, (_, i) => new Date(0, i))
+        .map((d, i) => `<option value="${i}">${d.toLocaleString('en-US', { month: 'long' })}</option>`).join('');
+
     modalFabContainer.innerHTML = `
-        <button id="showAddTransactionModalBtn" class="fab" title="Add Transaction">+</button>
-        <div id="addTransactionModal" class="modal-overlay">
-            <div class="modal-content">
-                <button class="modal-close-btn" style="position:absolute; top:1rem; right:1rem; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">×</button>
-                <h3>Add New Transaction</h3>
+        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addTransactionModal" title="Add Transaction">
+            <i class="bi-plus-lg fs-4"></i>
+        </button>
+        <div class="modal fade" id="addTransactionModal" tabindex="-1" aria-labelledby="addTransactionModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
                 <form id="addTransactionForm">
-                    <div class="form-group"><label for="transactionType">Type</label><select id="transactionType" required><option value="expense">Expense</option><option value="revenue">Revenue</option></select></div>
-                    <div class="form-group"><label for="transactionName">Item Name</label><input type="text" id="transactionName" placeholder="e.g., T-Shirt Printing" required></div>
-                    <div class="form-group"><label for="transactionPrice">Price (per item)</label><input type="number" id="transactionPrice" min="1" step="0.01" required></div>
-                    <div class="form-group"><label for="transactionQuantity">Quantity</label><input type="number" id="transactionQuantity" min="1" value="1" required></div>
-                    <div class="form-group"><label for="transactionDate">Date</label><input type="datetime-local" id="transactionDate" required></div>
-                    <div class="form-group"><label><input type="checkbox" id="isEventCheckbox" style="margin-right: 0.5rem;">For an official Event?</label></div>
-                    <div id="activityNameGroup" class="form-group"><label for="activityName">Activity Name (if not an event)</label><input type="text" id="activityName" placeholder="e.g., Fundraiser 2024" required></div>
-                    <div id="eventNameGroup" class="form-group hidden"><label for="eventName">Select Event</label><select id="eventName">${initialData.events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('')}</select></div>
-                    <button type="submit" class="btn primary-btn">Add Transaction</button>
+                    <div class="modal-header"><h5 class="modal-title" id="addTransactionModalLabel">Add New Transaction</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body"><!-- ... form fields ... --></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary">Add Transaction</button></div>
                 </form>
-            </div>
+            </div></div>
+        </div>
+        
+        <div class="modal fade" id="timeRangeModal" tabindex="-1" aria-labelledby="timeRangeModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <form id="timeRangeForm">
+                    <div class="modal-header"><h5 class="modal-title" id="timeRangeModalLabel">Select Custom Date Range</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <div class="alert alert-info alert-dismissible fade show" role="alert" id="timeRangeValidationAlert" style="display: none;">
+                            End date cannot be earlier than the start date.
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12"><strong class="text-body-secondary">START DATE</strong></div>
+                            <div class="col-md-6"><label for="timeRangeStartMonth" class="form-label">Month</label><select id="timeRangeStartMonth" class="form-select">${monthOptions}</select></div>
+                            <div class="col-md-6"><label for="timeRangeStartYear" class="form-label">Year</label><select id="timeRangeStartYear" class="form-select">${yearOptions}</select></div>
+                            <div class="col-12 mt-4"><strong class="text-body-secondary">END DATE</strong></div>
+                            <div class="col-md-6"><label for="timeRangeEndMonth" class="form-label">Month</label><select id="timeRangeEndMonth" class="form-select">${monthOptions}</select></div>
+                            <div class="col-md-6"><label for="timeRangeEndYear" class="form-label">Year</label><select id="timeRangeEndYear" class="form-select">${yearOptions}</select></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary">Apply</button></div>
+                </form>
+            </div></div>
         </div>`;
 
-    // Modal Logic
-    const modal = document.getElementById('addTransactionModal');
-    document.getElementById('showAddTransactionModalBtn').addEventListener('click', () => modal.classList.add('open'));
-    modal.querySelector('.modal-close-btn').addEventListener('click', () => modal.classList.remove('open'));
+    document.querySelector("#addTransactionModal .modal-body").innerHTML = `
+        <div class="mb-3"><label for="transactionType" class="form-label">Type</label><select id="transactionType" class="form-select" required><option value="expense">Expense</option><option value="revenue">Revenue</option></select></div>
+        <div class="mb-3"><label for="transactionName" class="form-label">Item Name</label><input type="text" id="transactionName" class="form-control" placeholder="e.g., T-Shirt Printing" required></div>
+        <div class="mb-3"><label for="transactionPrice" class="form-label">Price (per item)</label><input type="number" id="transactionPrice" class="form-control" min="1" step="0.01" required></div>
+        <div class="mb-3"><label for="transactionQuantity" class="form-label">Quantity</label><input type="number" id="transactionQuantity" class="form-control" min="1" value="1" required></div>
+        <div class="mb-3"><label for="transactionDate" class="form-label">Date</label><input type="datetime-local" id="transactionDate" class="form-control" required></div>
+        <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="isEventCheckbox"><label class="form-check-label" for="isEventCheckbox">For an official Event?</label></div>
+        <div id="activityNameGroup" class="mb-3"><label for="activityName" class="form-label">Activity Name (if not an event)</label><input type="text" class="form-control" id="activityName" placeholder="e.g., Fundraiser 2024" required></div>
+        <div id="eventNameGroup" class="mb-3 d-none"><label for="eventName" class="form-label">Select Event</label><select id="eventName" class="form-select">${initialData.events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('')}</select></div>`;
+
+
+    // --- Modal Instantiation & Logic ---
+    const addTransactionModal = new Modal(document.getElementById('addTransactionModal'));
+    const timeRangeModalEl = document.getElementById('timeRangeModal');
+    const timeRangeModal = new Modal(timeRangeModalEl);
+    const timeRangeForm = document.getElementById('timeRangeForm');
+
+    timeRangeModalEl.addEventListener('show.bs.modal', () => {
+        const { startYear, startMonth, endYear, endMonth } = getStoredDateRange();
+        document.getElementById('timeRangeStartYear').value = startYear;
+        document.getElementById('timeRangeStartMonth').value = startMonth;
+        document.getElementById('timeRangeEndYear').value = endYear;
+        document.getElementById('timeRangeEndMonth').value = endMonth;
+        document.getElementById('timeRangeValidationAlert').style.display = 'none';
+    });
+
+    timeRangeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const startYear = parseInt(document.getElementById('timeRangeStartYear').value, 10);
+        const startMonth = parseInt(document.getElementById('timeRangeStartMonth').value, 10);
+        const endYear = parseInt(document.getElementById('timeRangeEndYear').value, 10);
+        const endMonth = parseInt(document.getElementById('timeRangeEndMonth').value, 10);
+
+        // Validation
+        if (new Date(endYear, endMonth) < new Date(startYear, startMonth)) {
+            document.getElementById('timeRangeValidationAlert').style.display = 'block';
+            return;
+        }
+
+        setStoredDateRange(startYear, startMonth, endYear, endMonth);
+        timeRangeModal.hide();
+        renderFinanceView(userLookup, currentUser); // Re-render with new date range
+    });
+
     document.getElementById('isEventCheckbox').addEventListener('change', (e) => {
         const isChecked = e.target.checked;
-        document.getElementById('activityNameGroup').classList.toggle('hidden', isChecked);
-        document.getElementById('eventNameGroup').classList.toggle('hidden', !isChecked);
+        document.getElementById('activityNameGroup').classList.toggle('d-none', isChecked);
+        document.getElementById('eventNameGroup').classList.toggle('d-none', !isChecked);
         document.getElementById('activityName').required = !isChecked;
         document.getElementById('eventName').required = isChecked;
     });
 
-    // Form Submission
     document.getElementById('addTransactionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
         try {
             const type = e.target.transactionType.value;
             const isEvent = e.target.isEventCheckbox.checked;
             const data = {
-                name: e.target.transactionName.value,
-                price: parseFloat(e.target.transactionPrice.value),
-                quantity: parseInt(e.target.transactionQuantity.value),
-                isEvent,
-                recorder: currentUser.$id,
+                name: e.target.transactionName.value, price: parseFloat(e.target.transactionPrice.value),
+                quantity: parseInt(e.target.transactionQuantity.value, 10), isEvent, recorder: currentUser.$id,
             };
             if (type === 'revenue') {
                 data.date_earned = e.target.transactionDate.value;
@@ -423,45 +418,41 @@ function attachOverviewListeners(currentUser, userLookup, initialData) {
                 data.event = isEvent ? e.target.eventName.value : null;
                 await databases.createDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, ID.unique(), data);
             }
-            alert('Transaction saved!');
-            renderFinanceView(userLookup, currentUser);
+            addTransactionModal.hide();
+            await renderFinanceView(userLookup, currentUser); // Re-render the view
         } catch (error) {
             console.error('Failed to save transaction:', error);
             alert(`Error: ${error.message}`);
         } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Add Transaction';
-            modal.classList.remove('open');
+            submitBtn.disabled = false; submitBtn.textContent = 'Add Transaction';
         }
     });
 
-    // Search Logic
     const allActivities = groupTransactions(initialData.revenues, initialData.expenses, initialData.eventLookup);
     document.getElementById('financeSearchInput').addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const filtered = allActivities.filter(act => act.name.toLowerCase().includes(searchTerm));
         const cardsContainer = document.getElementById('finance-cards-container');
-        cardsContainer.innerHTML = filtered.length > 0 ? filtered.map(createActivityCard).join('') : '<p>No activities found matching your search.</p>';
+        cardsContainer.innerHTML = filtered.length > 0 ? filtered.map(createActivityCard).join('') : '<p class="text-muted text-center w-100">No activities found matching your search.</p>';
     });
 
-    // Card Click to Detail View
     mainContainer.addEventListener('click', async (e) => {
         const card = e.target.closest('.finance-activity-card');
         if (!card) return;
-        mainContainer.innerHTML = '<p>Loading details...</p>';
+        mainContainer.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
         try {
             const groupKey = card.dataset.groupKey;
             const isEvent = card.dataset.isEvent === 'true';
             const [revenueDetails, expenseDetails] = await Promise.all([
-                databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.equal(isEvent ? 'event' : 'activity', groupKey), Query.limit(200)]),
-                databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.equal(isEvent ? 'event' : 'activity_name', groupKey), Query.limit(200)])
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.equal(isEvent ? 'event' : 'activity', groupKey), Query.limit(500)]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.equal(isEvent ? 'event' : 'activity_name', groupKey), Query.limit(500)])
             ]);
             mainContainer.innerHTML = getDetailViewHTML(card.dataset.groupName, revenueDetails.documents, expenseDetails.documents);
             attachDetailViewListeners(currentUser, userLookup);
             document.getElementById('backToFinanceMainBtn').addEventListener('click', () => renderFinanceView(userLookup, currentUser));
         } catch (error) {
             console.error('Failed to load details:', error);
-            mainContainer.innerHTML = `<p>Error loading details: ${error.message}</p>`;
+            mainContainer.innerHTML = `<p class="text-danger text-center">Error loading details: ${error.message}</p>`;
         }
     });
 }
@@ -471,18 +462,34 @@ function attachOverviewListeners(currentUser, userLookup, initialData) {
  */
 export default async function renderFinanceView(userLookup, currentUser) {
     const contentEl = document.getElementById("dashboard-content");
-    contentEl.innerHTML = getFinanceHTMLShell();
+    contentEl.innerHTML = `
+        <div id="finance-view-container"></div>
+        <div id="finance-modal-fab-container"></div>
+    `;
     const mainContainer = document.getElementById('finance-view-container');
-    mainContainer.innerHTML = `<p>Loading financial data...</p>`;
+    mainContainer.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
 
     try {
-        await loadScript("https://cdn.jsdelivr.net/npm/chart.js");
+        // Fetch data based on the stored start/end date range.
+        const { startYear, startMonth, endYear, endMonth } = getStoredDateRange();
+        const firstDayOfRange = new Date(startYear, startMonth, 1);
+        const lastDayOfRange = new Date(endYear, endMonth + 1, 0);
+        lastDayOfRange.setHours(23, 59, 59, 999);
 
-        const today = new Date();
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+        const firstDayISO = firstDayOfRange.toISOString();
+        const lastDayISO = lastDayOfRange.toISOString();
+
         const [revenueRes, expenseRes, eventRes] = await Promise.all([
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.greaterThanEqual('date_earned', firstDayOfMonth), Query.limit(5000)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.greaterThanEqual('date_buy', firstDayOfMonth), Query.limit(5000)]),
+            databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
+                Query.greaterThanEqual('date_earned', firstDayISO),
+                Query.lessThanEqual('date_earned', lastDayISO),
+                Query.limit(5000)
+            ]),
+            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [
+                Query.greaterThanEqual('date_buy', firstDayISO),
+                Query.lessThanEqual('date_buy', lastDayISO),
+                Query.limit(5000)
+            ]),
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(500)])
         ]);
 
@@ -490,20 +497,55 @@ export default async function renderFinanceView(userLookup, currentUser) {
         const initialData = { revenues: revenueRes.documents, expenses: expenseRes.documents, events: eventRes.documents, eventLookup };
         const groupedActivities = groupTransactions(initialData.revenues, initialData.expenses, initialData.eventLookup);
 
+        const startRangeStr = firstDayOfRange.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const endRangeStr = new Date(endYear, endMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+        const chartTitle = `Net Income (${startRangeStr} - ${endRangeStr})`;
+
+        // MODIFICATION: Conditionally generate either the list of cards or a flat "empty state" message.
+        let activitiesContent;
+        if (groupedActivities.length > 0) {
+            activitiesContent = `
+                <div id="finance-cards-container" class="row row-cols-1 row-cols-lg-2 row-cols-xxl-3 g-4">
+                    ${groupedActivities.map(act => createActivityCard(act)).join('')}
+                </div>`;
+        } else {
+            activitiesContent = `
+                <div class="text-center text-muted py-5">
+                    <div class="mb-3">
+                        <i class="bi bi-inbox" style="font-size: 4rem; color: var(--bs-secondary-color);"></i>
+                    </div>
+                    <h4 class="fw-light">No Financial Activities Found</h4>
+                    <p>There are no recorded transactions for the selected period.</p>
+                    <p>Click the <span class="btn btn-sm btn-primary pe-none rounded-circle"><i class="bi-plus-lg"></i></span> button to add a new transaction.</p>
+                </div>
+            `;
+        }
+
         mainContainer.innerHTML = `
             <div class="finance-overview-container">
-                <h1>Finance Overview</h1>
-                <div class="chart-container"><canvas id="financeChart" style="min-height: 250px;"></canvas></div>
-                <div class="finance-controls"><input type="search" id="financeSearchInput" placeholder="Search activities or events..."></div>
-                <div id="finance-cards-container">
-                    ${groupedActivities.length > 0 ? groupedActivities.map(act => createActivityCard(act)).join('') : '<p>No financial activities recorded yet. Click the (+) button to add one.</p>'}
+                <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-2">
+                    <h1 class="mb-3 mb-md-0">Finance Overview</h1>
+                    <div class="d-flex gap-2">
+                        <input type="search" id="financeSearchInput" class="form-control" style="max-width: 320px;" placeholder="Search activities or events...">
+                        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#timeRangeModal" title="Change Time Range">
+                            <i class="bi bi-calendar-range"></i>
+                        </button>
+                    </div>
                 </div>
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0" id="finance-chart-title">${chartTitle}</h5></div>
+                    <div class="card-body">
+                         <canvas id="financeChart" style="min-height: 300px;"></canvas>
+                    </div>
+                </div>
+                ${activitiesContent}
             </div>`;
 
-        renderChart(processDataForChart(initialData.revenues, initialData.expenses));
+        renderChart(processDataForChart(initialData.revenues, initialData.expenses, firstDayOfRange, lastDayOfRange));
         attachOverviewListeners(currentUser, userLookup, initialData);
+
     } catch (error) {
         console.error("Failed to render finance view:", error);
-        mainContainer.innerHTML = `<p style="color:red;">Error: Could not load financial data. ${error.message}</p>`;
+        mainContainer.innerHTML = `<div class="alert alert-danger" role="alert"><strong>Error:</strong> Could not load financial data. ${error.message}</div>`;
     }
 }
