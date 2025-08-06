@@ -1,0 +1,68 @@
+// =================================================================
+// SHARED STYLES - THEME & FOUNDATION (LEAN VERSION)
+// =================================================================
+// This file ONLY defines the shared theme (variables) and the most
+// basic structural SCSS from Bootstrap. It does NOT contain any
+// custom component styles.
+// =================================================================
+
+
+// -----------------------------------------------------------------
+// 1. THEME DEFINITION (CUSTOM BOOTSTRAP VARIABLES)
+// -----------------------------------------------------------------
+$primary:       #0d6b66;
+$secondary:     #10b981;
+$info:          #60a5fa;
+$success:       #00c39a;
+$dark:          #0f172a;
+$light:         #e2f1f0;
+$body-bg:       #f4fefc;
+$body-color:    #0f172a;
+$font-family-sans-serif: 'Segoe UI', Roboto, sans-serif;
+$card-border-radius: 1rem;
+$card-border-width: 0;
+$navbar-dark-color:           rgba(white, 0.9);
+$navbar-dark-hover-color:     white;
+$navbar-dark-active-color:    $secondary;
+
+// -----------------------------------------------------------------
+// 2. FOUNDATIONAL BOOTSTRAP IMPORTS
+// -----------------------------------------------------------------
+// Core logic - always required.
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables"; // Imports Bootstrap's defaults, which we overrode above
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/utilities";
+
+// --- 2. BOOTSTRAP CORE IMPORTS (ESSENTIAL) ---
+// These MUST be imported in this order for Bootstrap to function correctly with our theme.
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/utilities";
+@import "bootstrap/scss/root";
+@import "bootstrap/scss/reboot";
+
+// --- NOTE: All specific component imports (cards, navbars, forms, etc.) ---
+// --- have been MOVED to page-specific SCSS files like landing.scss. ---
+
+// -----------------------------------------------------------------
+// 3. TRULY GLOBAL STYLES
+// -----------------------------------------------------------------
+body {
+  background-color: $body-bg;
+  color: $body-color;
+  font-family: $font-family-sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// --- Utilities API (Essential for helper classes like .d-flex, .p-5) ---
+@import "bootstrap/scss/utilities/api";
+
+// --- Bootstrap Icons (Needed globally) ---
+@import "bootstrap-icons/font/bootstrap-icons.css";
