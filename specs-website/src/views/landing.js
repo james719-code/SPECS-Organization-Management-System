@@ -161,7 +161,7 @@ function createLogoBreakdownHTML() {
                 <div class="row g-5 align-items-center">
                     <div class="col-lg-6">
                         <div class="logo-interactive-container">
-                            <img src="/logo.png" class="img-fluid" alt="SPECS Organization Logo with interactive points">
+                            <img src="/logo.webp" class="img-fluid" alt="SPECS Organization Logo with interactive points">
                             ${hotspotsHTML}
                         </div>
                     </div>
@@ -257,7 +257,7 @@ function getLandingHTML() {
                 <div class="container">
                     <h2 class="text-center fw-bold mb-5">About SPECS</h2>
                     <div class="row align-items-center">
-                        <div class="col-lg-4 mb-4 mb-lg-0 text-center"><img src="/logo.png" class="img-fluid rounded-3 shadow-sm" alt="SPECS Organization Logo" style="max-height: 250px;"></div>
+                        <div class="col-lg-4 mb-4 mb-lg-0 text-center"><img src="/logo.webp" class="img-fluid rounded-3 shadow-sm" alt="SPECS Organization Logo" style="max-height: 250px;"></div>
                         <div class="col-lg-8">
                             <h3 class="fw-bold">Our Mission</h3>
                             <p>The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the premier organization for all Computer Science students at Partido State University. We are dedicated to fostering a dynamic environment of learning, innovation, and collaboration. Our goal is to empower members with the technical skills, professional networks, and leadership qualities necessary to excel in the ever-evolving world of technology.</p>

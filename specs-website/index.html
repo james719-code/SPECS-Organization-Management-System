@@ -1,13 +1,57 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SPECS Website</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/logo.webp" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPECS Website</title>
+  <style>
+    /* Inline CSS for the loading spinner */
+    #loader {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 9999;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .spinner {
+      border: 8px solid #f3f3f3; /* Light grey */
+      border-top: 8px solid #0d6b66; /* Blue */
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+<!-- Loading spinner element -->
+<div id="loader">
+  <div class="spinner"></div>
+</div>
+
+<div id="app"></div>
+
+<script type="module" src="/src/main.js"></script>
+<script>
+  // JavaScript to hide the loader once the page is fully loaded
+  window.addEventListener('load', () => {
+    const loader = document.getElementById('loader');
+    if (loader) {
+      loader.style.display = 'none';
+    }
+  });
+</script>
+</body>
 </html>
