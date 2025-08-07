@@ -553,12 +553,12 @@ function initializeDataAndListenersForLanding() {
     };
 
     const adviserContainer = document.getElementById('adviser-card-container');
-    const officersContainer = document.getElementById('officers-grid-container');
+    //const officersContainer = document.getElementById('officers-grid-container');
     const jobsContainer = document.getElementById('jobs-grid-container');
     const faqContainer = document.getElementById('faqAccordion');
 
     if (adviserContainer) adviserContainer.innerHTML = createAdviserCardHTML(siteData.adviser);
-    if (officersContainer) officersContainer.innerHTML = siteData.officers.map(createOfficerCardHTML).join('');
+    //if (officersContainer) officersContainer.innerHTML = siteData.officers.map(createOfficerCardHTML).join('');
     if (jobsContainer) jobsContainer.innerHTML = siteData.jobs.map(createJobCardHTML).join('');
     if (faqContainer) faqContainer.innerHTML = siteData.faq.map(createFaqItemHTML).join('');
 
