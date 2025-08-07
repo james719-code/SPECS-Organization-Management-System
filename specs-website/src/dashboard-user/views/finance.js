@@ -26,11 +26,6 @@ const formatCurrency = (value) => new Intl.NumberFormat('en-PH', { style: 'curre
 
 const STORAGE_KEY_DATE_RANGE = 'finance_date_range_v2';
 
-/**
- * Gets the stored date range from localStorage.
- * Defaults to the last 12 months if nothing is stored.
- * @returns {{startYear: number, startMonth: number, endYear: number, endMonth: number}}
- */
 function getStoredDateRange() {
     const stored = localStorage.getItem(STORAGE_KEY_DATE_RANGE);
     if (stored) {
@@ -50,13 +45,6 @@ function getStoredDateRange() {
     };
 }
 
-/**
- * Saves the selected date range to localStorage.
- * @param {number} startYear
- * @param {number} startMonth
- * @param {number} endYear
- * @param {number} endMonth
- */
 function setStoredDateRange(startYear, startMonth, endYear, endMonth) {
     const data = JSON.stringify({ startYear, startMonth, endYear, endMonth });
     localStorage.setItem(STORAGE_KEY_DATE_RANGE, data);
@@ -469,9 +457,6 @@ function attachOverviewListeners(currentUser, userLookup, initialData) {
     });
 }
 
-/**
- * Main render function for the Finance view.
- */
 export default async function renderFinanceView(userLookup, currentUser) {
     const contentEl = document.getElementById("dashboard-content");
     contentEl.innerHTML = `

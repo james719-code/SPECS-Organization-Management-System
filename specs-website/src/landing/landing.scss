@@ -1,26 +1,15 @@
-/* /src/landing/landing.scss */
-
-// =================================================================
-// COMPLETE & OPTIMIZED STYLESHEET FOR LANDING SPA (UI/UX ENHANCED)
-// =================================================================
-
-// --- 1. IMPORT THE SHARED FOUNDATION ---
-// This provides the themed variables ($primary, etc.), custom mixins,
-// and imports Google Fonts.
 @import '../shared/styles';
 
-// Bootstrap Components Used in Landing Page
-@import "bootstrap/scss/grid"; // for row, col-* classes
-@import "bootstrap/scss/containers";  // for spacing, text, background utilities
-@import "bootstrap/scss/helpers"; // for clearfix, ratio, position, stacks, etc.
-@import "bootstrap/scss/nav"; // for nav components
-@import "bootstrap/scss/transitions"; // for collapse transitions
-@import "bootstrap/scss/accordion"; // for accordion components
-@import "bootstrap/scss/forms"; // for form controls (already in main but ensuring)
-@import "bootstrap/scss/spinners"; // for spinner-border classes
-@import "bootstrap/scss/alert"; // for alert classes
+@import "bootstrap/scss/grid";
+@import "bootstrap/scss/containers";
+@import "bootstrap/scss/helpers";
+@import "bootstrap/scss/nav";
+@import "bootstrap/scss/transitions";
+@import "bootstrap/scss/accordion";
+@import "bootstrap/scss/forms";
+@import "bootstrap/scss/spinners";
+@import "bootstrap/scss/alert";
 
-// --- 3. GLOBAL & BODY STYLES ---
 a {
   color: $primary;
   transition: color 0.2s ease-in-out;
@@ -29,7 +18,6 @@ a {
   }
 }
 
-// --- 4. CUSTOM COMPONENT OVERRIDES & HELPERS ---
 .footer {
   background-color: $dark;
   color: $light;
@@ -56,7 +44,6 @@ a {
   border-bottom-right-radius: 1.5rem;
 }
 
-// --- Landing Page Past Events ---
 .past-event-card .event-image-placeholder img {
   filter: grayscale(100%);
   opacity: 0.65;
@@ -77,21 +64,18 @@ a {
   background-color: $gray-100;
 }
 
-// KEY CHANGE: Improved form styling
 .form-label {
   color: $gray-800;
 }
 
 .form-control {
-  // Font size and padding are now handled by the variable overrides above
   &:focus {
     border-color: rgba($primary, 0.5);
     box-shadow: 0 0 0 0.25rem rgba($primary, 0.2);
   }
-  // Improve placeholder text for better readability and UX
   &::placeholder {
     color: $gray-500;
-    opacity: 1; // Override Firefox's default lower opacity
+    opacity: 1;
     font-style: italic;
   }
 }
@@ -111,24 +95,17 @@ a {
   text-shadow: 0 4px 15px rgba($dark, 0.1);
 }
 
-/* Interactive Logo Section */
 .logo-interactive-container {
   position: relative;
-  // Ensure the container itself doesn't overflow horizontally
-  // and is centered if it's block or inline-block
-  display: block; // Changed from inline-block to block for better width control
-  max-width: 100vw; // Ensure it doesn't exceed viewport width
-  margin-left: auto; // Center the block element
-  margin-right: auto; // Center the block element
+  display: block;
+  max-width: 100vw;
+  margin-left: auto;
+  margin-right: auto;
 
-  // Ensure the image inside also respects the container's width
   img {
-    // Make the image responsive within its container
     max-width: 100%;
     height: auto;
-    // Prevent the image from being wider than its container or viewport
-    // Use min() to pick the smaller of the two values
-    width: min(100%, 600px); // Example: Cap at 600px or 100% of container, whichever is smaller
+    width: min(100%, 600px);
     display: block;
     margin-left: auto;
     margin-right: auto;
@@ -136,9 +113,7 @@ a {
 }
 
 .logo-hotspot {
-  // --- Base styles for larger screens ---
   position: absolute;
-  // Default size for screens md and up
   width: 30px;
   height: 30px;
   background-color: rgba($primary, 0.9);
@@ -154,12 +129,8 @@ a {
   border: 2px solid $white;
   box-shadow: 0 2px 8px rgba($black, 0.3);
   animation: pulse 2.5s infinite;
+  font-size: 1rem;
 
-  // Font size adjustments
-  font-size: 1rem; // Base font size
-
-  // --- Responsive styles for smaller screens ---
-  // Adjust for small screens (sm) and down - smaller size
   @include media-breakpoint-down(sm) {
     width: 24px;
     height: 24px;
@@ -168,8 +139,7 @@ a {
     box-shadow: 0 1px 4px rgba($black, 0.3);
   }
 
-  // More aggressive adjustment for extra small screens (xs) - smallest size
-  @include media-breakpoint-down(xs) { // Check if 'xs' is a valid breakpoint
+  @include media-breakpoint-down(xs) {
     width: 20px;
     height: 20px;
     font-size: 0.7rem;
@@ -177,16 +147,14 @@ a {
     box-shadow: 0 1px 3px rgba($black, 0.3);
   }
 
-  // Alternative using a raw media query for screens <= 400px for even finer control
   @media (max-width: 400px) {
-    width: 16px; // Even smaller
-    height: 16px; // Even smaller
-    font-size: 0.6rem; // Much smaller font
+    width: 16px;
+    height: 16px;
+    font-size: 0.6rem;
     border-width: 1px;
     box-shadow: 0 1px 2px rgba($black, 0.25);
   }
 
-  // Extreme tiny screens <= 320px
   @media (max-width: 320px) {
     width: 14px;
     height: 14px;
@@ -198,20 +166,19 @@ a {
 
   &:hover,
   &.active {
-    // Gradually reduce scale on smaller screens to prevent overflow/clipping
     @include media-breakpoint-down(xs) {
-      transform: translate(-50%, -50%) scale(1.15); // Smaller scale increase
+      transform: translate(-50%, -50%) scale(1.15);
     }
     @media (max-width: 400px) {
-      transform: translate(-50%, -50%) scale(1.1); // Minimal scale on tiny screens
+      transform: translate(-50%, -50%) scale(1.1);
     }
     @media (max-width: 320px) {
-      transform: translate(-50%, -50%) scale(1.05); // Even more minimal
+      transform: translate(-50%, -50%) scale(1.05);
     }
-    @include media-breakpoint-up(sm) { // Scale for small screens and up
-      transform: translate(-50%, -50%) scale(1.25); // Slightly increased from original for better feel
+    @include media-breakpoint-up(sm) {
+      transform: translate(-50%, -50%) scale(1.25);
     }
-    @include media-breakpoint-up(md) { // Original scale on medium and larger
+    @include media-breakpoint-up(md) {
       transform: translate(-50%, -50%) scale(1.3);
     }
     animation: none;
@@ -219,7 +186,6 @@ a {
   }
 }
 
-// Ensure the keyframes are defined
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba($primary, 0.6); }
   70% { box-shadow: 0 0 0 12px rgba($primary, 0); }
@@ -235,7 +201,6 @@ a {
   }
 }
 
-// --- 5. CUSTOM UTILITY CLASSES FOR LANDING PAGE ---
 .card-hover-grow {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   &:hover {

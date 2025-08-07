@@ -1,5 +1,5 @@
 import './landing.scss';
-import 'bootstrap';
+import { Collapse, Dropdown } from 'bootstrap';
 
 // Import SVG icons instead of using the icon font
 import calendar from 'bootstrap-icons/icons/calendar2-week.svg';

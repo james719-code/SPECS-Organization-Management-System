@@ -1,36 +1,22 @@
-// dashboardUser.scss
-
-// =================================================================
-// DASHBOARD USER STYLESHEET
-// =================================================================
-
-// --- 1. IMPORT SHARED FOUNDATION ---
-// Provides themed variables ($primary, etc.), mixins, and fonts
 @import '../shared/styles';
 
-// Layout & Grid
 @import "bootstrap/scss/grid";
 @import "bootstrap/scss/containers";
 
-// Utilities & Helpers
 @import "bootstrap/scss/helpers";
 
-// Navigation & Components
 @import "bootstrap/scss/nav";
 @import "bootstrap/scss/offcanvas";
-@import "bootstrap/scss/dropdown";  // For user menu
+@import "bootstrap/scss/dropdown";
 @import "bootstrap/scss/button-group";
 @import "bootstrap/scss/list-group";
 @import "bootstrap/scss/tables";
 @import "bootstrap/scss/forms";
-@import "bootstrap/scss/spinners"; // For loading indicators
-@import "bootstrap/scss/alert";     // If modals are used in views
-@import "bootstrap/scss/popover";  // If popovers are used
-@import "bootstrap/scss/tooltip";  // If tooltips are used
+@import "bootstrap/scss/spinners";
+@import "bootstrap/scss/alert";
+@import "bootstrap/scss/popover";
+@import "bootstrap/scss/tooltip";
 
-// --- 3. DASHBOARD-SPECIFIC CUSTOM STYLES ---
-
-// Sidebar Styling
 .offcanvas-start {
   &.bg-primary {
     background-color: $primary !important;
@@ -61,16 +47,15 @@
   }
 }
 
-// Content Area
+
 #dashboard-content {
-  min-height: calc(100vh - 56px); // Account for mobile navbar height
+  min-height: calc(100vh - 56px);
 
   @include media-breakpoint-up(lg) {
     min-height: 100vh;
   }
 }
 
-// View-specific Enhancements
 .dashboard-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 
@@ -80,7 +65,6 @@
   }
 }
 
-// File List Specific
 .file-item {
   border-left: 3px solid $primary;
 
@@ -89,7 +73,6 @@
   }
 }
 
-// Status Badges
 .status-badge {
   &.status-pending {
     background-color: $warning;
@@ -105,7 +88,6 @@
   }
 }
 
-// Responsive Adjustments
 @include media-breakpoint-down(lg) {
   .offcanvas-start {
     width: 250px !important;

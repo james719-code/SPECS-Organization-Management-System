@@ -22,10 +22,8 @@ function getSettingsHTML(user, profile) {
             return `<option value="${value}" ${selected}>${value}</option>`;
         }).join('');
 
-    // Reusable styles for icons on buttons
     const btnIconStyle = "width: 1.1em; height: 1.1em; filter: invert(1);";
 
-    // --- Create conditional sections for student-only features ---
     const scheduleSection = isStudent ? `
         <div class="card mb-4">
             <div class="card-body">
@@ -112,9 +110,6 @@ function getSettingsHTML(user, profile) {
     `;
 }
 
-/**
- * Attaches event listeners for the forms on the settings page.
- */
 function attachEventListeners(user, profile) {
     const showFeedback = (button, message, isSuccess) => {
         const originalText = button.innerText; // Get only text content
@@ -212,7 +207,6 @@ function attachEventListeners(user, profile) {
     // --- SCHEDULE FILE UPLOAD ---
     const uploadScheduleForm = document.getElementById('uploadScheduleForm');
     if (uploadScheduleForm) {
-        // Save the original icon to the button itself for restoration
         const submitBtn = uploadScheduleForm.querySelector('button[type="submit"]');
         const originalIcon = submitBtn.querySelector('img');
         if (originalIcon) {
@@ -260,7 +254,7 @@ function attachEventListeners(user, profile) {
                 setTimeout(() => {
                     submitBtn.innerHTML = originalButtonHTML;
                     submitBtn.disabled = false;
-                    uploadScheduleForm.reset(); // Clear the file input
+                    uploadScheduleForm.reset();
                 }, 3000);
             }
         });
@@ -294,9 +288,6 @@ function attachEventListeners(user, profile) {
     }
 }
 
-/**
- * Renders the settings view.
- */
 export default function renderSettingsView(user, profile) {
     return {
         html: getSettingsHTML(user, profile),

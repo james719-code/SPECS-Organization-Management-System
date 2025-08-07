@@ -25,7 +25,6 @@ const YEAR_LEVEL_OPTIONS = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B']
 // --- HTML TEMPLATE FUNCTIONS ---
 function createStudentCardHTML(studentDoc) {
     const studentData = JSON.stringify(studentDoc).replace(/'/g, "\\'");
-    // --- Reusable icon styles ---
     const dropdownIconStyle = "width: 1.1em; height: 1.1em; filter: var(--bs-dropdown-link-color-filter);";
     const dangerIconStyle = "width: 1.1em; height: 1.1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);";
 

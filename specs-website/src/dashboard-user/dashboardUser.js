@@ -7,7 +7,6 @@ import { account, databases } from "../shared/appwrite.js";
 import { Query } from "appwrite";
 import { Offcanvas, Dropdown } from 'bootstrap';
 
-// Import views
 import renderFinanceView from "./views/finance.js";
 import renderFilesView from "./views/files.js";
 import renderEventsView from "./views/events.js";
@@ -15,7 +14,6 @@ import renderSettingsView from "./views/settings.js";
 import renderStudentView from "./views/students.js";
 import renderPaymentView from "./views/payments.js";
 
-// Import SVG icons
 import wallet from 'bootstrap-icons/icons/wallet.svg';
 import folder from 'bootstrap-icons/icons/folder.svg';
 import calendarEvent from 'bootstrap-icons/icons/calendar-event.svg';
@@ -26,14 +24,12 @@ import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 
-// --- DATABASE CONFIG ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const FILES_PAGE_LIMIT = 10;
 
-// --- MAIN DASHBOARD COMPONENT ---
 export default async function renderDashboard() {
     const app = document.getElementById("app");
 
@@ -54,11 +50,8 @@ export default async function renderDashboard() {
             map[student.$id] = student.fullname || student.username;
             return map;
         }, {});
-
-        // NOTE: All 'bi-*' icon classes have been replaced with <img src="..."> tags using imported SVGs.
         app.innerHTML = `
       <div class="d-flex" style="min-height: 100vh;">
-        <!-- Sidebar -->
         <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3 bg-primary" style="width: 280px;" tabindex="-1" id="sidebar">
           <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-white text-decoration-none">
             <span class="fs-4 fw-bold">SPECS</span>
@@ -73,7 +66,6 @@ export default async function renderDashboard() {
             <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Settings</a></li>
           </ul>
           
-          <!-- User Menu Dropdown -->
           <div class="dropdown mt-auto">
             <hr>
             <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
@@ -88,7 +80,6 @@ export default async function renderDashboard() {
           </div>
         </aside>
 
-        <!-- Main Content Wrapper -->
         <div class="flex-grow-1" style="overflow-y: auto; height: 100vh;">
           <header class="navbar d-lg-none">
             <div class="container-fluid">
@@ -104,7 +95,6 @@ export default async function renderDashboard() {
       </div>
     `;
 
-        // --- LOGIC AND EVENT HANDLING ---
         const contentEl = document.getElementById("dashboard-content");
         const viewLinks = document.querySelectorAll('#sidebar [data-view]');
         const sidebar = document.getElementById('sidebar');
@@ -162,7 +152,6 @@ export default async function renderDashboard() {
             }
         };
 
-        // Attach event listeners to all view links (in sidebar and dropdown)
         viewLinks.forEach((link) => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
@@ -179,8 +168,6 @@ export default async function renderDashboard() {
             await account.deleteSession("current");
             window.location.href = "/landing/#login";
         });
-
-        // Initial render
         await renderContent("finance");
 
     } catch (err) {

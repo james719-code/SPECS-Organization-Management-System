@@ -35,11 +35,6 @@ let currentStudent = null;
 let addPaymentModalInstance, editPaymentModalInstance;
 
 // --- HTML TEMPLATE FUNCTIONS ---
-
-/**
- * Creates the HTML for a single, redesigned student payment card.
- * Includes a conditional delete button for students who are fully paid up.
- */
 function createStudentPaymentCardHTML(student, paymentsForStudent) {
     const pendingPayments = paymentsForStudent.filter(p => !p.isPaid);
     const hasPaidRecords = paymentsForStudent.some(p => p.isPaid);
@@ -79,9 +74,6 @@ function createStudentPaymentCardHTML(student, paymentsForStudent) {
     `;
 }
 
-/**
- * Returns the main HTML structure for the initial view, including all modals and styles.
- */
 function getInitialPaymentViewHTML(sectionOptionsHTML) {
     const eventOptions = events.map(event => `<option value="${event.event_name}">${event.event_name}</option>`).join('');
     return `
@@ -134,9 +126,6 @@ function getInitialPaymentViewHTML(sectionOptionsHTML) {
     `;
 }
 
-/**
- * Returns the HTML for the student's detailed payment view.
- */
 function getStudentDetailsPageHTML(student, paymentsForStudent) {
     const pending = paymentsForStudent.filter(p => !p.isPaid);
     const paid = paymentsForStudent.filter(p => p.isPaid);

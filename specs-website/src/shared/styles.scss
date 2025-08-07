@@ -1,47 +1,31 @@
-// =================================================================
-// MAIN SCSS FILE
-// =================================================================
-
-// -----------------------------------------------------------------
-// 1. BOOTSTRAP SETUP & THEME VARIABLES
-// -----------------------------------------------------------------
-$primary: #0d6b66;     // Deep teal
-$secondary: #10b981;   // Soft green
-$info: #60a5fa;        // Circuit highlights
-$success: #00c39a;     // Molecule bright green
-$dark: #0f172a;        // Deep background
-$light: #e2f1f0;       // Whitish bg
+$primary: #0d6b66;
+$secondary: #10b981;
+$info: #60a5fa;
+$success: #00c39a;
+$dark: #0f172a;
+$light: #e2f1f0;
 
 $body-bg: #f4fefc;
 $body-color: #0f172a;
 $font-family-sans-serif: 'Segoe UI', Roboto, sans-serif;
 
-// Core Bootstrap Tools
-@import "../../node_modules/bootstrap/scss/functions";
-@import "../../node_modules/bootstrap/scss/variables";
-@import "../../node_modules/bootstrap/scss/variables-dark";
-@import "../../node_modules/bootstrap/scss/mixins";
 
-// Bootstrap Required Dependencies
-@import "../../node_modules/bootstrap/scss/maps";
-@import "../../node_modules/bootstrap/scss/utilities";
-@import "../../node_modules/bootstrap/scss/root";
-@import "../../node_modules/bootstrap/scss/reboot";
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/variables-dark";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/utilities";
+@import "bootstrap/scss/root";
+@import "bootstrap/scss/reboot";
+@import "bootstrap/scss/buttons";
+@import "bootstrap/scss/card";
+@import "bootstrap/scss/navbar";
+@import "bootstrap/scss/badge";
+@import "bootstrap/scss/dropdown";
+@import "bootstrap/scss/modal";
+@import "bootstrap/scss/utilities/api";
 
-// Components You Are Using
-@import "../../node_modules/bootstrap/scss/buttons";
-@import "../../node_modules/bootstrap/scss/card";
-@import "../../node_modules/bootstrap/scss/navbar";
-@import "../../node_modules/bootstrap/scss/badge";
-@import "../../node_modules/bootstrap/scss/dropdown";
-@import "../../node_modules/bootstrap/scss/modal";
-
-// Utilities API must come last after components
-@import "../../node_modules/bootstrap/scss/utilities/api";
-
-// -----------------------------------------------------------------
-// 2. GLOBAL RESETS & BASE STYLES
-// -----------------------------------------------------------------
 body {
   background-color: $body-bg;
   color: $body-color;
@@ -52,10 +36,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-
-// -----------------------------------------------------------------
-// 3. LAYOUT STYLES
-// -----------------------------------------------------------------
 .navbar {
   background-color: $primary;
 
@@ -66,8 +46,6 @@ body {
       color: $secondary !important;
     }
   }
-
-  // User menu dropdown toggle inside the primary navbar
   .dropdown-toggle {
     transition: background-color 0.2s ease-in-out;
 
@@ -82,11 +60,6 @@ body {
   }
 }
 
-
-
-// -----------------------------------------------------------------
-// 4. COMPONENT STYLES
-// -----------------------------------------------------------------
 .btn-primary {
   background-color: $primary;
   border-color: darken($primary, 10%);
@@ -114,7 +87,7 @@ body {
 
   .card-img-top {
     width: 100%;
-    height: 200px; // Maintain consistent image height
+    height: 200px;
     object-fit: cover;
   }
 

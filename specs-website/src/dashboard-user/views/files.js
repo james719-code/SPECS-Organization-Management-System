@@ -20,10 +20,6 @@ const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
 const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;
 const FILES_PAGE_LIMIT = 10;
 
-/**
- * Creates the HTML for a single, redesigned file card.
- * Features: Better layout, hover effects, and graceful text truncation.
- */
 function createFileCard(fileDoc, userLookup, currentUserId) {
     const downloadUrl = storage.getFileDownload(BUCKET_ID_UPLOADS, fileDoc.fileID);
     const uploaderName = userLookup[fileDoc.uploader] || 'Unknown User';
@@ -75,10 +71,6 @@ function createFileCard(fileDoc, userLookup, currentUserId) {
     `;
 }
 
-
-/**
- * Returns the main HTML structure for the Files view, including CSS for the new card design.
- */
 function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
     const showLoadMore = fileList.length < totalFiles;
     const loadMoreButton = showLoadMore ? `
@@ -179,10 +171,6 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
     `;
 }
 
-
-/**
- * Fetches the first page of files and re-renders the grid or empty state.
- */
 async function refreshFileList(gridContainer, userLookup, currentUserId, renderEmptyState) {
     const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
         Query.orderDesc('$createdAt'),
@@ -197,10 +185,6 @@ async function refreshFileList(gridContainer, userLookup, currentUserId, renderE
     }
 }
 
-
-/**
- * Attaches all event listeners for the files view.
- */
 function attachEventListeners(currentUser, userLookup, totalFiles) {
     let loadedFilesCount = document.querySelectorAll('#file-cards-container .col').length;
     const currentUserId = currentUser.$id;
@@ -379,10 +363,6 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
     });
 }
 
-
-/**
- * Main render function for the Files view.
- */
 export default function renderFilesView(initialData, userLookup, user) {
     return {
         html: getFilesHTML(initialData.files, initialData.total, userLookup, user.$id),

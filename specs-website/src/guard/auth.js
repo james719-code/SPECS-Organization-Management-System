@@ -11,9 +11,6 @@ const ROUTES = {
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 
-/**
- * An immediately-invoked async function to protect the current page.
- */
 (async () => {
     const currentPath = window.location.pathname;
 
@@ -40,7 +37,7 @@ const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
             }
             if (!userIsVerifiedStudent) {
                 console.warn('Auth Guard: Unverified student denied access. Redirecting...');
-                window.location.replace(ROUTES.LANDING_PAGE); // Send to landing, which will show "pending" state
+                window.location.replace(ROUTES.LANDING_PAGE);
                 return;
             }
         }

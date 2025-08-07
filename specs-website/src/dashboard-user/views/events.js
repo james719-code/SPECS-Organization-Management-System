@@ -17,15 +17,11 @@ import calendar2Plus from 'bootstrap-icons/icons/calendar2-plus.svg';
 import search from 'bootstrap-icons/icons/search.svg';
 import xLg from 'bootstrap-icons/icons/x-lg.svg';
 
-
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
 
-/**
- * Creates the HTML for a single event card.
- */
 function createEventCard(eventDoc, userLookup, currentUserId) {
     const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 400, 250);
     const eventDate = new Date(eventDoc.date_to_held);
@@ -66,9 +62,6 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
         </div></div>`;
 }
 
-/**
- * Returns the main HTML structure for the Events view.
- */
 function getEventsHTML() {
     return `
     <div class="events-view-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
