@@ -2,6 +2,17 @@ import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
+// --- SVG ICON IMPORTS ---
+import threeDotsVerticalIcon from 'bootstrap-icons/icons/three-dots-vertical.svg';
+import pencilFillIcon from 'bootstrap-icons/icons/pencil-fill.svg';
+import trashFillIcon from 'bootstrap-icons/icons/trash-fill.svg';
+import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
+import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
+import peopleIcon from 'bootstrap-icons/icons/people.svg';
+import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
+import personPlusFillIcon from 'bootstrap-icons/icons/person-plus-fill.svg';
+import peopleFillIcon from 'bootstrap-icons/icons/people-fill.svg';
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_NON_OFFICER_STUDENT = import.meta.env.VITE_COLLECTION_NON_OFFICER_STUDENT;
@@ -14,23 +25,27 @@ const YEAR_LEVEL_OPTIONS = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B']
 // --- HTML TEMPLATE FUNCTIONS ---
 function createStudentCardHTML(studentDoc) {
     const studentData = JSON.stringify(studentDoc).replace(/'/g, "\\'");
+    // --- Reusable icon styles ---
+    const dropdownIconStyle = "width: 1.1em; height: 1.1em; filter: var(--bs-dropdown-link-color-filter);";
+    const dangerIconStyle = "width: 1.1em; height: 1.1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);";
+
     return `
         <div class="col"><div class="card h-100">
             <div class="card-body">
                 <div class="position-absolute top-0 end-0 p-2">
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
-                            <i class="bi-three-dots-vertical"></i>
+                            <img src="${threeDotsVerticalIcon}" alt="Options">
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><button class="dropdown-item edit-student-btn" type="button" data-student='${studentData}'><i class="bi-pencil-fill me-2"></i>Edit</button></li>
+                            <li><button class="dropdown-item d-flex align-items-center gap-2 edit-student-btn" type="button" data-student='${studentData}'><img src="${pencilFillIcon}" alt="Edit" style="${dropdownIconStyle}">Edit</button></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item delete-student-btn text-danger" type="button" data-id="${studentDoc.$id}" data-name="${studentDoc.name}"><i class="bi-trash-fill me-2"></i>Delete</button></li>
+                            <li><button class="dropdown-item text-danger d-flex align-items-center gap-2 delete-student-btn" type="button" data-id="${studentDoc.$id}" data-name="${studentDoc.name}"><img src="${trashFillIcon}" alt="Delete" style="${dangerIconStyle}">Delete</button></li>
                         </ul>
                     </div>
                 </div>
                 <div class="d-flex align-items-center">
-                    <i class="bi-person-circle fs-2 me-3 text-secondary"></i>
+                    <img src="${personCircleIcon}" alt="Avatar" class="fs-2 me-3 text-secondary" style="width: 2.5rem; height: 2.5rem; opacity: 0.5;">
                     <div>
                         <h6 class="card-title fw-bold mb-0">${studentDoc.name}</h6>
                         <p class="card-text small text-muted mb-0">${studentDoc.email}</p>
@@ -42,6 +57,10 @@ function createStudentCardHTML(studentDoc) {
 }
 
 function getStudentHTML() {
+    const whiteIconStyle = "filter: invert(1);";
+    const primaryOutlineIconStyle = "filter: var(--bs-btn-color-filter);";
+    const secondaryOutlineIconStyle = "filter: var(--bs-btn-color-filter-secondary);";
+
     return `
         <div class="student-directory-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
             <div class="d-flex flex-column flex-lg-row justify-content-lg-between align-items-lg-center mb-4">
@@ -55,7 +74,7 @@ function getStudentHTML() {
         </div>
 
         <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addStudentModal" title="Add New Student">
-            <i class="bi bi-plus-lg fs-4"></i>
+            <img src="${plusLgIcon}" alt="Add Student" style="width: 1.5rem; height: 1.5rem; ${whiteIconStyle}">
         </button>
 
         <div class="modal fade" id="addStudentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
@@ -64,8 +83,8 @@ function getStudentHTML() {
                 <div id="add-student-choice-view">
                     <p>How would you like to add students?</p>
                     <div class="d-grid gap-3">
-                        <button class="btn btn-outline-primary p-3" id="show-single-add-btn"><i class="bi-person-plus-fill fs-4 me-2"></i>Add a Single Student</button>
-                        <button class="btn btn-outline-secondary p-3" id="show-bulk-add-btn"><i class="bi-people-fill fs-4 me-2"></i>Add Students in Bulk</button>
+                        <button class="btn btn-outline-primary p-3 d-flex align-items-center justify-content-center gap-2" id="show-single-add-btn"><img src="${personPlusFillIcon}" alt="Add Single" style="width: 1.5rem; height: 1.5rem; ${primaryOutlineIconStyle}">Add a Single Student</button>
+                        <button class="btn btn-outline-secondary p-3 d-flex align-items-center justify-content-center gap-2" id="show-bulk-add-btn"><img src="${peopleFillIcon}" alt="Add Bulk" style="width: 1.5rem; height: 1.5rem; ${secondaryOutlineIconStyle}">Add Students in Bulk</button>
                     </div>
                 </div>
                 <form id="add-single-student-form" class="d-none">
@@ -133,16 +152,16 @@ async function attachEventListeners(currentUser, profile) {
             cardsContainer.className = 'row flex-grow-1 align-items-center justify-content-center';
             let icon, title, text;
             if (reason === 'filter') {
-                icon = 'bi-funnel';
+                icon = funnelIcon;
                 title = 'No Students Found';
                 text = 'Your search or section filter did not match any students in the directory.';
             } else {
-                icon = 'bi-people';
+                icon = peopleIcon;
                 title = 'Student Directory is Empty';
                 text = 'Add your first student by clicking the (+) button below.';
             }
             cardsContainer.innerHTML = `<div class="col-12"><div class="text-center text-muted py-5">
-                <div class="mb-3"><i class="bi ${icon}" style="font-size: 5rem; color: var(--bs-secondary-color);"></i></div>
+                <div class="mb-3"><img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;"></div>
                 <h4 class="fw-light">${title}</h4><p>${text}</p>
             </div></div>`;
         }
@@ -235,7 +254,7 @@ async function attachEventListeners(currentUser, profile) {
                 alert(`An error occurred: ${error.message}`);
             } finally {
                 deleteBtn.disabled = false;
-                deleteBtn.innerHTML = `<i class="bi-trash-fill me-2"></i>Delete`;
+                deleteBtn.innerHTML = `<img src="${trashFillIcon}" alt="Delete" style="width: 1.1em; height: 1.1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);" class="me-2">Delete`;
             }
         }
     });

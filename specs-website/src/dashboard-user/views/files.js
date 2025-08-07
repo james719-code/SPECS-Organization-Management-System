@@ -3,6 +3,17 @@ import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
+// --- SVG ICON IMPORTS ---
+import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
+import download from 'bootstrap-icons/icons/download.svg';
+import trash from 'bootstrap-icons/icons/trash.svg';
+import person from 'bootstrap-icons/icons/person.svg';
+import calendar3 from 'bootstrap-icons/icons/calendar3.svg';
+import cloudArrowUp from 'bootstrap-icons/icons/cloud-arrow-up.svg';
+import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
+import searchIcon from 'bootstrap-icons/icons/search.svg';
+
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
@@ -22,33 +33,41 @@ function createFileCard(fileDoc, userLookup, currentUserId) {
         ? `${fileDoc.description.substring(0, 80)}...`
         : fileDoc.description || 'No description provided.';
 
+    // --- Inline styles for SVG icons ---
+    const iconStyle = "width: 1em; height: 1em;";
+    const whiteIconStyle = `${iconStyle} filter: invert(1);`;
+    const dangerIconStyle = `${iconStyle} filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);`;
+    const footerIconStyle = `${iconStyle} opacity: 0.6;`;
+    const mainIconStyle = "width: 3rem; height: 3rem; filter: invert(39%) sepia(97%) saturate(1450%) hue-rotate(193deg) brightness(101%) contrast(102%);"; // Primary color filter
+
+
     return `
         <div class="col">
             <div class="card file-card h-100">
                 <div class="card-body d-flex flex-column">
                     <div class="file-icon mb-3">
-                        <i class="bi-file-earmark-text"></i>
+                        <img src="${fileEarmarkText}" alt="File Icon" style="${mainIconStyle}">
                     </div>
                     <h5 class="card-title" title="${fileDoc.fileName}">
                         <span>${fileDoc.fileName}</span>
                     </h5>
                     <p class="card-text small text-body-secondary flex-grow-1">${shortDescription}</p>
                     <div class="mt-auto pt-3">
-                        <a href="${downloadUrl}" class="btn btn-sm btn-primary w-100 mb-2" target="_blank">
-                            <i class="bi-download me-1"></i> Download
+                        <a href="${downloadUrl}" class="btn btn-sm btn-primary w-100 mb-2 d-flex align-items-center justify-content-center gap-1" target="_blank">
+                            <img src="${download}" alt="Download" style="${whiteIconStyle}"> Download
                         </a>
                         ${canDelete ? `
-                        <button class="btn btn-sm btn-outline-danger w-100 delete-file-btn" data-doc-id="${fileDoc.$id}" data-file-id="${fileDoc.fileID}">
-                            <i class="bi-trash me-1"></i> Delete
+                        <button class="btn btn-sm btn-outline-danger w-100 delete-file-btn d-flex align-items-center justify-content-center gap-1" data-doc-id="${fileDoc.$id}" data-file-id="${fileDoc.fileID}">
+                            <img src="${trash}" alt="Delete" style="${dangerIconStyle}"> Delete
                         </button>` : ''}
                     </div>
                 </div>
                 <div class="card-footer small text-body-secondary">
-                    <div title="Uploaded by ${uploaderName}">
-                        <i class="bi-person me-2"></i> ${uploaderName}
+                    <div title="Uploaded by ${uploaderName}" class="d-flex align-items-center gap-2">
+                        <img src="${person}" alt="Uploader" style="${footerIconStyle}"> ${uploaderName}
                     </div>
-                    <div title="Upload date: ${new Date(fileDoc.$createdAt).toLocaleString()}">
-                        <i class="bi-calendar3 me-2"></i> ${new Date(fileDoc.$createdAt).toLocaleDateString()}
+                    <div title="Upload date: ${new Date(fileDoc.$createdAt).toLocaleString()}" class="d-flex align-items-center gap-2">
+                        <img src="${calendar3}" alt="Date" style="${footerIconStyle}"> ${new Date(fileDoc.$createdAt).toLocaleDateString()}
                     </div>
                 </div>
             </div>
@@ -69,6 +88,7 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
 
     let filesGridContent;
     let gridClasses = "row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xxl-5 g-4";
+    const whitePlusIcon = `<img src="${plusLg}" alt="Add" style="width:0.8rem; height:0.8rem; filter:invert(1);">`;
 
     if (fileList.length > 0) {
         filesGridContent = fileList.map(doc => createFileCard(doc, userLookup, currentUserId)).join('');
@@ -78,11 +98,11 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
             <div class="col-12">
                 <div class="text-center text-muted py-5">
                     <div class="mb-4">
-                        <i class="bi bi-cloud-arrow-up" style="font-size: 6rem; color: var(--bs-gray-400);"></i>
+                        <img src="${cloudArrowUp}" alt="No files" style="width: 6rem; height: 6rem; opacity: 0.3;">
                     </div>
                     <h2 class="fw-light">Your File Storage is Empty</h2>
                     <p class="lead text-body-secondary">Ready to get started? Upload your first file.</p>
-                    <p>Click the <span class="btn btn-primary pe-none rounded-circle mx-1"><i class="bi-plus-lg"></i></span> button to share a document.</p>
+                    <p>Click the <span class="btn btn-primary pe-none rounded-circle mx-1 d-inline-flex align-items-center justify-content-center" style="width:1.5rem; height:1.5rem;">${whitePlusIcon}</span> button to share a document.</p>
                 </div>
             </div>
         `;
@@ -102,8 +122,7 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
         .file-card .card-body {
             text-align: center;
         }
-        .file-card .file-icon {
-            font-size: 3rem;
+        .file-card .file-icon img { /* Adjusted selector */
             color: var(--bs-primary);
         }
         .file-card .card-title {
@@ -140,7 +159,7 @@ function getFilesHTML(fileList, totalFiles, userLookup, currentUserId) {
         ${loadMoreButton}
         
         <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#uploadFileModal" title="Upload New File">
-            <i class="bi bi-plus-lg fs-4"></i>
+             <img src="${plusLg}" alt="Add" style="width:1.5rem; height:1.5rem; filter:invert(1);">
         </button>
 
         <div class="modal fade" id="uploadFileModal" tabindex="-1" aria-labelledby="uploadFileModalLabel" aria-hidden="true">
@@ -196,12 +215,14 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
 
     const renderEmptyState = (type, searchTerm = '') => {
         let icon, title, text;
+        const whitePlusIcon = `<img src="${plusLg}" alt="Add" style="width:0.8rem; height:0.8rem; filter:invert(1);">`;
+
         if (type === 'initial') {
-            icon = 'bi-cloud-arrow-up';
+            icon = cloudArrowUp;
             title = 'Your File Storage is Empty';
-            text = `Click the <span class="btn btn-primary pe-none rounded-circle mx-1"><i class="bi-plus-lg"></i></span> button to upload your first file.`;
+            text = `Click the <span class="btn btn-primary pe-none rounded-circle mx-1 d-inline-flex align-items-center justify-content-center" style="width:1.5rem; height:1.5rem;">${whitePlusIcon}</span> button to upload your first file.`;
         } else { // 'search'
-            icon = 'bi-search';
+            icon = searchIcon;
             title = 'No Files Found';
             text = `Your search for "<strong>${searchTerm}</strong>" didn't match any files. Try different keywords.`;
         }
@@ -209,7 +230,7 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
         gridContainer.innerHTML = `
             <div class="col-12">
                 <div class="text-center text-muted py-5">
-                    <div class="mb-4"><i class="bi ${icon}" style="font-size: 6rem; color: var(--bs-gray-400);"></i></div>
+                    <div class="mb-4"><img src="${icon}" alt="${title}" style="width: 6rem; height: 6rem; opacity: 0.3;"></div>
                     <h2 class="fw-light">${title}</h2>
                     <p class="lead text-body-secondary">${text}</p>
                 </div>
@@ -322,7 +343,7 @@ function attachEventListeners(currentUser, userLookup, totalFiles) {
                 console.error('Failed to delete file:', error);
                 alert('Could not delete the file.');
                 deleteBtn.disabled = false;
-                deleteBtn.innerHTML = `<i class="bi-trash me-1"></i> Delete`;
+                deleteBtn.innerHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);"> Delete`;
             }
             return;
         }

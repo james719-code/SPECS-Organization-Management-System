@@ -2,6 +2,21 @@ import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
+// --- SVG ICON IMPORTS ---
+import trashIcon from 'bootstrap-icons/icons/trash.svg';
+import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
+import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
+import arrowLeftIcon from 'bootstrap-icons/icons/arrow-left.svg';
+import threeDotsIcon from 'bootstrap-icons/icons/three-dots.svg';
+import checkCircleFillIcon from 'bootstrap-icons/icons/check-circle-fill.svg';
+import pencilFillIcon from 'bootstrap-icons/icons/pencil-fill.svg';
+import trashFillIcon from 'bootstrap-icons/icons/trash-fill.svg';
+import eraserIcon from 'bootstrap-icons/icons/eraser.svg';
+import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
+import peopleIcon from 'bootstrap-icons/icons/people.svg';
+import personXIcon from 'bootstrap-icons/icons/person-x.svg';
+
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_PAYMENTS = import.meta.env.VITE_COLLECTION_ID_PAYMENTS;
@@ -43,12 +58,12 @@ function createStudentPaymentCardHTML(student, paymentsForStudent) {
                                 title="Clear all paid records for ${studentName}" 
                                 data-student-id="${student.$id}" 
                                 data-student-name="${studentName}">
-                            <i class="bi-trash"></i>
+                            <img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">
                         </button>
                     ` : ''}
                     <div class="d-flex align-items-center">
                          <div class="student-avatar">
-                            <i class="bi-person-circle"></i>
+                            <img src="${personCircleIcon}" alt="Avatar">
                         </div>
                         <div class="student-info">
                             <h6 class="card-title mb-0" title="${studentName}">${studentName}</h6>
@@ -74,15 +89,16 @@ function getInitialPaymentViewHTML(sectionOptionsHTML) {
             .student-payment-card { border-radius: .75rem; border: 1px solid var(--bs-border-color-translucent); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; overflow: hidden; }
             .student-payment-card:hover { transform: translateY(-5px); box-shadow: var(--bs-card-box-shadow); }
             .student-payment-card .card-body { padding: 1rem; position: relative; }
-            .student-payment-card .student-avatar { font-size: 2.5rem; margin-right: 1rem; color: var(--bs-secondary-color); line-height: 1; }
+            .student-payment-card .student-avatar img { width: 2.5rem; height: 2.5rem; margin-right: 1rem; filter: opacity(0.5); }
             .student-payment-card .student-info .card-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
             .student-payment-card .payment-status { text-align: center; font-weight: 500; padding: 0.5rem 0.75rem; border-top: 1px solid var(--bs-border-color-translucent); transition: background-color 0.2s ease; }
             .student-payment-card.has-dues { border-left: 4px solid var(--bs-danger); }
-            .student-payment-card.has-dues .student-avatar { color: var(--bs-danger); }
+            .student-payment-card.has-dues .student-avatar img { filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%); } /* Red */
             .student-payment-card.has-dues .payment-status { background-color: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
             .student-payment-card.paid-up { border-left: 4px solid var(--bs-success); }
+            .student-payment-card.paid-up .student-avatar img { filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%); } /* Green */
             .student-payment-card.paid-up .payment-status { background-color: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
-            .clear-student-records-btn { position: absolute; top: .5rem; right: .5rem; z-index: 5; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; opacity: 0.6; }
+            .clear-student-records-btn { position: absolute; top: .5rem; right: .5rem; z-index: 5; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items-center; justify-content: center; opacity: 0.6; }
             .student-payment-card:hover .clear-student-records-btn { opacity: 1; }
             .clear-student-records-btn:hover { background-color: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
         </style>
@@ -96,7 +112,9 @@ function getInitialPaymentViewHTML(sectionOptionsHTML) {
             </div>
             <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-4 flex-grow-1"></div>
         </div>
-        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" title="Add New Payment"><i class="bi bi-plus-lg fs-4"></i></button>
+        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" title="Add New Payment">
+             <img src="${plusLgIcon}" alt="Add" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
+        </button>
         
         <!-- Add Payment Modal -->
         <div class="modal fade" id="addPaymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="addPaymentForm">
@@ -125,10 +143,18 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
     const totalDue = pending.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const eventOptions = events.map(event => `<option value="${event.event_name}">${event.event_name}</option>`).join('');
 
+    // --- Icon styles for reuse ---
+    const iconStyle = "width: 1.1em; height: 1.1em;";
+    const successStyle = `${iconStyle} filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);`;
+    const defaultStyle = `${iconStyle} filter: var(--bs-dropdown-link-color-filter);`;
+    const dangerStyle = `${iconStyle} filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);`;
+    const secondaryStyle = `${iconStyle} filter: var(--bs-btn-color-filter);`;
+
+
     return `
         <div class="student-payment-details-page">
             <div class="d-flex align-items-center mb-4">
-                <button id="backToPaymentsBtn" class="btn btn-light me-3" title="Back to all students"><i class="bi-arrow-left"></i></button>
+                <button id="backToPaymentsBtn" class="btn btn-light me-3" title="Back to all students"><img src="${arrowLeftIcon}" alt="Back"></button>
                 <div><h1 class="mb-0">${student.fullname || student.name}'s Payments</h1><p class="text-muted mb-0">${student.yearLevel || student.section}</p></div>
             </div>
             <div class="card mb-4">
@@ -137,11 +163,11 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                     <p class="${totalDue > 0 ? 'text-danger' : 'text-success'} fs-5"><strong>Total Due:</strong> ${formatCurrency(totalDue)}</p>
                     <div class="table-responsive"><table class="table table-striped align-middle">
                         <thead><tr><th>Item</th><th>For</th><th class="text-end">Total</th><th class="text-center">Actions</th></tr></thead>
-                        <tbody>${pending.length > 0 ? pending.map(p => { const paymentData = JSON.stringify(p).replace(/'/g, "\\'"); return `<tr><td>${p.item_name}</td><td>${p.is_event ? p.event : p.activity}</td><td class="text-end">${formatCurrency(p.price * p.quantity)}</td><td class="text-center"><div class="dropdown"><button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown"><i class="bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
-                            <li><button class="dropdown-item paid-payment-btn" type="button" data-payment='${paymentData}'><i class="bi-check-circle-fill me-2 text-success"></i>Mark as Paid</button></li>
-                            <li><button class="dropdown-item edit-payment-btn" type="button" data-payment='${paymentData}'><i class="bi-pencil-fill me-2"></i>Edit</button></li>
+                        <tbody>${pending.length > 0 ? pending.map(p => { const paymentData = JSON.stringify(p).replace(/'/g, "\\'"); return `<tr><td>${p.item_name}</td><td>${p.is_event ? p.event : p.activity}</td><td class="text-end">${formatCurrency(p.price * p.quantity)}</td><td class="text-center"><div class="dropdown"><button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown"><img src="${threeDotsIcon}" alt="Actions"></button><ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item d-flex align-items-center gap-2 paid-payment-btn" type="button" data-payment='${paymentData}'><img src="${checkCircleFillIcon}" alt="Paid" style="${successStyle}">Mark as Paid</button></li>
+                            <li><button class="dropdown-item d-flex align-items-center gap-2 edit-payment-btn" type="button" data-payment='${paymentData}'><img src="${pencilFillIcon}" alt="Edit" style="${defaultStyle}">Edit</button></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item delete-payment-btn text-danger" type="button" data-payment-id="${p.$id}" data-payment-name="${p.item_name}"><i class="bi-trash-fill me-2"></i>Delete</button></li>
+                            <li><button class="dropdown-item d-flex align-items-center gap-2 delete-payment-btn text-danger" type="button" data-payment-id="${p.$id}" data-payment-name="${p.item_name}"><img src="${trashFillIcon}" alt="Delete" style="${dangerStyle}">Delete</button></li>
                         </ul></div></td></tr>`}).join('') : '<tr><td colspan="4" class="text-center text-muted p-4">No pending payments.</td></tr>'}
                         </tbody>
                     </table></div>
@@ -150,7 +176,7 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5>Payment History</h5>
-                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-secondary clear-paid-records-btn" data-student-id="${student.$id}" data-student-name="${student.fullname || student.name}" title="Delete all paid records for this student"><i class="bi-eraser me-2"></i>Clear Paid Records</button>` : ''}
+                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-secondary clear-paid-records-btn d-flex align-items-center gap-2" data-student-id="${student.$id}" data-student-name="${student.fullname || student.name}" title="Delete all paid records for this student"><img src="${eraserIcon}" alt="Clear" style="${secondaryStyle}">Clear Paid Records</button>` : ''}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive"><table class="table table-hover align-middle">
@@ -194,15 +220,15 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
         cardsContainer.className = 'row flex-grow-1 align-items-center justify-content-center';
         let icon, title, text;
         if (reason === 'filter') {
-            icon = 'bi-funnel';
+            icon = funnelIcon;
             title = 'No Students Found';
             text = 'Your search or section filter did not match any students.';
         } else {
-            icon = 'bi-people';
+            icon = peopleIcon;
             title = 'No Student Data';
             text = 'There are no non-officer students in the system to manage payments for.';
         }
-        cardsContainer.innerHTML = `<div class="col-12"><div class="text-center text-muted py-5"><div class="mb-3"><i class="bi ${icon}" style="font-size: 5rem; color: var(--bs-secondary-color);"></i></div><h4 class="fw-light">${title}</h4><p>${text}</p></div></div>`;
+        cardsContainer.innerHTML = `<div class="col-12"><div class="text-center text-muted py-5"><div class="mb-3"><img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;"></div><h4 class="fw-light">${title}</h4><p>${text}</p></div></div>`;
     }
 };
 
@@ -259,7 +285,7 @@ async function attachEventListeners(currentUser, profile) {
         nonOfficerStudents = nonOfficersRes.documents;
 
         if (nonOfficerStudents.length === 0) {
-            wrapper.innerHTML = `<div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted"><div><i class="bi bi-person-x" style="font-size: 5rem;"></i><h4 class="fw-light mt-3">Payments Module Unavailable</h4><p>There are no non-officer students currently in the system.</p></div></div>`;
+            wrapper.innerHTML = `<div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted"><div><img src="${personXIcon}" alt="No students" style="width: 5rem; height: 5rem; opacity: 0.5;"><h4 class="fw-light mt-3">Payments Module Unavailable</h4><p>There are no non-officer students currently in the system.</p></div></div>`;
             return;
         }
 
@@ -328,13 +354,13 @@ async function attachEventListeners(currentUser, profile) {
                             }
                         } else {
                             alert(`No paid records found for ${studentName} to delete.`);
-                            clearStudentBtn.innerHTML = `<i class="bi-trash"></i>`;
+                            clearStudentBtn.innerHTML = `<img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">`;
                             clearStudentBtn.disabled = false;
                         }
                     } catch (error) {
                         console.error("Failed to clear student records:", error);
                         alert(`Error: ${error.message}`);
-                        clearStudentBtn.innerHTML = `<i class="bi-trash"></i>`;
+                        clearStudentBtn.innerHTML = `<img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">`;
                         clearStudentBtn.disabled = false;
                     }
                 }

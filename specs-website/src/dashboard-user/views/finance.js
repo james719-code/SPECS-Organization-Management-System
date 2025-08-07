@@ -5,6 +5,15 @@ import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import Chart from 'chart.js/auto';
 
+// --- SVG ICON IMPORTS ---
+import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
+import inbox from 'bootstrap-icons/icons/inbox.svg';
+import calendarRange from 'bootstrap-icons/icons/calendar-range.svg';
+import pencilSquare from 'bootstrap-icons/icons/pencil-square.svg';
+import trash from 'bootstrap-icons/icons/trash.svg';
+import checkLg from 'bootstrap-icons/icons/check-lg.svg';
+import xLg from 'bootstrap-icons/icons/x-lg.svg';
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
@@ -60,6 +69,7 @@ function getDetailViewHTML(groupName, revenues, expenses) {
         const collectionId = type === 'revenue' ? COLLECTION_ID_REVENUE : COLLECTION_ID_EXPENSES;
         const date = new Date(type === 'revenue' ? item.date_earned : item.date_buy).toLocaleDateString();
         const originalDateValue = type === 'revenue' ? item.date_earned : item.date_buy;
+        const btnIconStyle = "width: 1em; height: 1em;";
 
         return `
         <tr data-doc-id="${item.$id}" data-collection-id="${collectionId}">
@@ -69,10 +79,10 @@ function getDetailViewHTML(groupName, revenues, expenses) {
             <td data-field="price" data-original-value="${item.price}"><span>${formatCurrency(item.price)}</span></td>
             <td>${formatCurrency(item.price * item.quantity)}</td>
             <td class="actions">
-                <button class="btn btn-sm btn-outline-primary edit-btn" title="Edit Item">Edit</button>
-                <button class="btn btn-sm btn-outline-danger delete-btn" title="Delete Item">Delete</button>
-                <button class="btn btn-sm btn-primary save-btn" style="display:none;" title="Save Changes">Save</button>
-                <button class="btn btn-sm btn-secondary cancel-btn" style="display:none;" title="Cancel Edit">Cancel</button>
+                <button class="btn btn-sm btn-outline-primary edit-btn" title="Edit Item"><img src="${pencilSquare}" alt="Edit" style="${btnIconStyle} filter: var(--bs-btn-color-filter);"></button>
+                <button class="btn btn-sm btn-outline-danger delete-btn" title="Delete Item"><img src="${trash}" alt="Delete" style="${btnIconStyle} filter: var(--bs-btn-color-filter-danger);"></button>
+                <button class="btn btn-sm btn-primary save-btn" style="display:none;" title="Save Changes"><img src="${checkLg}" alt="Save" style="${btnIconStyle} filter: invert(1);"></button>
+                <button class="btn btn-sm btn-secondary cancel-btn" style="display:none;" title="Cancel Edit"><img src="${xLg}" alt="Cancel" style="${btnIconStyle} filter: invert(1);"></button>
             </td>
         </tr>
         `;
@@ -217,7 +227,9 @@ function attachDetailViewListeners(currentUser, userLookup) {
     if (!detailView) return;
 
     detailView.addEventListener('click', async (e) => {
-        const target = e.target;
+        const target = e.target.closest('button');
+        if (!target) return;
+
         const row = target.closest('tr');
         if (!row || !row.dataset.docId) return;
 
@@ -309,7 +321,7 @@ function attachOverviewListeners(currentUser, userLookup, initialData) {
 
     modalFabContainer.innerHTML = `
         <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addTransactionModal" title="Add Transaction">
-            <i class="bi-plus-lg fs-4"></i>
+            <img src="${plusLg}" alt="Add Transaction" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
         </button>
         <div class="modal fade" id="addTransactionModal" tabindex="-1" aria-labelledby="addTransactionModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
@@ -501,7 +513,6 @@ export default async function renderFinanceView(userLookup, currentUser) {
         const endRangeStr = new Date(endYear, endMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
         const chartTitle = `Net Income (${startRangeStr} - ${endRangeStr})`;
 
-        // MODIFICATION: Conditionally generate either the list of cards or a flat "empty state" message.
         let activitiesContent;
         if (groupedActivities.length > 0) {
             activitiesContent = `
@@ -512,11 +523,11 @@ export default async function renderFinanceView(userLookup, currentUser) {
             activitiesContent = `
                 <div class="text-center text-muted py-5">
                     <div class="mb-3">
-                        <i class="bi bi-inbox" style="font-size: 4rem; color: var(--bs-secondary-color);"></i>
+                        <img src="${inbox}" alt="No activities" style="width: 4rem; height: 4rem; opacity: 0.5;">
                     </div>
                     <h4 class="fw-light">No Financial Activities Found</h4>
                     <p>There are no recorded transactions for the selected period.</p>
-                    <p>Click the <span class="btn btn-sm btn-primary pe-none rounded-circle"><i class="bi-plus-lg"></i></span> button to add a new transaction.</p>
+                    <p>Click the <span class="btn btn-sm btn-primary pe-none rounded-circle d-inline-flex align-items-center justify-content-center" style="width:1.5rem; height:1.5rem;"><img src="${plusLg}" alt="Add" style="width:0.8rem; height:0.8rem; filter:invert(1);"></span> button to add a new transaction.</p>
                 </div>
             `;
         }
@@ -527,8 +538,8 @@ export default async function renderFinanceView(userLookup, currentUser) {
                     <h1 class="mb-3 mb-md-0">Finance Overview</h1>
                     <div class="d-flex gap-2">
                         <input type="search" id="financeSearchInput" class="form-control" style="max-width: 320px;" placeholder="Search activities or events...">
-                        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#timeRangeModal" title="Change Time Range">
-                            <i class="bi bi-calendar-range"></i>
+                        <button class="btn btn-outline-secondary d-flex align-items-center justify-content-center" type="button" data-bs-toggle="modal" data-bs-target="#timeRangeModal" title="Change Time Range">
+                            <img src="${calendarRange}" alt="Change Time Range" style="width: 1.2em; height: 1.2em; filter: var(--bs-btn-color-filter);">
                         </button>
                     </div>
                 </div>

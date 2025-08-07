@@ -1,6 +1,12 @@
 import { databases, storage, account } from "../../shared/appwrite.js";
 import { ID } from "appwrite";
 
+// --- SVG ICON IMPORTS ---
+import uploadIcon from 'bootstrap-icons/icons/upload.svg';
+import exclamationOctagonIcon from 'bootstrap-icons/icons/exclamation-octagon.svg';
+import checkCircleIcon from 'bootstrap-icons/icons/check-circle.svg';
+import xCircleIcon from 'bootstrap-icons/icons/x-circle.svg';
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
@@ -16,6 +22,9 @@ function getSettingsHTML(user, profile) {
             return `<option value="${value}" ${selected}>${value}</option>`;
         }).join('');
 
+    // Reusable styles for icons on buttons
+    const btnIconStyle = "width: 1.1em; height: 1.1em; filter: invert(1);";
+
     // --- Create conditional sections for student-only features ---
     const scheduleSection = isStudent ? `
         <div class="card mb-4">
@@ -30,7 +39,10 @@ function getSettingsHTML(user, profile) {
                         <label for="scheduleFile" class="form-label">${profile.haveSchedule ? 'Upload New Schedule (Replaces Current)' : 'Schedule File (PDF Only)'}</label>
                         <input type="file" class="form-control" id="scheduleFile" name="scheduleFile" accept=".pdf" required>
                     </div>
-                    <button type="submit" class="btn btn-primary"><i class="bi-upload me-2"></i>${profile.haveSchedule ? 'Update Schedule' : 'Upload Schedule'}</button>
+                    <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+                        <img src="${uploadIcon}" alt="Upload" style="${btnIconStyle}">
+                        ${profile.haveSchedule ? 'Update Schedule' : 'Upload Schedule'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -90,7 +102,10 @@ function getSettingsHTML(user, profile) {
             </div>
             <div class="card-body">
                 <p>This action is permanent and cannot be undone. Proceed with caution.</p>
-                <button type="button" id="deleteAccountBtn" class="btn btn-danger"><i class="bi-exclamation-octagon me-2"></i>Delete My Account</button>
+                <button type="button" id="deleteAccountBtn" class="btn btn-danger d-flex align-items-center gap-2">
+                    <img src="${exclamationOctagonIcon}" alt="Warning" style="${btnIconStyle}">
+                    Delete My Account
+                </button>
             </div>
         </div>
     </div>
@@ -102,12 +117,26 @@ function getSettingsHTML(user, profile) {
  */
 function attachEventListeners(user, profile) {
     const showFeedback = (button, message, isSuccess) => {
-        const originalText = button.innerHTML;
-        button.innerHTML = isSuccess ? `<i class="bi-check-circle me-2"></i> ${message}` : `<i class="bi-x-circle me-2"></i> ${message}`;
+        const originalText = button.innerText; // Get only text content
+        const iconStyle = "width: 1.1em; height: 1.1em; margin-right: 0.5rem;";
+        const successFilter = "filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);"; // Green
+        const errorFilter = "filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);"; // Red
+
+        const iconHtml = isSuccess
+            ? `<img src="${checkCircleIcon}" alt="Success" style="${iconStyle} ${successFilter}">`
+            : `<img src="${xCircleIcon}" alt="Error" style="${iconStyle} ${errorFilter}">`;
+
+        button.innerHTML = `${iconHtml} ${message}`;
         button.disabled = true;
 
         setTimeout(() => {
-            button.innerHTML = originalText;
+            // Restore only the original text, assuming no icon was there initially
+            const originalIcon = button.querySelector('img.original-icon');
+            if (originalIcon) {
+                button.innerHTML = `${originalIcon.outerHTML} ${originalText}`;
+            } else {
+                button.innerHTML = originalText;
+            }
             button.disabled = false;
         }, 3000);
     };
@@ -183,11 +212,17 @@ function attachEventListeners(user, profile) {
     // --- SCHEDULE FILE UPLOAD ---
     const uploadScheduleForm = document.getElementById('uploadScheduleForm');
     if (uploadScheduleForm) {
+        // Save the original icon to the button itself for restoration
+        const submitBtn = uploadScheduleForm.querySelector('button[type="submit"]');
+        const originalIcon = submitBtn.querySelector('img');
+        if (originalIcon) {
+            originalIcon.classList.add('original-icon');
+        }
+
         uploadScheduleForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const submitBtn = uploadScheduleForm.querySelector('button[type="submit"]');
             const file = document.getElementById('scheduleFile').files[0];
-            const originalButtonText = submitBtn.innerHTML;
+            const originalButtonHTML = submitBtn.innerHTML;
 
             if (!file) {
                 alert('Please select a PDF file to upload.');
@@ -223,10 +258,37 @@ function attachEventListeners(user, profile) {
                 alert('Failed to upload schedule. Please try again.');
             } finally {
                 setTimeout(() => {
-                    submitBtn.innerHTML = originalButtonText;
+                    submitBtn.innerHTML = originalButtonHTML;
                     submitBtn.disabled = false;
                     uploadScheduleForm.reset(); // Clear the file input
                 }, 3000);
+            }
+        });
+    }
+
+    // --- DELETE ACCOUNT ---
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', async () => {
+            const confirmation = prompt('This action is irreversible. To confirm, please type "DELETE" in all caps below:');
+            if (confirmation !== 'DELETE') {
+                alert('Account deletion cancelled.');
+                return;
+            }
+
+            deleteAccountBtn.disabled = true;
+            deleteAccountBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
+
+            try {
+                alert("Account deletion initiated. You will be logged out.");
+                await account.deleteSession('current');
+                window.location.href = '/landing/';
+
+            } catch (error) {
+                console.error('Failed to delete account:', error);
+                alert('Failed to delete account. Please contact an administrator.');
+                deleteAccountBtn.disabled = false;
+                deleteAccountBtn.innerHTML = `<img src="${exclamationOctagonIcon}" alt="Warning" style="width: 1.1em; height: 1.1em; filter: invert(1);" class="me-2">Delete My Account`;
             }
         });
     }
