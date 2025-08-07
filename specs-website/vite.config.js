@@ -6,10 +6,10 @@ dotenv.config(); // Load .env variables
 
 export default defineConfig({
   // Set the root to the directory containing your main index.html
-  root: 'src/landing',
+  root: 'src',
 
   // Public directory for static assets, relative to the project root.
-  publicDir: '../../public',
+  publicDir: '../public',
 
   define: {
     __APP_TITLE__: JSON.stringify(process.env.VITE_APP_TITLE),
@@ -29,7 +29,7 @@ export default defineConfig({
   },
   build: {
     // The output directory is relative to the project root.
-    outDir: '../../dist',
+    outDir: '../dist',
 
     // Clean the output directory before building.
     emptyOutDir: true,
@@ -38,9 +38,10 @@ export default defineConfig({
       input: {
         // Define all your entry points here using absolute paths.
         // This is crucial for a multi-page application setup.
-        main: resolve(__dirname, 'src/landing/index.html'),
+        main: resolve(__dirname, './src/index.html'),
+        landing: resolve(__dirname, 'src/landing/index.html'),
         // Uncomment these as you build them out.
-        // userDashboard: resolve(__dirname, 'src/user-dashboard/index.html'),
+        userDashboard: resolve(__dirname, 'src/dashboard-user/index.html'),
         // adminDashboard: resolve(__dirname, 'src/admin-dashboard/index.html'),
       },
       output: {

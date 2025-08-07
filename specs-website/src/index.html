@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initializing SPECS Portal...</title>
+
+    <!-- Using the same logo for a consistent favicon -->
+    <link rel="icon" href="/logo.webp" type="image/webp">
+
+    <!-- Styles for the initial loading screen -->
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f8f9fa; /* A soft, neutral background */
+            font-family: 'Poppins', system-ui, sans-serif;
+        }
+        .loader {
+            text-align: center;
+            color: #212529;
+        }
+        .loader img {
+            width: 80px;
+            height: 80px;
+            animation: pulse 1.8s infinite ease-in-out;
+        }
+        .loader p {
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+    </style>
+
+</head>
+<body>
+
+<div class="loader">
+    <img src="/logo.webp" alt="SPECS Logo">
+    <p>Initializing Portal...</p>
+</div>
+
+<script type="module">
+    import { account, databases } from './shared/appwrite.js';
+
+    // --- Configuration: Centralize all paths for easy maintenance ---
+    const ROUTES = {
+        ADMIN_DASHBOARD: '/dashboard-admin/',
+        USER_DASHBOARD: '/dashboard-user/',
+        LANDING_PAGE: '/landing/'
+    };
+
+    // Get required IDs from environment variables provided by Vite
+    const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
+    const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+
+    /**
+     * An immediately-invoked async function that acts as the application's main router.
+     */
+    (async () => {
+        try {
+            // --- User is Logged In ---
+            // Attempt to get the current user session.
+            const user = await account.get();
+            // Fetch their profile to determine their role.
+            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
+
+            // Role-based redirection
+            if (profile.type === 'admin') {
+                window.location.replace(ROUTES.ADMIN_DASHBOARD);
+            } else if (profile.type === 'student' && profile.verified) {
+                window.location.replace(ROUTES.USER_DASHBOARD);
+            } else {
+                window.location.replace(ROUTES.LANDING_PAGE);
+            }
+        } catch (error) {
+            window.location.replace(ROUTES.LANDING_PAGE);
+        }
+    })();
+</script>
+
+<noscript>
+    <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>This web application requires JavaScript to function. Please enable it in your browser settings and refresh the page.</p>
+    </div>
+</noscript>
+
+</body>
+</html>

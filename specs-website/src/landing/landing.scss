@@ -9,32 +9,7 @@
 // and imports Google Fonts.
 @import '../shared/styles.scss';
 
-// --- 3. BOOTSTRAP COMPONENT IMPORTS (MODULAR) ---
-// Import only the components needed for this part of the application.
-@import "bootstrap/scss/type";
-@import "bootstrap/scss/images";
-@import "bootstrap/scss/containers";
-@import "bootstrap/scss/grid";
-@import "bootstrap/scss/nav";
-@import "bootstrap/scss/navbar";
-@import "bootstrap/scss/card";
-@import "bootstrap/scss/accordion";
-@import "bootstrap/scss/buttons";
-@import "bootstrap/scss/forms";
-@import "bootstrap/scss/spinners";
-@import "bootstrap/scss/transitions";
-@import "bootstrap/scss/close";
-@import "bootstrap/scss/alert";
-@import "bootstrap/scss/utilities/api";
-
-
 // --- 4. GLOBAL & BODY STYLES ---
-body {
-  background-color: $gray-100;
-  font-family: $font-family-sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
 
 a {
   color: $primary;
@@ -46,6 +21,7 @@ a {
 
 // --- 6. CUSTOM COMPONENT OVERRIDES & HELPERS ---
 .navbar {
+  max-width: 100vw;
   background-color: $primary;
   box-shadow: 0 2px 10px rgba($black, 0.15);
   transition: background-color 0.3s ease;
