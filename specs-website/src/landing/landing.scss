@@ -7,10 +7,20 @@
 // --- 1. IMPORT THE SHARED FOUNDATION ---
 // This provides the themed variables ($primary, etc.), custom mixins,
 // and imports Google Fonts.
-@import '../shared/styles.scss';
+@import '../shared/styles';
 
-// --- 4. GLOBAL & BODY STYLES ---
+// Bootstrap Components Used in Landing Page
+@import "bootstrap/scss/grid"; // for row, col-* classes
+@import "bootstrap/scss/containers";  // for spacing, text, background utilities
+@import "bootstrap/scss/helpers"; // for clearfix, ratio, position, stacks, etc.
+@import "bootstrap/scss/nav"; // for nav components
+@import "bootstrap/scss/transitions"; // for collapse transitions
+@import "bootstrap/scss/accordion"; // for accordion components
+@import "bootstrap/scss/forms"; // for form controls (already in main but ensuring)
+@import "bootstrap/scss/spinners"; // for spinner-border classes
+@import "bootstrap/scss/alert"; // for alert classes
 
+// --- 3. GLOBAL & BODY STYLES ---
 a {
   color: $primary;
   transition: color 0.2s ease-in-out;
@@ -19,27 +29,14 @@ a {
   }
 }
 
-// --- 6. CUSTOM COMPONENT OVERRIDES & HELPERS ---
-.navbar {
-  max-width: 100vw;
-  background-color: $primary;
-  box-shadow: 0 2px 10px rgba($black, 0.15);
-  transition: background-color 0.3s ease;
-  .nav-link {
-    transition: color 0.2s ease, background-color 0.2s ease;
-    border-radius: $border-radius-sm;
-    &:hover {
-      color: $white;
-      background-color: rgba($white, 0.1);
-    }
-  }
-}
-
+// --- 4. CUSTOM COMPONENT OVERRIDES & HELPERS ---
 .footer {
-  background-color: $gray-900;
-  color: $gray-400;
-  padding: 3rem 1rem;
+  background-color: $dark;
+  color: $light;
+  padding: 2rem;
+  text-align: center;
   font-size: 0.9rem;
+
   .footer-link {
     color: $gray-300;
     text-decoration: none;
@@ -50,45 +47,25 @@ a {
   }
 }
 
-.card {
-  border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card-hover-grow:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-}
-
-.btn-primary {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba($primary, 0.3);
-  }
-}
-
-// --- 7. PAGE-SPECIFIC & TYPOGRAPHY STYLES ---
-.hero-section-gradient {
+.hero, .hero-section-gradient {
   background: linear-gradient(135deg, $primary, $secondary);
   color: white;
-  text-shadow: 0 2px 4px rgba($black, 0.2);
-
-  .lead {
-    font-size: 1.25rem;
-    font-weight: 300;
-  }
+  padding: 4rem 2rem;
+  text-align: center;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
 }
 
+// --- Landing Page Past Events ---
 .past-event-card .event-image-placeholder img {
-  filter: grayscale(85%);
-  opacity: 0.7;
+  filter: grayscale(100%);
+  opacity: 0.65;
   transition: filter 0.3s ease, opacity 0.3s ease;
-  &:hover {
-    filter: grayscale(0%);
-    opacity: 1;
-  }
+}
+
+.past-event-card:hover .event-image-placeholder img {
+  filter: grayscale(0%);
+  opacity: 1;
 }
 
 .auth-container {
@@ -137,11 +114,31 @@ a {
 /* Interactive Logo Section */
 .logo-interactive-container {
   position: relative;
-  display: inline-block;
+  // Ensure the container itself doesn't overflow horizontally
+  // and is centered if it's block or inline-block
+  display: block; // Changed from inline-block to block for better width control
+  max-width: 100vw; // Ensure it doesn't exceed viewport width
+  margin-left: auto; // Center the block element
+  margin-right: auto; // Center the block element
+
+  // Ensure the image inside also respects the container's width
+  img {
+    // Make the image responsive within its container
+    max-width: 100%;
+    height: auto;
+    // Prevent the image from being wider than its container or viewport
+    // Use min() to pick the smaller of the two values
+    width: min(100%, 600px); // Example: Cap at 600px or 100% of container, whichever is smaller
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .logo-hotspot {
+  // --- Base styles for larger screens ---
   position: absolute;
+  // Default size for screens md and up
   width: 30px;
   height: 30px;
   background-color: rgba($primary, 0.9);
@@ -157,23 +154,96 @@ a {
   border: 2px solid $white;
   box-shadow: 0 2px 8px rgba($black, 0.3);
   animation: pulse 2.5s infinite;
+
+  // Font size adjustments
+  font-size: 1rem; // Base font size
+
+  // --- Responsive styles for smaller screens ---
+  // Adjust for small screens (sm) and down - smaller size
+  @include media-breakpoint-down(sm) {
+    width: 24px;
+    height: 24px;
+    font-size: 0.8rem;
+    border-width: 1px;
+    box-shadow: 0 1px 4px rgba($black, 0.3);
+  }
+
+  // More aggressive adjustment for extra small screens (xs) - smallest size
+  @include media-breakpoint-down(xs) { // Check if 'xs' is a valid breakpoint
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    border-width: 1px;
+    box-shadow: 0 1px 3px rgba($black, 0.3);
+  }
+
+  // Alternative using a raw media query for screens <= 400px for even finer control
+  @media (max-width: 400px) {
+    width: 16px; // Even smaller
+    height: 16px; // Even smaller
+    font-size: 0.6rem; // Much smaller font
+    border-width: 1px;
+    box-shadow: 0 1px 2px rgba($black, 0.25);
+  }
+
+  // Extreme tiny screens <= 320px
+  @media (max-width: 320px) {
+    width: 14px;
+    height: 14px;
+    font-size: 0.55rem;
+    border-width: 1px;
+    box-shadow: 0 0.5px 1.5px rgba($black, 0.2);
+  }
+
+
   &:hover,
   &.active {
-    transform: translate(-50%, -50%) scale(1.3);
+    // Gradually reduce scale on smaller screens to prevent overflow/clipping
+    @include media-breakpoint-down(xs) {
+      transform: translate(-50%, -50%) scale(1.15); // Smaller scale increase
+    }
+    @media (max-width: 400px) {
+      transform: translate(-50%, -50%) scale(1.1); // Minimal scale on tiny screens
+    }
+    @media (max-width: 320px) {
+      transform: translate(-50%, -50%) scale(1.05); // Even more minimal
+    }
+    @include media-breakpoint-up(sm) { // Scale for small screens and up
+      transform: translate(-50%, -50%) scale(1.25); // Slightly increased from original for better feel
+    }
+    @include media-breakpoint-up(md) { // Original scale on medium and larger
+      transform: translate(-50%, -50%) scale(1.3);
+    }
     animation: none;
     background-color: darken($primary, 5%);
   }
 }
 
+// Ensure the keyframes are defined
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba($primary, 0.6); }
   70% { box-shadow: 0 0 0 12px rgba($primary, 0); }
   100% { box-shadow: 0 0 0 0 rgba($primary, 0); }
 }
 
+
 #logo-description-content {
   transition: opacity 0.3s ease-in-out;
+
   &.content-hidden {
     opacity: 0;
   }
+}
+
+// --- 5. CUSTOM UTILITY CLASSES FOR LANDING PAGE ---
+.card-hover-grow {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  }
+}
+
+.object-fit-cover {
+  object-fit: cover;
 }

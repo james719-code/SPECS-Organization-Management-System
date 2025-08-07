@@ -59,6 +59,10 @@ export default defineConfig({
             if (id.includes('bootstrap')) {
               return 'vendor-bootstrap';
             }
+
+            if(id.includes('chart')) {
+              return 'vendor-chart';
+            }
             // Bundle all other dependencies into a single 'vendor' file.
             return 'vendor';
           }

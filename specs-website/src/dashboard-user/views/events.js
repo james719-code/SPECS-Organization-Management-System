@@ -3,6 +3,21 @@ import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
+// --- SVG ICON IMPORTS ---
+import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
+import pencilSquare from 'bootstrap-icons/icons/pencil-square.svg';
+import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
+import trash from 'bootstrap-icons/icons/trash.svg';
+import calendar3 from 'bootstrap-icons/icons/calendar3.svg';
+import person from 'bootstrap-icons/icons/person.svg';
+import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
+import plusCircle from 'bootstrap-icons/icons/plus-circle.svg';
+import calendarX from 'bootstrap-icons/icons/calendar-x.svg';
+import calendar2Plus from 'bootstrap-icons/icons/calendar2-plus.svg';
+import search from 'bootstrap-icons/icons/search.svg';
+import xLg from 'bootstrap-icons/icons/x-lg.svg';
+
+
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
@@ -19,14 +34,20 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
     const creatorName = userLookup[eventDoc.added_by] || 'Unknown';
     const isEnded = eventDoc.event_ended === true;
 
+    // SVG icon styles
+    const iconStyle = "width: 1.1em; height: 1.1em; opacity: 0.7;";
+    const btnIconStyleSecondary = "width: 1em; height: 1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);";
+    const btnIconStyleSuccess = "width: 1em; height: 1em; filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);";
+    const btnIconStyleDanger = "width: 1em; height: 1em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);";
+
     const collaboratorsHTML = (eventDoc.collab && eventDoc.collab.length > 0)
-        ? `<div class="small text-muted mb-2 mt-2"><i class="bi-people-fill me-1"></i> <strong>Collaborators:</strong> ${eventDoc.collab.join(', ')}</div>` : '';
+        ? `<div class="small text-muted mb-2 mt-2 d-flex align-items-center gap-1"><img src="${peopleFill}" alt="Collaborators" style="${iconStyle}"> <strong>Collaborators:</strong> ${eventDoc.collab.join(', ')}</div>` : '';
 
     const actionButtons = canManage ? `
         <div class="btn-group">
-            <button class="btn btn-sm btn-outline-secondary edit-event-btn" data-doc-id="${eventDoc.$id}" title="Edit this event"><i class="bi-pencil-square"></i></button>
-            ${!isEnded ? `<button class="btn btn-sm btn-outline-success mark-ended-btn" data-doc-id="${eventDoc.$id}" title="Mark as ended"><i class="bi-check-circle"></i></button>` : ''}
-            <button class="btn btn-sm btn-outline-danger delete-event-btn" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}" title="Delete this event"><i class="bi-trash"></i></button>
+            <button class="btn btn-sm btn-outline-secondary edit-event-btn" data-doc-id="${eventDoc.$id}" title="Edit this event"><img src="${pencilSquare}" alt="Edit" style="${btnIconStyleSecondary}"></button>
+            ${!isEnded ? `<button class="btn btn-sm btn-outline-success mark-ended-btn" data-doc-id="${eventDoc.$id}" title="Mark as ended"><img src="${checkCircle}" alt="Mark as ended" style="${btnIconStyleSuccess}"></button>` : ''}
+            <button class="btn btn-sm btn-outline-danger delete-event-btn" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}" title="Delete this event"><img src="${trash}" alt="Delete" style="${btnIconStyleDanger}"></button>
         </div>` : '';
 
     return `
@@ -34,11 +55,11 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
             <img src="${imageUrl}" class="card-img-top" alt="${eventDoc.event_name}" style="height: 200px; object-fit: cover;">
             <div class="card-body d-flex flex-column">
                 <h5 class="card-title">${eventDoc.event_name}</h5>
-                <div class="card-subtitle mb-2 text-body-secondary small"><i class="bi-calendar3 me-1"></i> ${formattedDate}</div>
+                <div class="card-subtitle mb-2 text-body-secondary small d-flex align-items-center gap-1"><img src="${calendar3}" alt="Date" style="${iconStyle}"> ${formattedDate}</div>
                 ${collaboratorsHTML}
                 <p class="card-text flex-grow-1 small">${eventDoc.description || 'No description provided.'}</p>
                 <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
-                    <small class="text-body-secondary"><i class="bi-person me-1"></i> ${creatorName}</small>
+                    <small class="text-body-secondary d-flex align-items-center gap-1"><img src="${person}" alt="Creator" style="${iconStyle}"> ${creatorName}</small>
                     ${actionButtons}
                 </div>
             </div>
@@ -64,7 +85,9 @@ function getEventsHTML() {
             </div>
         </div>
         
-        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addEventModal" title="Add New Event"><i class="bi bi-plus-lg fs-4"></i></button>
+        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addEventModal" title="Add New Event">
+            <img src="${plusLg}" alt="Add Event" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
+        </button>
 
         <div class="modal fade" id="addEventModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="addEventForm">
             <div class="modal-header"><h5 class="modal-title">Add a New Event</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -73,7 +96,7 @@ function getEventsHTML() {
                 <div class="mb-3"><label for="eventDate" class="form-label">Date & Time</label><input type="datetime-local" id="eventDate" class="form-control" required></div>
                 <div class="mb-3"><label for="eventImage" class="form-label">Event Image</label><input type="file" id="eventImage" class="form-control" accept="image/*" required></div>
                 <div class="mb-3"><label for="eventDescription" class="form-label">Description</label><textarea id="eventDescription" class="form-control" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label">Collaborators</label><div id="collaborators-list"></div><button type="button" id="add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2"><i class="bi-plus-circle me-1"></i> Add Collaborator</button></div>
+                <div class="mb-3"><label class="form-label">Collaborators</label><div id="collaborators-list"></div><button type="button" id="add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2 d-flex align-items-center gap-1"><img src="${plusCircle}" alt="Add" style="width:1.1em; height:1.1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);"> Add Collaborator</button></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Create Event</button></div>
         </form></div></div></div>
@@ -87,7 +110,7 @@ function getEventsHTML() {
                 <div class="mb-3"><label for="editEventDate" class="form-label">Date & Time</label><input type="datetime-local" id="editEventDate" class="form-control" required></div>
                 <div class="mb-3"><label for="editEventImage" class="form-label">New Event Image (Optional)</label><input type="file" id="editEventImage" class="form-control" accept="image/*"></div>
                 <div class="mb-3"><label for="editEventDescription" class="form-label">Description</label><textarea id="editEventDescription" class="form-control" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label">Collaborators</label><div id="edit-collaborators-list"></div><button type="button" id="edit-add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2"><i class="bi-plus-circle me-1"></i> Add Collaborator</button></div>
+                <div class="mb-3"><label class="form-label">Collaborators</label><div id="edit-collaborators-list"></div><button type="button" id="edit-add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2 d-flex align-items-center gap-1"><img src="${plusCircle}" alt="Add" style="width:1.1em; height:1.1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);"> Add Collaborator</button></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
         </form></div></div></div>
@@ -100,7 +123,7 @@ function renderEventsToContainer(events, container, userLookup, currentUserId) {
         container.innerHTML = events.map(doc => createEventCard(doc, userLookup, currentUserId)).join('');
     } else {
         const message = container.id.includes('upcoming') ? 'No upcoming events found.' : 'No ended events found.';
-        container.innerHTML = `<div class="col-12"><div class="text-center text-muted p-4"><i class="bi bi-calendar-x fs-3"></i><p class="mt-2 mb-0">${message}</p></div></div>`;
+        container.innerHTML = `<div class="col-12"><div class="text-center text-muted p-4"><img src="${calendarX}" alt="No events" style="width: 2.5rem; height: 2.5rem; opacity: 0.6;"><p class="mt-2 mb-0">${message}</p></div></div>`;
     }
 }
 
@@ -118,18 +141,18 @@ function renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId) {
 function renderEmptyState(wrapper, type, searchTerm = '') {
     let icon, title, text;
     if (type === 'initial') {
-        icon = 'bi-calendar2-plus';
+        icon = calendar2Plus;
         title = 'No Events Yet';
-        text = `Click the <span class="btn btn-sm btn-primary pe-none rounded-circle"><i class="bi-plus-lg"></i></span> button to create the first event.`;
+        text = `Click the <span class="btn btn-sm btn-primary pe-none rounded-circle d-inline-flex align-items-center justify-content-center" style="width:1.5rem; height:1.5rem;"><img src="${plusLg}" alt="Add" style="width:0.8rem; height:0.8rem; filter: invert(1);"></span> button to create the first event.`;
     } else { // 'search'
-        icon = 'bi-search';
+        icon = search;
         title = 'No Events Found';
         text = `Your search for "<strong>${searchTerm}</strong>" did not match any events.`;
     }
     wrapper.innerHTML = `
         <div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted">
             <div>
-                <i class="bi ${icon}" style="font-size: 5rem;"></i>
+                <img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;">
                 <h4 class="fw-light mt-3">${title}</h4>
                 <p>${text}</p>
             </div>
@@ -244,7 +267,7 @@ function attachEventListeners(currentUser, userLookup) {
             const list = addCollabBtn.previousElementSibling;
             const inputGroup = document.createElement('div');
             inputGroup.className = 'input-group mb-2';
-            inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" placeholder="Name of collaborator"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><i class="bi-x-lg"></i></button>`;
+            inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" placeholder="Name of collaborator"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><img src="${xLg}" alt="Remove" style="width:0.8em; height:0.8em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);"></button>`;
             list.appendChild(inputGroup);
         }
 
@@ -269,7 +292,7 @@ function attachEventListeners(currentUser, userLookup) {
             (eventData.collab || []).forEach(name => {
                 const inputGroup = document.createElement('div');
                 inputGroup.className = 'input-group mb-2';
-                inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" value="${name}"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><i class="bi-x-lg"></i></button>`;
+                inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" value="${name}"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><img src="${xLg}" alt="Remove" style="width:0.8em; height:0.8em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);"></button>`;
                 editCollabList.appendChild(inputGroup);
             });
             editEventModal.show();
@@ -286,7 +309,7 @@ function attachEventListeners(currentUser, userLookup) {
                 console.error('Failed to mark event as ended:', error);
                 alert('Could not update the event.');
                 markEndedBtn.disabled = false;
-                markEndedBtn.innerHTML = `<i class="bi-check-circle"></i>`;
+                markEndedBtn.innerHTML = `<img src="${checkCircle}" alt="Mark as ended" style="width: 1em; height: 1em; filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);">`;
             }
         }
 
@@ -302,7 +325,7 @@ function attachEventListeners(currentUser, userLookup) {
                 console.error('Failed to delete event:', error);
                 alert('Could not delete the event.');
                 deleteBtn.disabled = false;
-                deleteBtn.innerHTML = `<i class="bi-trash"></i>`;
+                deleteBtn.innerHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);">`;
             }
         }
     });

@@ -1,17 +1,30 @@
 // dashboard.js
 
-import './dashboardUser.scss'
-import '../guard/auth.js'
+import './dashboardUser.scss';
+import '../guard/auth.js';
 
 import { account, databases } from "../shared/appwrite.js";
 import { Query } from "appwrite";
 import { Offcanvas, Dropdown } from 'bootstrap';
+
+// Import views
 import renderFinanceView from "./views/finance.js";
 import renderFilesView from "./views/files.js";
 import renderEventsView from "./views/events.js";
 import renderSettingsView from "./views/settings.js";
 import renderStudentView from "./views/students.js";
 import renderPaymentView from "./views/payments.js";
+
+// Import SVG icons
+import wallet from 'bootstrap-icons/icons/wallet.svg';
+import folder from 'bootstrap-icons/icons/folder.svg';
+import calendarEvent from 'bootstrap-icons/icons/calendar-event.svg';
+import personBadgeFill from 'bootstrap-icons/icons/person-badge-fill.svg';
+import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
+import gear from 'bootstrap-icons/icons/gear.svg';
+import personCircle from 'bootstrap-icons/icons/person-circle.svg';
+import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
+import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 
 // --- DATABASE CONFIG ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -42,8 +55,8 @@ export default async function renderDashboard() {
             return map;
         }, {});
 
+        // NOTE: All 'bi-*' icon classes have been replaced with <img src="..."> tags using imported SVGs.
         app.innerHTML = `
-     
       <div class="d-flex" style="min-height: 100vh;">
         <!-- Sidebar -->
         <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3 bg-primary" style="width: 280px;" tabindex="-1" id="sidebar">
@@ -52,25 +65,25 @@ export default async function renderDashboard() {
           </a>
           <hr>
           <ul class="nav nav-pills flex-column">
-            <li><a href="#" class="nav-link" data-view="finance"><i class="bi-wallet me-2"></i>Finance</a></li>
-            <li><a href="#" class="nav-link" data-view="files"><i class="bi-folder me-2"></i>Files</a></li>
-            <li><a href="#" class="nav-link" data-view="events"><i class="bi-calendar-event me-2"></i>Events</a></li>
-            <li><a href="#" class="nav-link" data-view="students"><i class="bi-person-badge-fill me-2"></i>Students</a></li>
-            <li><a href="#" class="nav-link" data-view="payments"><i class="bi-credit-card-fill me-2"></i>Payments</a></li>
-            <li><a href="#" class="nav-link" data-view="settings"><i class="bi-gear me-2"></i>Settings</a></li>
+            <li><a href="#" class="nav-link" data-view="finance"><img src="${wallet}" alt="Finance" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Finance</a></li>
+            <li><a href="#" class="nav-link" data-view="files"><img src="${folder}" alt="Files" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Files</a></li>
+            <li><a href="#" class="nav-link" data-view="events"><img src="${calendarEvent}" alt="Events" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Events</a></li>
+            <li><a href="#" class="nav-link" data-view="students"><img src="${personBadgeFill}" alt="Students" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Students</a></li>
+            <li><a href="#" class="nav-link" data-view="payments"><img src="${creditCardFill}" alt="Payments" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Payments</a></li>
+            <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.2em; height:1.2em; filter: invert(1);">Settings</a></li>
           </ul>
           
           <!-- User Menu Dropdown -->
           <div class="dropdown mt-auto">
             <hr>
             <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi-person-circle fs-4 me-2"></i>
+              <img src="${personCircle}" alt="User" class="me-2" style="width: 32px; height: 32px; filter: invert(1);">
               <strong>${profile.username || 'User'}</strong>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-              <li><a class="dropdown-item" href="#" data-view="settings"><i class="bi-gear-fill me-2"></i>Settings</a></li>
+              <li><a class="dropdown-item" href="#" data-view="settings"><img src="${gearFill}" alt="Settings" class="me-2" style="width: 1em; height: 1em; filter: invert(1);">Settings</a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item text-danger fw-bold" href="#" id="logout-btn"><i class="bi-box-arrow-right me-2"></i>Sign out</a></li>
+              <li><a class="dropdown-item text-danger fw-bold" href="#" id="logout-btn"><img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 1em; height: 1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out</a></li>
             </ul>
           </div>
         </aside>
@@ -172,9 +185,9 @@ export default async function renderDashboard() {
 
     } catch (err) {
         console.error("Failed to render dashboard:", err);
-        await account.deleteSession("current").catch(() => {});
+        await account.deleteSession("current").catch(() => { });
         window.location.href = "/landing/#login";
     }
 }
 
-renderDashboard()
+renderDashboard();

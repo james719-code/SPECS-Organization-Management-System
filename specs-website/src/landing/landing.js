@@ -1,6 +1,30 @@
-
 import './landing.scss';
 import 'bootstrap';
+
+// Import SVG icons instead of using the icon font
+import calendar from 'bootstrap-icons/icons/calendar2-week.svg';
+import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
+import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
+import clock from 'bootstrap-icons/icons/clock.svg';
+import personCircle from 'bootstrap-icons/icons/person-circle.svg';
+import personVideo3 from 'bootstrap-icons/icons/person-video3.svg';
+import boxArrowInRight from 'bootstrap-icons/icons/box-arrow-in-right.svg';
+import envelopeFill from 'bootstrap-icons/icons/envelope-fill.svg';
+import facebook from 'bootstrap-icons/icons/facebook.svg';
+import codeSlash from 'bootstrap-icons/icons/code-slash.svg';
+import barChartLineFill from 'bootstrap-icons/icons/bar-chart-line-fill.svg';
+import shieldLockFill from 'bootstrap-icons/icons/shield-lock-fill.svg';
+import robot from 'bootstrap-icons/icons/robot.svg';
+import controller from 'bootstrap-icons/icons/controller.svg';
+import paletteFill from 'bootstrap-icons/icons/palette-fill.svg';
+import imageAlt from 'bootstrap-icons/icons/image-alt.svg';
+import arrowsMove from 'bootstrap-icons/icons/arrows-move.svg';
+import bullseye from 'bootstrap-icons/icons/bullseye.svg';
+import checkCircleFill from 'bootstrap-icons/icons/check-circle-fill.svg';
+import xCircleFill from 'bootstrap-icons/icons/x-circle-fill.svg';
+import hourglassSplit from 'bootstrap-icons/icons/hourglass-split.svg';
+import envelopeCheckFill from 'bootstrap-icons/icons/envelope-check-fill.svg';
+
 import logoURL from '../../public/logo.webp';
 import { account, databases, storage, Query, ID } from '../shared/appwrite.js';
 
@@ -23,12 +47,12 @@ function getCachedImageUrl(fileId, width = 400, height = 250) {
         }
         const newUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80);
         if (!cache[fileId]) cache[fileId] = {};
-        cache[fileId][`${width}x${height}`] = newUrl.href;
+        cache[fileId][`${width}x${height}`] = newUrl;
         localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
-        return newUrl.href;
+        return newUrl;
     } catch (error) {
         console.warn("Could not access event image cache.", error);
-        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80).href;
+        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80);
     }
 }
 
@@ -40,9 +64,9 @@ function getPictureUrl(fileId, size = 150) {
             return cache[fileId];
         }
         const newUrl = storage.getFilePreview(BUCKET_ID_PICTURES, fileId, size, size, 'center', 90);
-        cache[fileId] = newUrl.href;
+        cache[fileId] = newUrl;
         localStorage.setItem(PICTURE_CACHE_KEY, JSON.stringify(cache));
-        return newUrl.href;
+        return newUrl;
     } catch (error) {
         console.warn(`Could not get picture for ${fileId}.`, error);
         return null;
@@ -70,7 +94,7 @@ function createGuestEventCard(eventDoc, isPastEvent = false) {
     const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     const formattedTime = eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const collaboratorsHTML = (eventDoc.collab && eventDoc.collab.length > 0)
-        ? `<div class="small text-muted mb-2"><i class="bi-people-fill me-1"></i><strong>In collaboration with:</strong> ${eventDoc.collab.join(', ')}</div>` : '';
+        ? `<div class="small text-muted mb-2 d-flex align-items-center"><img src="${peopleFill}" alt="Collaboration icon" class="me-1" style="width: 1.1em; height: 1.1em; filter: invert(50%);"><strong>In collaboration with:</strong>&nbsp;${eventDoc.collab.join(', ')}</div>` : '';
 
     return `
         <div class="col">
@@ -85,7 +109,7 @@ function createGuestEventCard(eventDoc, isPastEvent = false) {
                         <h5 class="card-title fw-bold">${eventDoc.event_name}</h5>
                         <p class="card-text small text-body-secondary flex-grow-1">${eventDoc.description || 'More details coming soon.'}</p>
                         ${collaboratorsHTML}
-                        <div class="mt-auto small text-muted"><i class="bi-clock me-1"></i> ${formattedDate} at ${formattedTime}</div>
+                        <div class="mt-auto small text-muted d-flex align-items-center"><img src="${clock}" alt="Clock icon" class="me-1" style="width: 1em; height: 1em; filter: invert(50%);"> ${formattedDate} at ${formattedTime}</div>
                     </div>
                 </div>
             </div>
@@ -110,7 +134,7 @@ function createOfficerCardHTML({ name, position, fileId }) {
                 <div class="card-body d-flex flex-column align-items-center justify-content-center p-3">
                     ${imageUrl
         ? `<img src="${imageUrl}" class="rounded-circle mb-3 object-fit-cover shadow-sm" alt="${name}" style="width: 100px; height: 100px; border: 3px solid var(--bs-primary-bg-subtle);">`
-        : `<i class="bi-person-circle fs-1 text-secondary mb-3" style="font-size: 100px !important;"></i>`
+        : `<img src="${personCircle}" alt="Default profile picture" class="mb-3" style="width: 100px; height: 100px; opacity: 0.5;">`
     }
                     <h5 class="card-title mb-1 fw-semibold">${name}</h5>
                     <p class="card-text text-muted small">${position}</p>
@@ -128,7 +152,7 @@ function createAdviserCardHTML({ name, position, fileId }) {
                 <div class="card-body p-4">
                      ${imageUrl
         ? `<img src="${imageUrl}" class="rounded-circle mb-3 object-fit-cover shadow" alt="${name}" style="width: 120px; height: 120px; border: 4px solid var(--bs-primary-bg-subtle);">`
-        : `<i class="bi-person-video3 fs-1 text-primary mb-3"></i>`
+        : `<img src="${personVideo3}" alt="Default adviser icon" class="mb-3" style="width: 80px; height: 80px; filter: var(--bs-primary-text-emphasis);">`
     }
                     <h5 class="card-title fw-bold mb-1">${name}</h5>
                     <p class="card-text text-muted">${position}</p>
@@ -144,7 +168,7 @@ function createJobCardHTML({ title, icon }) {
             <div class="card text-center shadow-sm h-100 card-hover-grow">
                 <div class="card-body p-4">
                     <div class="d-inline-flex align-items-center justify-content-center text-bg-primary bg-gradient fs-2 mb-3 rounded-circle" style="width: 4rem; height: 4rem;">
-                        <i class="${icon}"></i>
+                        <img src="${icon}" alt="${title} icon" style="width: 2rem; height: 2rem; filter: brightness(0) invert(1);">
                     </div>
                     <h5 class="fw-semibold mb-0">${title}</h5>
                 </div>
@@ -191,9 +215,9 @@ function renderLandingPage() {
                         <li class="nav-item"><a class="nav-link" href="#about-bscs">About BSCS</a></li>
                         <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
                         <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-                        <li class="nav-item d-lg-none mt-2"><a href="#login" class="btn btn-sm btn-outline-light w-100"><i class="bi-box-arrow-in-right me-2"></i>Login / Sign Up</a></li>
+                        <li class="nav-item d-lg-none mt-2"><a href="#login" class="btn btn-sm btn-outline-light w-100"><img src="${boxArrowInRight}" alt="Login icon" class="me-2" style="width: 1em; height: 1em; filter: invert(1);">Login / Sign Up</a></li>
                     </ul>
-                    <a href="#login" class="btn btn-sm btn-outline-light d-none d-lg-block"><i class="bi-box-arrow-in-right me-2"></i>Login / Sign Up</a>
+                    <a href="#login" class="btn btn-sm btn-outline-light d-none d-lg-block"><img src="${boxArrowInRight}" alt="Login icon" class="me-2" style="width: 1em; height: 1em; filter: invert(1);">Login / Sign Up</a>
                 </div>
             </div>
         </header>
@@ -245,8 +269,8 @@ function renderLandingPage() {
                 <h3 class="fw-bold mb-3">Contact Us</h3>
                 <p class="mb-4">For inquiries, partnerships, or more information about SPECS, feel free to reach out.</p>
                 <div class="d-flex justify-content-center flex-wrap align-items-center gap-4">
-                    <a href="mailto:parsu.specs@gmail.com" class="link-light text-decoration-none footer-link"><i class="bi-envelope-fill fs-4"></i><span class="ms-2">parsu.specs@gmail.com</span></a>
-                    <a href="https://www.facebook.com/parsu.specs" target="_blank" class="link-light text-decoration-none footer-link"><i class="bi-facebook fs-4"></i><span class="ms-2">facebook.com/psu.specs</span></a>
+                    <a href="mailto:parsu.specs@gmail.com" class="link-light text-decoration-none footer-link d-flex align-items-center"><img src="${envelopeFill}" alt="Email icon" style="width: 1.5rem; height: 1.5rem; filter: invert(1);"><span class="ms-2">parsu.specs@gmail.com</span></a>
+                    <a href="https://www.facebook.com/parsu.specs" target="_blank" class="link-light text-decoration-none footer-link d-flex align-items-center"><img src="${facebook}" alt="Facebook icon" style="width: 1.5rem; height: 1.5rem; filter: invert(1);"><span class="ms-2">facebook.com/psu.specs</span></a>
                 </div>
                 <hr class="my-4"><p class="mb-0 small">© ${new Date().getFullYear()} SPECS. All Rights Reserved.</p>
             </div>
@@ -261,7 +285,6 @@ function renderLoginPage() {
     app.innerHTML = `
     <div class="container auth-container">
         <div class="row justify-content-center">
-            <!-- KEY CHANGE: Wider columns on large (lg) and extra-large (xl) screens -->
             <div class="col-md-7 col-lg-5 col-xl-4">
                 <div class="card shadow-lg">
                     <div class="card-body p-4 p-md-5">
@@ -425,7 +448,7 @@ function renderVerifyEmailPage() {
     <div class="container auth-container">
       <div class="row justify-content-center">
         <div class="col-md-7 col-lg-5"><div class="card shadow-lg text-center"><div class="card-body p-4 p-md-5">
-            <div id="verify-icon" class="mb-4" style="font-size: 5rem;"><div class="spinner-border text-primary" style="width: 5rem; height: 5rem;" role="status"></div></div>
+            <div id="verify-icon" class="mb-4"><div class="spinner-border text-primary" style="width: 5rem; height: 5rem;" role="status"></div></div>
             <h2 id="verify-status" class="card-title h3 fw-bold">Verifying Email...</h2>
             <p id="verify-message" class="card-text text-body-secondary">Please wait a moment while we confirm your verification link.</p>
             <div class="d-grid mt-4"><a href="#login" id="verify-action-btn" class="btn btn-primary d-none">Proceed to Login</a></div>
@@ -444,13 +467,13 @@ function renderVerifyEmailPage() {
             const secret = urlParams.get('secret');
             if (!userId || !secret) throw new Error("Verification link is invalid or incomplete.");
             await account.updateVerification(userId, secret);
-            iconEl.innerHTML = `<i class="bi-check-circle-fill text-success"></i>`;
+            iconEl.innerHTML = `<img src="${checkCircleFill}" alt="Success" class="text-success" style="width: 5rem; height: 5rem; fill: var(--bs-success);">`;
             statusEl.textContent = "Email Verified!";
             messageEl.innerHTML = `Thank you! Your account is now active. You can now log in. Redirecting shortly...`;
             actionBtn.classList.remove('d-none');
             setTimeout(() => { window.location.hash = 'login'; }, 4000);
         } catch (err) {
-            iconEl.innerHTML = `<i class="bi-x-circle-fill text-danger"></i>`;
+            iconEl.innerHTML = `<img src="${xCircleFill}" alt="Failure" class="text-danger" style="width: 5rem; height: 5rem; fill: var(--bs-danger);">`;
             statusEl.textContent = "Verification Failed";
             messageEl.textContent = err.message + ". The link may have expired or has already been used.";
             actionBtn.classList.remove('d-none');
@@ -465,7 +488,7 @@ function renderPendingVerificationPage() {
             <div class="row justify-content-center">
                 <div class="col-lg-8 col-xl-7">
                     <div class="card bg-light p-5 shadow-lg">
-                        <i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>
+                        <img src="${hourglassSplit}" alt="Pending approval" class="mx-auto" style="width: 4rem; height: 4rem; filter: invert(75%) sepia(50%) saturate(1) hue-rotate(5deg) brightness(1.2);">
                         <h2 class="mt-3 fw-bold">Account Pending Approval</h2>
                         <p class="mb-4 lead">Thank you for signing up and verifying your email. Your account is now waiting to be verified by an administrator. You will be able to access the dashboard once your account is approved.</p>
                         <button id="logout-btn-pending" class="btn btn-secondary w-100 mt-3">Logout</button>
@@ -492,7 +515,7 @@ function renderCheckEmailPage() {
             <div class="row justify-content-center">
                  <div class="col-lg-8 col-xl-7">
                     <div class="card bg-light p-5 shadow-lg">
-                        <i class="bi-envelope-check-fill text-success" style="font-size: 4rem;"></i>
+                        <img src="${envelopeCheckFill}" alt="Check email" class="mx-auto" style="width: 4rem; height: 4rem; filter: invert(48%) sepia(61%) saturate(2371%) hue-rotate(120deg) brightness(94%) contrast(101%);">
                         <h2 class="mt-3 fw-bold">Check Your Inbox!</h2>
                         <p class="mb-4 lead">A verification link has been sent to your @parsu.edu.ph email address. Please click the link inside to activate your account.</p>
                         <a href="#login" class="btn btn-primary">Back to Login</a>
@@ -518,8 +541,8 @@ function initializeDataAndListenersForLanding() {
             { name: 'John Russel Ivan S. Romero', position: '4A Representative', fileId: '4AR' },
         ],
         jobs: [
-            { title: 'Software Engineer', icon: 'bi-code-slash' }, { title: 'Data Scientist', icon: 'bi-bar-chart-line-fill' }, { title: 'Cybersecurity Analyst', icon: 'bi-shield-lock-fill' },
-            { title: 'AI/ML Engineer', icon: 'bi-robot' }, { title: 'Game Developer', icon: 'bi-controller' }, { title: 'UX/UI Designer', icon: 'bi-palette-fill' },
+            { title: 'Software Engineer', icon: codeSlash }, { title: 'Data Scientist', icon: barChartLineFill }, { title: 'Cybersecurity Analyst', icon: shieldLockFill },
+            { title: 'AI/ML Engineer', icon: robot }, { title: 'Game Developer', icon: controller }, { title: 'UX/UI Designer', icon: paletteFill },
         ],
         faq: [
             { id: 'one', question: 'What is SPECS?', answer: 'The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the official organization for Computer Science students at Partido State University. We aim to foster a community of learning, innovation, and collaboration.' },
@@ -565,8 +588,8 @@ function setupInteractiveLogo() {
     const updateDescriptionPanel = (pointNumber, isReset = false) => {
         const data = symbolismData.find(item => item.num === pointNumber);
         const newHTML = (isReset || !data)
-            ? `<div class="text-center"><i class="bi bi-arrows-move fs-1 text-primary mb-3"></i><h5 class="fw-bold">Explore the Logo</h5><p class="text-muted">Hover over the numbered points on the logo to discover the meaning behind each symbol.</p></div>`
-            : `<div class="text-start"><div class="d-flex align-items-center mb-3"><div class="flex-shrink-0"><i class="bi bi-bullseye text-primary fs-2 me-3"></i></div><div class="flex-grow-1"><h5 class="fw-bold mb-0">${data.title}</h5><span class="text-primary small fw-semibold">SYMBOL #${data.num}</span></div></div><p class="text-muted mb-3">${data.symbolism}</p><p class="small text-muted border-top pt-3 mt-3 mb-0"><strong>Location:</strong> <em>${data.location}</em></p></div>`;
+            ? `<div class="text-center"><img src="${arrowsMove}" alt="Explore icon" class="mb-3" style="width: 3rem; height: 3rem; filter: invert(26%) sepia(96%) saturate(2221%) hue-rotate(205deg) brightness(98%) contrast(97%);"><h5 class="fw-bold">Explore the Logo</h5><p class="text-muted">Hover over the numbered points on the logo to discover the meaning behind each symbol.</p></div>`
+            : `<div class="text-start"><div class="d-flex align-items-center mb-3"><div class="flex-shrink-0"><img src="${bullseye}" alt="Symbol icon" class="me-3" style="width: 2rem; height: 2rem; filter: invert(26%) sepia(96%) saturate(2221%) hue-rotate(205deg) brightness(98%) contrast(97%);"></div><div class="flex-grow-1"><h5 class="fw-bold mb-0">${data.title}</h5><span class="text-primary small fw-semibold">SYMBOL #${data.num}</span></div></div><p class="text-muted mb-3">${data.symbolism}</p><p class="small text-muted border-top pt-3 mt-3 mb-0"><strong>Location:</strong> <em>${data.location}</em></p></div>`;
 
         descriptionContent.classList.add('content-hidden');
         setTimeout(() => {
@@ -612,7 +635,7 @@ function initializeImageLoader() {
         placeholder.style.height = '100%';
         placeholder.style.minHeight = '200px';
         const src = placeholder.dataset.src;
-        const defaultIcon = `<div class="d-flex w-100 h-100 justify-content-center align-items-center bg-secondary-subtle"><i class="bi-image-alt text-muted fs-1"></i></div>`;
+        const defaultIcon = `<div class="d-flex w-100 h-100 justify-content-center align-items-center bg-secondary-subtle"><img src="${imageAlt}" alt="Default image placeholder" style="width: 4rem; height: 4rem; opacity: 0.3;"></div>`;
         if (!src) {
             placeholder.innerHTML = defaultIcon;
             return;
@@ -639,9 +662,15 @@ async function fetchUpcomingEvents() {
 
     try {
         const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.equal('event_ended', false), Query.orderAsc('date_to_held'), Query.limit(3)]);
-        container.innerHTML = (response.documents.length > 0)
-            ? response.documents.map(doc => createGuestEventCard(doc, false)).join('')
-            : `<div class="col-12 text-center text-muted py-5"><i class="bi bi-calendar2-week" style="font-size: 4rem;"></i><h4 class="fw-light mt-3">No Upcoming Events</h4><p>New events will be posted here. Please check back soon!</p></div>`;
+        if (response.documents.length > 0) {
+            container.innerHTML = response.documents.map(doc => createGuestEventCard(doc, false)).join('');
+        } else {
+            container.innerHTML = `<div class="col-12 text-center text-muted py-5">
+                <img src="${calendar}" alt="Calendar icon" style="width: 4rem; height: 4rem; opacity: 0.5;"/>
+                <h4 class="fw-light mt-3">No Upcoming Events</h4>
+                <p>New events will be posted here. Please check back soon!</p>
+            </div>`;
+        }
     } catch (error) {
         console.error("Failed to load upcoming events:", error);
         container.innerHTML = '<div class="col-12"><div class="alert alert-warning">Could not load upcoming events. Please try refreshing the page.</div></div>';
@@ -657,7 +686,7 @@ async function fetchPastEvents() {
         const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.equal('event_ended', true), Query.orderDesc('date_to_held'), Query.limit(3)]);
         container.innerHTML = (response.documents.length > 0)
             ? response.documents.map(doc => createGuestEventCard(doc, true)).join('')
-            : `<div class="col-12 text-center text-muted py-5"><i class="bi bi-clock-history" style="font-size: 4rem;"></i><h4 class="fw-light mt-3">No Past Events Yet</h4><p>Our event history will appear here once events conclude.</p></div>`;
+            : `<div class="col-12 text-center text-muted py-5"><img src="${clockHistory}" alt="Past events icon" style="width: 4rem; height: 4rem; opacity: 0.5;"><h4 class="fw-light mt-3">No Past Events Yet</h4><p>Our event history will appear here once events conclude.</p></div>`;
     } catch (error) {
         console.error("Failed to load past events:", error);
         container.innerHTML = '<div class="col-12"><div class="alert alert-warning">Could not load past events. Please try refreshing the page.</div></div>';
