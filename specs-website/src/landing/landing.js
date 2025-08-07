@@ -344,9 +344,9 @@ function renderLoginPage() {
             const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
 
             if (profile.type === 'admin') {
-                window.location.href = '/admin-dashboard/';
+                window.location.href = '/dashboard-admin/';
             } else if (profile.type === 'student' && profile.verified) {
-                window.location.href = '/user-dashboard/';
+                window.location.href = '/dashboard-user/';
             } else {
                 await account.deleteSession('current');
                 window.location.hash = 'pending-verification';
