@@ -7,31 +7,31 @@ A modern web application built with Vanilla JavaScript and Appwrite to serve as 
 ## ✨ Features
 
 ### ✅ General
-- **User Authentication:** Secure login/signup with university email validation and email verification.
-- **Role-Based Access:** Separated dashboards and permissions for `students` and `admins`.
+- **User Authentication:** Secure login/signup for organization officers and members with university email validation and verification.
+- **Role-Based Access:** Separated dashboards and permissions for `students` and `admins` within the `officers` collection.
 - **Public Landing Page:** Displays upcoming events, past events, FAQ, and contact info.
 
 ### 🎓 Student Dashboard
 - **Finance Overview:** Track revenue and expenses.
 - **File Sharing:** Browse and download shared documents.
 - **Event Calendar:** View upcoming events.
-- **Student Directory:** Filterable list of non-officer students.
+- **Student Directory:** Filterable list of general (`non-officer`) students.
 - **Payment Tracking:** See pending and past payments.
-- **Profile Settings:** Update personal info and upload documents (e.g. resume, schedule).
+- **Profile Settings:** Update personal info and upload documents (e.g., resume, schedule).
 
 ### 🛠️ Admin Panel
-- **Dashboard Stats:** Overview of accounts, events, files, and visual stats.
-- **Account Management:** Approve/verify/delete student accounts.
-- **Event Management:** Add/edit/delete events, mark them as ended, add collaborators.
-- **Payment Management:** Assign and manage payments (individually or bulk).
-- **Admin Settings:** Update profile and credentials.
+- **Dashboard Stats:** At-a-glance overview of accounts, events, files, and visual stats with charts.
+- **Account Management:** A modern interface to approve, verify, and delete officer/student accounts.
+- **Event Management:** A timeline view to add, edit, and delete events.
+- **Payment Management:** Assign and manage payments (individually or by bulk).
+- **File Management:** A view for all uploaded files.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** Vanilla JavaScript (ES6+), HTML5, SASS/SCSS
-- **UI:** Bootstrap 5, Bootstrap Icons
+- **UI:** Bootstrap 5 (via SCSS), Bootstrap Icons (as imported SVGs)
 - **Backend:** Appwrite Cloud (BaaS)
 - **Build Tool:** Vite
 
@@ -53,7 +53,7 @@ A modern web application built with Vanilla JavaScript and Appwrite to serve as 
 ```bash
 git clone https://github.com/james719-code/SPECS-Organization-Management-System.git
 cd SPECS-Organization-Management-System/specs-website
-````
+```
 
 #### 2. Install Dependencies
 
@@ -63,32 +63,32 @@ npm install
 
 #### 3. Set Up Appwrite Backend
 
-1. **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/)
-2. **Add Web Platform:** Name it, set hostname as `localhost`.
-3. **Create Database & Collections:**
-
-    * Create a database (e.g. `Main Database`)
-    * Create collections: `accounts`, `non_officer_students`, `events`, `files`, `payments`, `revenue`, `expenses`
-    * Set proper permissions and attributes as [outlined here](#collection-schemas)
-4. **Create Storage Buckets:**
-
-    * `Event Images`
-    * `User Uploads`
-    * `Resumes`
-    * `Schedules`
+1.  **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/).
+2.  **Add Web Platform:** Name it, and set the hostname to `localhost`.
+3.  **Create Database & Collections:**
+    *   Create a new database (e.g., `Main Database`).
+    *   Inside the database, create the following collections: `officers`, `non_officer_students`, `events`, `files`, `payments`, `revenue`, `expenses`.
+    *   Set the necessary permissions and attributes for each collection as detailed in the [Collection Schemas](#-collection-schemas) section below.
+4.  **Create Storage Buckets:**
+    *   `Event Images`
+    *   `User Uploads`
+    *   `Resumes`
+    *   `Schedules`
 
 #### 4. Environment Setup
 
-Create `.env.local` in the root and copy this template:
+Create a file named `.env.local` in the `specs-website` directory and populate it with your Appwrite credentials.
 
 ```ini
 # .env.local
+# Replace placeholders with your actual Appwrite IDs
+
 VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
 VITE_APPWRITE_PROJECT_ID="<YOUR_NEW_PROJECT_ID>"
 
 VITE_DATABASE_ID="<YOUR_NEW_DATABASE_ID>"
-VITE_COLLECTION_ID_STUDENTS="<YOUR_STUDENTS_COLLECTION_ID>"
-VITE_COLLECTION_NON_OFFICER_STUDENT="<YOUR_NON_OFFICER_STUDENTS_COLLECTION_ID>"
+VITE_COLLECTION_ID_OFFICERS="<YOUR_OFFICERS_COLLECTION_ID>"
+VITE_COLLECTION_ID_NON_OFFICER_STUDENTS="<YOUR_NON_OFFICER_STUDENTS_COLLECTION_ID>"
 VITE_COLLECTION_ID_EVENTS="<YOUR_EVENTS_COLLECTION_ID>"
 VITE_COLLECTION_ID_FILES="<YOUR_FILES_COLLECTION_ID>"
 VITE_COLLECTION_ID_PAYMENTS="<YOUR_PAYMENTS_COLLECTION_ID>"
@@ -107,40 +107,49 @@ VITE_BUCKET_ID_SCHEDULES="<YOUR_SCHEDULES_BUCKET_ID>"
 npm run dev
 ```
 
-Open your browser to [http://localhost:5173](http://localhost:5173)
+Open your browser and navigate to [http://localhost:5173](http://localhost:5173).
 
+---
+## 🏆 Project Quality
+
+### Site-wide Performance Scanning
+This project uses **Unlighthouse** to scan the entire site for performance, accessibility, and SEO issues, ensuring a consistently high-quality experience across all pages.
+
+![Unlighthouse Scan](https://img.shields.io/badge/Unlighthouse-Scanned-brightgreen.svg?style=for-the-badge)
 ---
 
 ## 📚 Collection Schemas
 
 <details>
-<summary><strong>📋 Click to expand</strong></summary>
+<summary><strong>📋 Click to expand Appwrite collection schemas</strong></summary>
 
-### 🧑‍🎓 `accounts`
+### 🧑‍✈️ `officers` (Users who can log in)
 
-| Key          | Type    | Required | Default   |
-| ------------ | ------- | -------- | --------- |
-| username     | String  | ✅        |           |
-| fullname     | String  | ✅        |           |
-| yearLevel    | String  | ✅        |           |
-| gender       | String  | ✅        |           |
-| type         | String  | ✅        | `student` |
-| verified     | Boolean | ✅        | `false`   |
-| haveResume   | Boolean | ✅        | `false`   |
-| resumeId     | String  |          |           |
-| haveSchedule | Boolean | ✅        | `false`   |
-| scheduleId   | String  |          |           |
-| email        | String  | ✅        |           |
+| Key          | Type    | Required | Default   | Notes                               |
+| ------------ | ------- | -------- | --------- | ----------------------------------- |
+| username     | String  | ✅        |           |                                     |
+| fullname     | String  | ✅        |           |                                     |
+| yearLevel    | String  | ✅        |           |                                     |
+| gender       | Enum    | ✅        |           | (e.g., Male, Female, Other)         |
+| email        | String  | ✅        |           | (Required for Appwrite Auth)        |
+| type         | Enum    | ✅        | `student` | (Elements: `student`, `admin`)      |
+| verified     | Boolean | ✅        | `false`   |                                     |
+| haveResume   | Boolean | ✅        | `false`   |                                     |
+| resumeId     | String  |          |           |                                     |
+| haveSchedule | Boolean | ✅        | `false`   |                                     |
+| scheduleId   | String  |          |           |                                     |
+
 
 ---
 
-### 👥 `non_officer_students`
+### 👥 `non_officer_students` (Directory list of students)
 
 | Key     | Type   | Required |
 | ------- | ------ | -------- |
 | name    | String | ✅        |
 | email   | String | ✅        |
 | section | String | ✅        |
+| address | String |          |
 
 ---
 
@@ -154,9 +163,7 @@ Open your browser to [http://localhost:5173](http://localhost:5173)
 | description    | String         |          |         |
 | added\_by      | String         | ✅        |         |
 | event\_ended   | Boolean        | ✅        | `false` |
-| collab         | String (Array) |          |         |
-
-* **Index:** Full-text on `event_name`
+| collab         | String (Array) |          | `[]`    |
 
 ---
 
@@ -169,34 +176,51 @@ Open your browser to [http://localhost:5173](http://localhost:5173)
 | uploader    | String | ✅        |
 | fileID      | String | ✅        |
 
-* **Index:** Full-text on `fileName`
-
 ---
 
 ### 💰 `payments`
 
-| Key         | Type    | Required | Default |
-| ----------- | ------- | -------- | ------- |
-| student\_id | String  | ✅        |         |
-| is\_event   | Boolean | ✅        | `false` |
-| event       | String  |          |         |
-| activity    | String  |          |         |
-| price       | Double  | ✅        |         |
-| item\_name  | String  | ✅        |         |
-| quantity    | Integer | ✅        | `1`     |
-| isPaid      | Boolean | ✅        | `false` |
+| Key         | Type     | Required | Default |
+| ----------- | -------- | -------- | ------- |
+| student\_id | String   | ✅        |         |
+| is\_event   | Boolean  | ✅        | `false` |
+| event       | String   |          |         |
+| activity    | String   |          |         |
+| price       | Double   | ✅        |         |
+| item\_name  | String   | ✅        |         |
+| quantity    | Integer  | ✅        |         |
+| isPaid      | Boolean  | ✅        | `false` |
+| date\_paid   | Datetime |          |         |
 
 ---
 
-### 📈 `revenue` & `expenses`
+### 📈 `revenue`
 
-**`revenue` Attributes:**
+| Key         | Type     | Required |
+| ----------- | -------- | -------- |
+| name        | String   | ✅        |
+| isEvent     | Boolean  | ✅        |
+| event       | String   |          |
+| activity    | String   |          |
+| quantity    | Integer  | ✅        |
+| price       | Double   | ✅        |
+| date\_earned | Datetime | ✅        |
+| recorder    | String   | ✅        |
 
-* name, price, quantity, date\_earned, recorder, isEvent, event, activity
+---
 
-**`expenses` Attributes:**
+### 📉 `expenses`
 
-* name, price, quantity, date\_buy, recorder, isEvent, event, activity\_name
+| Key           | Type     | Required | Default |
+| ------------- | -------- | -------- | ------- |
+| name          | String   | ✅        |         |
+| isEvent       | Boolean  | ✅        | `false` |
+| event         | String   |          |         |
+| activity\_name | String   |          |         |
+| quantity      | Integer  | ✅        | `1`     |
+| price         | Double   | ✅        |         |
+| date\_buy      | Datetime | ✅        |         |
+| recorder      | String   | ✅        |         |
 
 </details>
 
@@ -204,16 +228,20 @@ Open your browser to [http://localhost:5173](http://localhost:5173)
 
 ## 🤝 Contribution Guide
 
-1. **Create Branch:**
-   `git checkout -b <type>/<feature-name>`
+1.  **Create Branch:**
+    `git checkout -b <type>/<feature-name>` (e.g., `feat/add-payment-list-page`)
 
-2. **Make Changes**
-   Implement your feature or fix.
+2.  **Make Changes:**
+    Implement your feature or fix, adhering to the project's coding style.
 
-3. **Commit Message Convention:**
-   `git commit -m "feat: Add payment list page"`
+3.  **Commit Message Convention:**
+    Use conventional commits for clear history. (e.g., `git commit -m "feat: Add payment list page"`)
 
-4. **Push & PR:**
-   Push your branch and open a pull request targeting `main`.
+4.  **Push & PR:**
+    Push your branch to the repository and open a pull request targeting the `main` branch.
 
 ---
+
+## 📜 License
+
+This project is licensed under the **BSD 3-Clause License**. See the [LICENSE](LICENSE) file for details.
