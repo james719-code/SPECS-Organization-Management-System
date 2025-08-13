@@ -519,11 +519,22 @@ function renderCheckEmailPage() {
                         <img src="${envelopeCheckFill}" alt="Check email" class="mx-auto" style="width: 4rem; height: 4rem; filter: invert(48%) sepia(61%) saturate(2371%) hue-rotate(120deg) brightness(94%) contrast(101%);">
                         <h2 class="mt-3 fw-bold">Check Your Inbox!</h2>
                         <p class="mb-4 lead">A verification link has been sent to your @parsu.edu.ph email address. Please click the link inside to activate your account.</p>
-                        <a href="#login" class="btn btn-primary">Back to Login</a>
+                        <a href="#login" class="btn btn-primary" id="buttonBack">Logout</a>
                     </div>
                 </div>
             </div>
         </div>`;
+    document.getElementById("buttonBack").onclick = async () => {
+        try {
+            await account.deleteSession('current');
+            window.location.hash = 'login';
+        } catch (error) {
+            const container = document.querySelector('.card');
+            if (container) {
+                container.innerHTML += `<p class="text-danger small mt-3">Failed to log out: ${error.message}</p>`;
+            }
+        }
+    }
 }
 
 function initializeDataAndListenersForLanding() {
