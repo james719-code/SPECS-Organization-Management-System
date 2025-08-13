@@ -426,6 +426,7 @@ function renderSignupPage() {
 
         try {
             const user = await account.create(ID.unique(), email.value, password.value, name.value);
+            await account.createEmailPasswordSession(email.value, password.value);
             await databases.createDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id, {
                 username: username.value, fullname: name.value, yearLevel: yearLevel.value, gender: gender.value,
                 verified: false, type: 'student', haveResume: false, resumeId: '', haveSchedule: false, scheduleId: ''
