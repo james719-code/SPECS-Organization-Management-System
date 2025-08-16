@@ -38,6 +38,7 @@ body {
 
 .navbar {
   background-color: $primary;
+  max-width: 100vw;
 
   .navbar-brand,
   .nav-link {

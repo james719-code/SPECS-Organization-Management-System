@@ -222,7 +222,7 @@ function renderLandingPage() {
             </div>
         </header>
 
-        <main>
+        <main style="overflow-x: hidden;">
             <section class="hero-section-gradient text-white text-center py-5">
                 <div class="container" style="padding-top: 6rem; padding-bottom: 6rem;">
                     <h1 class="display-4 fw-bold">Society of Programmers and Enthusiasts in Computer Science</h1>
@@ -541,20 +541,34 @@ function initializeDataAndListenersForLanding() {
     const siteData = {
         adviser: { name: 'Nicolas A. Pura', position: 'Organization Adviser', fileId: 'adviser' },
         officers: [
-            { name: 'Ramon P. Bombita Jr.', position: 'President', fileId: 'president' }, { name: 'Ariel August A. Ablay', position: 'Vice-President External Affairs', fileId: 'vice-president-external' },
-            { name: 'Alexander R. Santos', position: 'Vice-President Internal Affairs', fileId: 'vice-president-internal' }, { name: 'Cathy A. Indico', position: 'Secretary', fileId: 'secretary' },
-            { name: 'Princess Yvonne D. Palmes', position: 'Assistant Secretary', fileId: 'assistant-secretary' }, { name: 'Lyzza V. Aboque', position: 'Treasurer', fileId: 'treasurer' },
-            { name: 'James Ryan S. Gallego', position: 'Auditor', fileId: 'auditor' }, { name: 'Mark Lorence R. Baltazar', position: 'P.I.O', fileId: 'pio' },
-            { name: 'Clement A. Crucillo', position: 'Business Manager', fileId: 'business-manager-1' }, { name: 'Rezel Joy A. Padillo', position: 'Business Manager', fileId: 'business-manager-2' },
-            { name: 'Renalene V. Seares', position: 'Sergeant at Arms', fileId: 'SA1' }, { name: 'Jabez B. Collano', position: 'Sergeant at Arms', fileId: 'SA2' },
-            { name: 'Jhan Angelo Milante', position: '1A Representative', fileId: '1AR' }, { name: 'Terence P. Serrano', position: '1B Representative', fileId: '1BR' },
-            { name: 'Gil IV Miguel Salvador I. Cea', position: '2A Representative', fileId: '2AR' }, { name: 'Joan C. Lara', position: '2B Representative', fileId: '2BR' },
-            { name: 'Nonalyn N. Bondad', position: '3A Representative', fileId: '3AR' }, { name: 'Robert A. Bayona Jr.', position: '3B Representative', fileId: '3BR' },
-            { name: 'John Russel Ivan S. Romero', position: '4A Representative', fileId: '4AR' },
+            { name: 'James Ryan S. Gallego', position: 'President', fileId: 'president' },
+            { name: 'Jay Virgil A. Romero', position: 'Vice-President External Affairs', fileId: 'vice-president-external' },
+            { name: 'Gil IV Miguel Salvador I. Cea', position: 'Vice-President Internal Affairs', fileId: 'vice-president-internal' },
+            { name: 'Princess Yvonne D. Palmes', position: 'Secretary', fileId: 'secretary' },
+            { name: 'Johann Dane P. Boaquña', position: 'Assistant Secretary', fileId: 'assistant-secretary' },
+            { name: 'Lyzza V. Aboque', position: 'Treasurer', fileId: 'treasurer' },
+            { name: 'Kateleen Bolocon', position: 'Assistant Treasurer', fileId: 'assistant-treasurer' },
+            { name: 'Renalene V. Seares', position: 'Auditor', fileId: 'auditor' },
+            { name: 'Mark Lorence R. Baltazar', position: 'P.I.O', fileId: 'pio' },
+            { name: 'Nicole Dumandan', position: 'Business Manager', fileId: 'business-manager-1' },
+            { name: 'Lea Mae Gabay', position: 'Business Manager', fileId: 'business-manager-2' },
+            { name: 'Karl Francis Gelo Pamada', position: 'Sergeant at Arms', fileId: 'SA1' },
+            { name: 'Althea Marie Pano', position: 'Sergeant at Arms', fileId: 'SA2' },
+            { name: 'Ashley Pollero', position: '1A Representative', fileId: '1AR' },
+            { name: 'Kirby Paladan', position: '1B Representative', fileId: '1BR' },
+            { name: 'Allana Mae Estaquio', position: '2A Representative', fileId: '2AR' },
+            { name: 'Mark Steve Carillo', position: '2B Representative', fileId: '2BR' },
+            { name: 'Aldrich Jay Francisco', position: '3A Representative', fileId: '3AR' },
+            { name: 'Joan Coderis Lara', position: '3B Representative', fileId: '3BR' },
+            { name: 'Sheilla Mae S. Rico', position: '4A Representative', fileId: '4AR' },
+            { name: 'Robert Bayona', position: '4B Representative', fileId: '4BR' },
         ],
         jobs: [
-            { title: 'Software Engineer', icon: codeSlash }, { title: 'Data Scientist', icon: barChartLineFill }, { title: 'Cybersecurity Analyst', icon: shieldLockFill },
-            { title: 'AI/ML Engineer', icon: robot }, { title: 'Game Developer', icon: controller }, { title: 'UX/UI Designer', icon: paletteFill },
+            { title: 'Software Engineer', icon: codeSlash }, { title: 'Data Scientist', icon: barChartLineFill },
+            { title: 'Cybersecurity Analyst', icon: shieldLockFill },
+            { title: 'AI/ML Engineer', icon: robot },
+            { title: 'Game Developer', icon: controller },
+            { title: 'UX/UI Designer', icon: paletteFill },
         ],
         faq: [
             { id: 'one', question: 'What is SPECS?', answer: 'The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the official organization for Computer Science students at Partido State University. We aim to foster a community of learning, innovation, and collaboration.' },
@@ -565,12 +579,12 @@ function initializeDataAndListenersForLanding() {
     };
 
     const adviserContainer = document.getElementById('adviser-card-container');
-    //const officersContainer = document.getElementById('officers-grid-container');
+    const officersContainer = document.getElementById('officers-grid-container');
     const jobsContainer = document.getElementById('jobs-grid-container');
     const faqContainer = document.getElementById('faqAccordion');
 
     if (adviserContainer) adviserContainer.innerHTML = createAdviserCardHTML(siteData.adviser);
-    //if (officersContainer) officersContainer.innerHTML = siteData.officers.map(createOfficerCardHTML).join('');
+    if (officersContainer) officersContainer.innerHTML = siteData.officers.map(createOfficerCardHTML).join('');
     if (jobsContainer) jobsContainer.innerHTML = siteData.jobs.map(createJobCardHTML).join('');
     if (faqContainer) faqContainer.innerHTML = siteData.faq.map(createFaqItemHTML).join('');
 
