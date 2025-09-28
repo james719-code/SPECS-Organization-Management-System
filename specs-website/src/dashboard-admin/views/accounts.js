@@ -1,5 +1,5 @@
 // views/renderAdmin/accounts.js
-import { databases, storage } from '../../shared/appwrite.js';
+import { databases, storage, functions } from '../../shared/appwrite.js';
 import { Query } from 'appwrite';
 import { Modal, Dropdown } from 'bootstrap';
 
@@ -17,6 +17,7 @@ const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES;
 const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
+const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID;
 
 // --- Reusable Icon HTML strings ---
 const acceptIconHTML = `<img src="${checkCircle}" alt="Accept" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em;">Accept User`;
@@ -146,11 +147,37 @@ async function attachAccountsListeners() {
             e.preventDefault();
             const docId = acceptBtn.dataset.docid;
             acceptBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Accepting...`;
+
             try {
+                // --- STEP 1: Update the document to set 'verified: true' ---
                 await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, docId, { verified: true });
+
                 const userToUpdate = allUsers.find(u => u.$id === docId);
-                if (userToUpdate) userToUpdate.verified = true;
-                renderUserList(allUsers.filter(u => searchInput.value ? u.fullname.toLowerCase().includes(searchInput.value.toLowerCase()) : true));
+                if (userToUpdate) {
+                    userToUpdate.verified = true;
+                }
+
+                // --- STEP 2: Explicitly execute the back-end function ---
+                console.log(`Executing function '${FUNCTION_ID}' for user ${docId}...`);
+                try {
+                    // We pass the entire user object as a JSON string in the body.
+                    const execution = await functions.createExecution(
+                        FUNCTION_ID,
+                        JSON.stringify(userToUpdate), // The body of the request
+                        false // 'async' execution: false means we wait for the result
+                    );
+
+                    console.log("Function execution successful:", execution);
+                } catch (functionError) {
+                    // Important: The user is already verified. We just log the error
+                    // for the admin to see, without stopping the UI update.
+                    console.error("Failed to execute team assignment function:", functionError);
+                    alert("User was verified, but the team assignment failed. Please check the function logs.");
+                }
+
+                // --- STEP 3: Update the UI ---
+                renderUserList(allUsers); // Re-render the user list to show the "Verified" badge
+
             } catch (error) {
                 alert('Failed to accept user: ' + error.message);
                 acceptBtn.innerHTML = acceptIconHTML;

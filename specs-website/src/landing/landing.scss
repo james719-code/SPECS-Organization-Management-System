@@ -10,6 +10,8 @@
 @import "bootstrap/scss/spinners";
 @import "bootstrap/scss/alert";
 
+@import "bootstrap/scss/carousel";
+
 a {
   color: $primary;
   transition: color 0.2s ease-in-out;
@@ -211,4 +213,68 @@ a {
 
 .object-fit-cover {
   object-fit: cover;
+}
+
+// --- Homepage UI Improvements ---
+.hero-section {
+  background: linear-gradient(45deg, rgba($primary, 0.95), rgba($dark, 0.9));
+  clip-path: polygon(0 0, 100% 0, 100% 90%, 0 100%);
+  padding-bottom: 10%;
+}
+
+.feature-icon-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background-color: $light;
+  box-shadow: 0 8px 20px rgba($primary, 0.15);
+  margin-bottom: 1rem;
+
+  img {
+    width: 90px;
+    height: 90px;
+    color: $primary;
+  }
+}
+
+// --- ADD THE NEW CAROUSEL STYLES HERE ---
+#home-stories .carousel {
+  background-color: $white;
+  border: 1px solid $gray-200; // Use a specific gray for subtle borders
+
+  .carousel-item {
+    // UI/UX IMPROVEMENT: Use responsive padding for better mobile display
+    padding: 2.5rem 2rem;
+
+    @include media-breakpoint-up(md) {
+      padding: 3rem 4rem;
+    }
+  }
+
+  .carousel-control-prev-icon,
+  .carousel-control-next-icon {
+    // This makes the carousel control arrows dark, which is great for a light background
+    filter: invert(1) grayscale(100%) brightness(0.5);
+  }
+
+  .carousel-indicators [data-bs-target] {
+    background-color: $secondary;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 8px;
+    opacity: 0.5;
+  }
+
+  .carousel-indicators .active {
+    opacity: 1;
+    background-color: $primary;
+  }
+
+  // NOTE: The styles for blockquote and blockquote-footer have been removed from here.
+  // It's better to rely on the Bootstrap utility classes (.text-success, .fw-semibold)
+  // already present in your JavaScript template for styling. This prevents style conflicts.
 }
