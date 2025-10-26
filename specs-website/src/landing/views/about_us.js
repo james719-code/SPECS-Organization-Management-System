@@ -208,7 +208,7 @@ export function renderAboutUsPage(container) {
             { name: 'John A. Guinomtad', position: 'Documentation Officer', fileId: 'pm-do-3' }
         ],
         developers: [
-            { name: 'James Ryan S. Gallego', course: 'BS in Computer Science', year: '3rd Year', quote: "If they can't, then I will", fileId: 'president' },
+            { name: 'James Ryan S. Gallego', course: 'BS in Computer Science', year: '3rd Year', quote: "It is never too late to be what you might have been", fileId: 'president' },
         ],
     };
 
