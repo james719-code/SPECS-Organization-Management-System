@@ -8,8 +8,6 @@ import bullseye from 'bootstrap-icons/icons/bullseye.svg';
 import logoURL from '../../../public/logo.webp';
 import {renderHeader} from "../../shared/utils.js";
 
-// --- Constants and Helper Functions (These are all correct and remain unchanged) ---
-
 const BUCKET_ID_PICTURES = import.meta.env.VITE_BUCKET_ID_PICTURES;
 const PICTURE_CACHE_KEY = 'pictureImageCache';
 
@@ -173,14 +171,6 @@ function setupInteractiveLogo() {
     updateDescriptionPanel(null, true);
 }
 
-
-// --- Main Render Function (Corrected and Updated) ---
-
-/**
- * Renders the About Us page content into the provided container
- * and sets up its interactive elements.
- * @param {HTMLElement} container - The element to render the content into.
- */
 export function renderAboutUsPage(container) {
     const siteData = {
         adviser: { name: 'Nicolas A. Pura', position: 'Organization Adviser', fileId: 'adviser' },
@@ -222,7 +212,6 @@ export function renderAboutUsPage(container) {
         ],
     };
 
-    // Step 1: Render the view's specific HTML into the container provided by the router.
     container.innerHTML = `
     <div class="landing-page">
         ${renderHeader()}
@@ -273,7 +262,6 @@ export function renderAboutUsPage(container) {
     </div>
     `;
 
-    // Step 2: Run any post-render logic that this view needs.
     setupInteractiveLogo();
     setupSmoothScrolling();
 }

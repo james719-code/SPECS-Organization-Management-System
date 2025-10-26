@@ -36,6 +36,7 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
+            console.log(id);
           if (id.includes('node_modules')) {
             if (id.includes('appwrite')) {
               return 'vendor-appwrite';
@@ -43,7 +44,6 @@ export default defineConfig({
             if (id.includes('bootstrap')) {
               return 'vendor-bootstrap';
             }
-
             if(id.includes('chart')) {
               return 'vendor-chart';
             }

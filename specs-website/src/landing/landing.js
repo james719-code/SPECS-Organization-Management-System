@@ -2,7 +2,6 @@
 import './landing.scss';
 import { Collapse, Dropdown } from 'bootstrap';
 
-// Import shared layout components and utilities
 import { renderHeader, renderFooter, updateActiveNavLink, setupNavbarToggler } from '../shared/utils.js';
 
 // Import page rendering functions from view modules
@@ -13,11 +12,9 @@ import { renderResourcesPage } from './views/resources.js';
 import { renderStoriesPage } from './views/stories.js';
 import { renderLoginPage } from './views/login.js';
 import { renderSignupPage, renderVerifyEmailPage, renderPendingVerificationPage, renderCheckEmailPage } from './views/signup.js';
+import { renderHighlightDetailsPage } from "./views/highlights_details.js";
 
-// The main application container in index.html
 export const app = document.getElementById('app');
-
-// --- Routes Definition ---
 
 const standardRoutes = {
     '': renderHomePage,
@@ -36,64 +33,69 @@ const fullPageRoutes = {
     'check-email': renderCheckEmailPage
 };
 
-/**
- * Initializes the main application layout and sets up its interactive components.
- * This is only called for standard routes on the initial load.
- */
 function initializeLayout() {
-    // Step 1: Render the static layout HTML
     app.innerHTML = `
         ${renderHeader()}
         <main id="main-content" class="main-container"></main>
         ${renderFooter()}
     `;
 
-    // --- THE FIX ---
-    // Step 2: Run post-render setup scripts for the layout components.
-    // This attaches the event listeners to make the mobile navbar close on click.
     setupNavbarToggler();
 }
 
-/**
- * The main router function.
- */
 function router() {
-    const path = (window.location.hash || '#').split('?')[0];
-    const pathKey = path.replace('#', '') || 'home';
+    const [path, queryString] = (window.location.hash || '#').split('?');
+    const pathKey = path.replace(/^#\/?/, '') || 'home';
 
+    const params = new URLSearchParams(queryString || '');
+    const page = parseInt(params.get('page')) || 1; // Get page number, default to 1
+
+    const storyDetailsMatch = pathKey.match(/^stories\/([\w-]+)$/);
     const standardRenderFn = standardRoutes[pathKey];
     const fullPageRenderFn = fullPageRoutes[pathKey];
 
-    if (fullPageRenderFn) {
-        fullPageRenderFn();
+    if (storyDetailsMatch) {
+        const storyId = storyDetailsMatch[1];
 
-    } else if (standardRenderFn) {
-        // If the main layout isn't on the page yet, create it.
         if (!document.getElementById('main-content')) {
             initializeLayout();
         }
 
         const contentContainer = document.getElementById('main-content');
-        standardRenderFn(contentContainer);
-        updateActiveNavLink(path || '#home');
+        renderHighlightDetailsPage(contentContainer, storyId);
+        updateActiveNavLink('#stories'); // Keep the 'Stories' nav link active
 
+    } else if (fullPageRenderFn) {
+        fullPageRenderFn(app);
+
+    } else if (standardRenderFn) {
+        if (!document.getElementById('main-content')) {
+            initializeLayout();
+        }
+        const contentContainer = document.getElementById('main-content');
+
+        if (pathKey === 'stories') {
+            standardRenderFn(contentContainer, page);
+        } else {
+            standardRenderFn(contentContainer);
+        }
+
+        updateActiveNavLink(path || '#home');
     } else {
         if (!document.getElementById('main-content')) {
             initializeLayout();
         }
         document.getElementById('main-content').innerHTML = `
-            <div class="container text-center py-5">
-                <h1 class="display-1">404</h1>
-                <h2>Page Not Found</h2>
-                <p class="lead">Sorry, the page you are looking for does not exist.</p>
+            <div class="container text-center py-5" style="padding-top: 6rem !important; padding-bottom: 6rem !important;">
+                <h1 class="display-1 fw-bold">404</h1>
+                <h2 class="fw-semibold">Page Not Found</h2>
+                <p class="lead text-muted">Sorry, the page you are looking for does not exist.</p>
                 <a href="#home" class="btn btn-primary mt-3">Go to Homepage</a>
             </div>
         `;
+        updateActiveNavLink('');
     }
 }
 
-// Listen for hash changes to navigate between pages
 window.addEventListener('hashchange', router);
-
-// Render the initial page on load
 window.addEventListener('load', router);

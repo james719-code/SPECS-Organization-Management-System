@@ -10,10 +10,7 @@ import shieldCheck from 'bootstrap-icons/icons/shield-check.svg'; // Icon for Pr
 import { renderHeader, renderFooter } from '../../shared/utils.js';
 import { storage } from '../../shared/appwrite.js'; // --- IMPORTED ---
 
-// --- Constants ---
 const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES;
-
-// --- Helper Functions ---
 
 function createFaqItemHTML({ id, question, answer }) {
     return `
@@ -72,7 +69,7 @@ export function renderResourcesPage(app) {
         faq: [
             { id: 'one', question: 'What is SPECS?', answer: 'The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the official organization for Computer Science students at Partido State University. We aim to foster a community of learning, innovation, and collaboration.' },
             { id: 'two', question: 'Who can join SPECS?', answer: 'All bona fide students enrolled in the Computer Science program at Partido State University are encouraged to join and become active members of the organization.' },
-            { id: 'three', question: 'How can I get updates on events?', answer: 'The best way is to create an account on this portal! We post all official events, announcements, and files here. You can also follow our official social media pages.' },
+            { id: 'three', question: 'How can I get updates on events?', answer: 'The best way to get updates is to look at our official Facebook page (<a href="https://www.facebook.com/parsu.specs" target="_blank" rel="noopener noreferrer">https://www.facebook.com/parsu.specs</a>) or visit this website for the latest announcements and event information.' },
             { id: 'four', question: 'What kind of events does SPECS organize?', answer: 'We organize a variety of events, including coding seminars, workshops, programming competitions, tech talks from industry professionals, and social gatherings to build camaraderie among members.' },
         ],
         files: [
@@ -120,25 +117,80 @@ export function renderResourcesPage(app) {
                 <div class="container">
                     <h2 class="text-center fw-bold mb-5">Terms & Privacy</h2>
                     <div class="row g-4 justify-content-center">
-                        <div class="col-lg-6">
-                            <div class="card h-100 shadow-sm">
+                        <div class="col-lg-6 d-flex">
+                            <div class="card h-100 shadow-sm w-100">
                                 <div class="card-body p-4">
                                     <div class="d-flex align-items-center mb-3">
                                         <img src="${fileTextFill}" alt="Terms icon" class="me-3" style="width: 2rem; height: 2rem; filter: var(--bs-primary-text-emphasis);">
                                         <h4 class="card-title mb-0 fw-semibold">Terms of Service</h4>
                                     </div>
-                                    <p class="card-text text-muted small">By accessing and using the SPECS Web Portal, you agree to comply with and be bound by the following terms and conditions. These terms apply to all visitors, users, and others who wish to access or use the service. If you disagree with any part of the terms, then you do not have permission to access the service. You agree not to use the portal for any unlawful purpose or any purpose prohibited under this clause.</p>
+                                    <p class="card-text text-muted small"><strong>Last Updated:</strong> October 26, 2025</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">1. Acceptance of Terms</h5>
+                                    <p class="card-text text-muted small">By accessing or using the official website of the <strong>Society of Programmers and Enthusiasts in Computer Science (SPECS)</strong> (“the Organization,” “we,” “our,” or “us”), you agree to be bound by these Terms of Service. If you do not agree, please do not access or use this site.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">2. Purpose of the Website</h5>
+                                    <p class="card-text text-muted small">This website serves as the <strong>official information and communication portal</strong> of SPECS. It presents organizational announcements, activities, objectives, and updates as recognized under the <strong>SPECS Constitution and By-Laws</strong>. Users cannot create accounts or submit content. The site functions purely as a <strong>landing page</strong> for informational and archival purposes.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">3. Ownership and Governance</h5>
+                                    <p class="card-text text-muted small">All content, materials, and data published on this website are the property of <strong>SPECS</strong>. Website operations and data handling are governed by the policies outlined in <strong>Article XI — Data Confidentiality</strong> of the SPECS Constitution and By-Laws.</p>
+                                    
+                                    <h5 class="fw-bold mt-4 mb-2">4. Permitted Use</h5>
+                                    <p class="card-text text-muted small">Users may access and share information from this site for personal, academic, or organizational reference, provided that such use:</p>
+                                    <ul class="card-text text-muted small ps-4">
+                                        <li>Does not misrepresent, modify, or falsely attribute the content;</li>
+                                        <li>Complies with university and organizational ethical standards;</li>
+                                        <li>Includes proper acknowledgment of SPECS as the source.</li>
+                                    </ul>
+
+                                    <h5 class="fw-bold mt-4 mb-2">5. Prohibited Conduct</h5>
+                                     <p class="card-text text-muted small">Users shall not:</p>
+                                    <ul class="card-text text-muted small ps-4">
+                                        <li>Attempt to interfere with, disrupt, or gain unauthorized access to the website or its servers;</li>
+                                        <li>Use automated tools or scripts that compromise website performance;</li>
+                                        <li>Misuse any organizational information for commercial, defamatory, or unlawful purposes.</li>
+                                    </ul>
+
+                                    <h5 class="fw-bold mt-4 mb-2">6. Contact Information</h5>
+                                    <p class="card-text text-muted small">For inquiries related to this website, please contact:<br>
+                                    <strong>Society of Programmers and Enthusiasts in Computer Science (SPECS)</strong><br>
+                                    Email: <a href="mailto:specs.cecs@parsu.edu.ph">specs.cecs@parsu.edu.ph</a><br>
+                                    Address: College of Engineering and Computational Sciences, Partido State University</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-lg-6">
-                            <div class="card h-100 shadow-sm">
+                        <div class="col-lg-6 d-flex">
+                            <div class="card h-100 shadow-sm w-100">
                                 <div class="card-body p-4">
                                     <div class="d-flex align-items-center mb-3">
                                         <img src="${shieldCheck}" alt="Privacy icon" class="me-3" style="width: 2rem; height: 2rem; filter: var(--bs-primary-text-emphasis);">
                                         <h4 class="card-title mb-0 fw-semibold">Privacy Policy</h4>
                                     </div>
-                                    <p class="card-text text-muted small">Our Privacy Policy describes how we collect, use, and share information about you when you use our portal. We are committed to protecting your privacy. We collect information you provide directly to us, such as when you create an account, as well as information collected automatically, like your usage data. This information is used to operate, maintain, and improve our services. We do not share your personal information with third parties except as described in this policy or with your consent.</p>
+                                    <p class="card-text text-muted small"><strong>Last Updated:</strong> October 26, 2025</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">1. Introduction</h5>
+                                    <p class="card-text text-muted small">SPECS respects your privacy. This Privacy Policy explains how we handle data collected through our website, in accordance with <strong>Article XI — Data Confidentiality</strong> of the SPECS Constitution and By-Laws.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">2. Data We Collect</h5>
+                                    <p class="card-text text-muted small">This website does not require or allow user registration. However, we may collect limited technical data automatically, including:</p>
+                                    <ul class="card-text text-muted small ps-4">
+                                        <li>Browser type, device, and operating system;</li>
+                                        <li>IP address (anonymized);</li>
+                                        <li>Cached data or cookies used solely to improve loading speed and performance.</li>
+                                    </ul>
+                                    <p class="card-text text-muted small">No personally identifiable information (such as names or contact details) is collected through public browsing.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">3. Data from Members</h5>
+                                    <p class="card-text text-muted small">Organizational data related to <strong>official SPECS members</strong> are collected <strong>offline</strong> and stored in accordance with the provisions of the <strong>SPECS Constitution and By-Laws — Article XI (Data Confidentiality)</strong> for purposes such as organizational coordination, university reporting, and record-keeping. Such information is never publicly displayed or shared through this website.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">4. Data Protection</h5>
+                                    <p class="card-text text-muted small">All stored organizational data are accessed only by authorized SPECS officers and are subject to the confidentiality standards outlined in Article XI of the Constitution and By-Laws. Unauthorized access, disclosure, or misuse is strictly prohibited.</p>
+
+                                    <h5 class="fw-bold mt-4 mb-2">5. Contact</h5>
+                                    <p class="card-text text-muted small">If you have questions regarding this Privacy Policy or data handling, you may contact:<br>
+                                    <strong>Society of Programmers and Enthusiasts in Computer Science (SPECS)</strong><br>
+                                    Email: <a href="mailto:specs.cecs@parsu.edu.ph">specs.cecs@parsu.edu.ph</a><br>
+                                    Address: College of Engineering and Computational Sciences, Partido State University</p>
                                 </div>
                             </div>
                         </div>

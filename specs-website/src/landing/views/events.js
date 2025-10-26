@@ -5,7 +5,7 @@ import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import clock from 'bootstrap-icons/icons/clock.svg';
 import imageAlt from 'bootstrap-icons/icons/image-alt.svg';
-import { renderHeader, renderFooter } from '../../shared/utils.js'; // Assuming utils.js for shared components
+import { renderHeader, renderFooter } from '../../shared/utils.js';
 
 const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
