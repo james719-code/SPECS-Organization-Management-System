@@ -1,4 +1,4 @@
-import { renderHeader, renderFooter } from '../../shared/utils.js';
+import {renderHeader, renderFooter} from '../../shared/utils.js';
 import {fetchHighlightById} from '../data/data.js';
 import personFill from 'bootstrap-icons/icons/person-fill.svg';
 import calendar3 from 'bootstrap-icons/icons/calendar3.svg';
@@ -32,59 +32,76 @@ export async function renderHighlightDetailsPage(app, highlightId) {
     `).join('');
 
     app.innerHTML = `
-    <div class="landing-page">
-        ${renderHeader()}
-        <main>
-            <section class="highlight-hero" style="background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${highlight.image}');">
-                <div class="container text-white text-center">
-                    <h1 class="display-4 fw-bold">${highlight.title}</h1>
-                </div>
-            </section>
+<div class="landing-page">
+    ${renderHeader()}
+    <main>
+        <section class="highlight-hero" style="background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${highlight.image}');">
+            <div class="container text-white text-center">
+                <h1 class="display-4 fw-bold">${highlight.title}</h1>
+            </div>
+        </section>
 
-            <section class="py-5">
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-8">
-                            <div class="card bg-light border-0 shadow-sm mb-4">
-                            </div>
+        <section class="py-5">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        
+                        <!-- Author and Date Meta Data -->
+<div class="d-flex justify-content-center flex-wrap align-items-center gap-4 text-muted mb-5">
+    <div class="d-flex align-items-center">
+        <img src="${personFill}" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.7;" />
+        <span class="opacity-75 me-2">Authored by</span>
+        <span class="fw-medium text-dark">${highlight.postedBy}</span>
+    </div>
+    <div class="d-flex align-items-center">
+        <img src="${calendar3}" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.7;" />
+        <span class="opacity-75 me-2">Posted on</span>
+        <span class="fw-medium text-dark">${highlight.date}</span>
+    </div>
+</div>
 
-                            <!-- Main Content -->
-                            <div class="highlight-content">
-                                ${highlight.details}
-                            </div>
-                            
-                            <!-- Related Links -->
-                            ${highlight.links.length > 0 ? `
-                                <div class="mt-5">
-                                    <h4 class="fw-bold">Related Links</h4>
-                                    <div class="list-group">${relatedLinksHTML}</div>
-                                </div>
-                            ` : ''}
-
-                             <div class="text-center mt-5 border-top pt-4">
-                                 <a href="#/stories" class="btn btn-outline-primary">
-                                    <img src="${arrowLeft}" class="me-1"/>
-                                     Back to All Highlights
-                                 </a>
-                             </div>
+                        <!-- Main Content -->
+                        <div class="highlight-content">
+                            ${highlight.details}
                         </div>
+                        
+                        <!-- Related Links -->
+                        ${highlight.links.length > 0 ? `
+                            <div class="mt-5">
+                                <h4 class="fw-bold">Related Links</h4>
+                                <div class="list-group">${relatedLinksHTML}</div>
+                            </div>
+                        ` : ''}
+
+                         <div class="text-center mt-5 border-top pt-4">
+                             <a href="#/stories" class="btn btn-outline-primary">
+                                <img src="${arrowLeft}" class="me-1"/>
+                                 Back to All Highlights
+                             </a>
+                         </div>
                     </div>
                 </div>
-            </section>
-        </main>
-    </div>
+            </div>
+        </section>
+    </main>
+</div>
 
-    <style>
-        .highlight-hero {
-            padding: 6rem 0;
-            background-size: cover;
-            background-position: center;
-        }
-        .highlight-content p {
-            line-height: 1.8;
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
-        }
-    </style>
-    `;
+<style>
+    .highlight-hero {
+        padding: 6rem 0;
+        background-size: cover;
+        background-position: center;
+    }
+    .highlight-content p {
+        line-height: 1.8;
+        font-size: 1.1rem;
+        margin-bottom: 1.5rem;
+    }
+    .highlight-content h2, .highlight-content h3 {
+        margin-top: 2.5rem;
+        margin-bottom: 1.25rem;
+        font-weight: 600;
+    }
+</style>
+`;
 }
