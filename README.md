@@ -1,6 +1,42 @@
-# SPECS Student & Admin Portal
+# SPECS Organization Management System
 
-A modern web application built with Vanilla JavaScript and Appwrite to serve as a central hub for the Society of Programmers and Enthusiasts in Computer Science (SPECS). It provides features for event management, file sharing, financial tracking, and user administration.
+![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=appwrite) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge)
+
+A centralized web application built with Vanilla JavaScript and Appwrite to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
+
+---
+
+## 🧐 Problem Statement
+
+Before this platform, managing the organization was a manual and fragmented process. The executive board faced several key challenges:
+* **Disorganized Data:** Student lists, payment records, and event attendance were scattered across multiple spreadsheets and paper logs, making data retrieval difficult.
+* **File Fragmentation:** Important documents and learning resources were shared via ephemeral messaging apps or broken drive links, leading to resource loss.
+* **Lack of Transparency:** Students had no real-time way to check their payment status or view upcoming events without directly contacting an officer.
+
+## 💡 The Solution
+
+This **Student & Admin Portal** acts as the "Single Source of Truth" for the organization. It digitizes the workflow by:
+1. **Centralizing Records:** A unified database for students, officers, and financial records.
+2. **Automating Access:** Role-based dashboards ensure officers have the tools they need while students access only what is relevant.
+3. **Streamlining Resources:** A dedicated file repository ensures educational materials are always accessible.
+
+---
+
+## 🏗️ Design Decisions
+
+In building this application, specific architectural and technical choices were made to balance performance, learning curve, and rapid deployment:
+
+### 1. **Why Vanilla JavaScript?**
+* **Decision:** We avoided heavy frontend frameworks (React/Vue) for the initial version.
+* **Reasoning:** To ensure a deep understanding of DOM manipulation and core Web APIs without the abstraction overhead. This keeps the bundle size incredibly small and the performance high on lower-end devices often used by students.
+
+### 2. **Why Appwrite (BaaS)?**
+* **Decision:** We utilized Appwrite for the backend instead of building a custom REST API with Node/Express.
+* **Reasoning:** As a student-led project with tight deadlines, we needed a secure, production-ready backend immediately. Appwrite handles Authentication, Database (CRUD), and File Storage out-of-the-box, allowing us to focus 100% on the frontend logic and user experience.
+
+### 3. **SCSS over Plain CSS**
+* **Decision:** Used SASS/SCSS with a BEM-like naming convention.
+* **Reasoning:** To maintain modularity and use variables for the organization's color themes, making future rebranding or dark mode implementation significantly easier.
 
 ---
 
@@ -31,9 +67,10 @@ A modern web application built with Vanilla JavaScript and Appwrite to serve as 
 ## 🛠️ Tech Stack
 
 - **Frontend:** Vanilla JavaScript (ES6+), HTML5, SASS/SCSS
-- **UI:** Bootstrap 5 (via SCSS), Bootstrap Icons (as imported SVGs)
+- **UI:** Bootstrap 5 (via SCSS), Bootstrap Icons (SVG)
 - **Backend:** Appwrite Cloud (BaaS)
 - **Build Tool:** Vite
+- **Quality Control:** Unlighthouse (Performance & SEO Scanning)
 
 ---
 
@@ -51,7 +88,7 @@ A modern web application built with Vanilla JavaScript and Appwrite to serve as 
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/james719-code/SPECS-Organization-Management-System.git
+git clone [https://github.com/james719-code/SPECS-Organization-Management-System.git](https://github.com/james719-code/SPECS-Organization-Management-System.git)
 cd SPECS-Organization-Management-System/specs-website
 ```
 
@@ -61,29 +98,29 @@ cd SPECS-Organization-Management-System/specs-website
 npm install
 ```
 
-#### 3. Set Up Appwrite Backend
+#### 3. Set Up Appwrite Backend1. **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/).
+2. **Add Web Platform:** Name it, and set the hostname to `localhost`.
+3. **Create Database & Collections:**
+* Create a new database (e.g., `Main Database`).
+* Inside the database, create the following collections: `officers`, `non_officer_students`, `events`, `files`, `payments`, `revenue`, `expenses`.
+* Set the necessary permissions and attributes for each collection as detailed in the [Collection Schemas](https://www.google.com/search?q=%23-collection-schemas) section below.
 
-1.  **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/).
-2.  **Add Web Platform:** Name it, and set the hostname to `localhost`.
-3.  **Create Database & Collections:**
-    *   Create a new database (e.g., `Main Database`).
-    *   Inside the database, create the following collections: `officers`, `non_officer_students`, `events`, `files`, `payments`, `revenue`, `expenses`.
-    *   Set the necessary permissions and attributes for each collection as detailed in the [Collection Schemas](#-collection-schemas) section below.
-4.  **Create Storage Buckets:**
-    *   `Event Images`
-    *   `User Uploads`
-    *   `Resumes`
-    *   `Schedules`
 
-#### 4. Environment Setup
+4. **Create Storage Buckets:**
+* `Event Images`
+* `User Uploads`
+* `Resumes`
+* `Schedules`
 
-Create a file named `.env.local` in the `specs-website` directory and populate it with your Appwrite credentials.
+
+
+#### 4. Environment SetupCreate a file named `.env.local` in the `specs-website` directory and populate it with your Appwrite credentials.
 
 ```ini
 # .env.local
 # Replace placeholders with your actual Appwrite IDs
 
-VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
+VITE_APPWRITE_ENDPOINT="[https://cloud.appwrite.io/v1](https://cloud.appwrite.io/v1)"
 VITE_APPWRITE_PROJECT_ID="<YOUR_NEW_PROJECT_ID>"
 
 VITE_DATABASE_ID="<YOUR_NEW_DATABASE_ID>"
@@ -102,146 +139,144 @@ VITE_BUCKET_ID_SCHEDULES="<YOUR_SCHEDULES_BUCKET_ID>"
 ```
 
 #### 5. Run the Development Server
-
 ```bash
 npm run dev
 ```
 
-Open your browser and navigate to [http://localhost:5173](http://localhost:5173).
+Open your browser and navigate to [http://localhost:5173](https://www.google.com/search?q=http://localhost:5173).
 
----
-## 🏆 Project Quality
-
-### Site-wide Performance Scanning
-This project uses **Unlighthouse** to scan the entire site for performance, accessibility, and SEO issues, ensuring a consistently high-quality experience across all pages.
-
-![Unlighthouse Scan](https://img.shields.io/badge/Unlighthouse-Scanned-brightgreen.svg?style=for-the-badge)
 ---
 
 ## 📚 Collection Schemas
-
 <details>
 <summary><strong>📋 Click to expand Appwrite collection schemas</strong></summary>
 
 ### 🧑‍✈️ `officers` (Users who can log in)
-
-| Key          | Type    | Required | Default   | Notes                               |
-| ------------ | ------- | -------- | --------- | ----------------------------------- |
-| username     | String  | ✅        |           |                                     |
-| fullname     | String  | ✅        |           |                                     |
-| yearLevel    | String  | ✅        |           |                                     |
-| gender       | Enum    | ✅        |           | (e.g., Male, Female, Other)         |
-| email        | String  | ✅        |           | (Required for Appwrite Auth)        |
-| type         | Enum    | ✅        | `student` | (Elements: `student`, `admin`)      |
-| verified     | Boolean | ✅        | `false`   |                                     |
-| haveResume   | Boolean | ✅        | `false`   |                                     |
-| resumeId     | String  |          |           |                                     |
-| haveSchedule | Boolean | ✅        | `false`   |                                     |
-| scheduleId   | String  |          |           |                                     |
-
+| Key | Type | Required | Default | Notes |
+| --- | --- | --- | --- | --- |
+| username | String | ✅ |  |  |
+| fullname | String | ✅ |  |  |
+| yearLevel | String | ✅ |  |  |
+| gender | Enum | ✅ |  | (e.g., Male, Female, Other) |
+| email | String | ✅ |  | (Required for Appwrite Auth) |
+| type | Enum | ✅ | `student` | (Elements: `student`, `admin`) |
+| verified | Boolean | ✅ | `false` |  |
+| haveResume | Boolean | ✅ | `false` |  |
+| resumeId | String |  |  |  |
+| haveSchedule | Boolean | ✅ | `false` |  |
+| scheduleId | String |  |  |  |
 
 ---
 
 ### 👥 `non_officer_students` (Directory list of students)
-
-| Key     | Type   | Required |
-| ------- | ------ | -------- |
-| name    | String | ✅        |
-| email   | String | ✅        |
-| section | String | ✅        |
-| address | String |          |
+| Key | Type | Required |
+| --- | --- | --- |
+| name | String | ✅ |
+| email | String | ✅ |
+| section | String | ✅ |
+| address | String |  |
 
 ---
 
 ### 📅 `events`
-
-| Key            | Type           | Required | Default |
-| -------------- | -------------- | -------- | ------- |
-| event\_name    | String         | ✅        |         |
-| date\_to\_held | Datetime       | ✅        |         |
-| image\_file    | String         | ✅        |         |
-| description    | String         |          |         |
-| added\_by      | String         | ✅        |         |
-| event\_ended   | Boolean        | ✅        | `false` |
-| collab         | String (Array) |          | `[]`    |
+| Key | Type | Required | Default |
+| --- | --- | --- | --- |
+| event_name | String | ✅ |  |
+| date_to_held | Datetime | ✅ |  |
+| image_file | String | ✅ |  |
+| description | String |  |  |
+| added_by | String | ✅ |  |
+| event_ended | Boolean | ✅ | `false` |
+| collab | String (Array) |  | `[]` |
 
 ---
 
 ### 📂 `files`
-
-| Key         | Type   | Required |
-| ----------- | ------ | -------- |
-| fileName    | String | ✅        |
-| description | String |          |
-| uploader    | String | ✅        |
-| fileID      | String | ✅        |
+| Key | Type | Required |
+| --- | --- | --- |
+| fileName | String | ✅ |
+| description | String |  |
+| uploader | String | ✅ |
+| fileID | String | ✅ |
 
 ---
 
 ### 💰 `payments`
-
-| Key         | Type     | Required | Default |
-| ----------- | -------- | -------- | ------- |
-| student\_id | String   | ✅        |         |
-| is\_event   | Boolean  | ✅        | `false` |
-| event       | String   |          |         |
-| activity    | String   |          |         |
-| price       | Double   | ✅        |         |
-| item\_name  | String   | ✅        |         |
-| quantity    | Integer  | ✅        |         |
-| isPaid      | Boolean  | ✅        | `false` |
-| date\_paid   | Datetime |          |         |
+| Key | Type | Required | Default |
+| --- | --- | --- | --- |
+| student_id | String | ✅ |  |
+| is_event | Boolean | ✅ | `false` |
+| event | String |  |  |
+| activity | String |  |  |
+| price | Double | ✅ |  |
+| item_name | String | ✅ |  |
+| quantity | Integer | ✅ |  |
+| isPaid | Boolean | ✅ | `false` |
+| date_paid | Datetime |  |  |
 
 ---
 
 ### 📈 `revenue`
-
-| Key         | Type     | Required |
-| ----------- | -------- | -------- |
-| name        | String   | ✅        |
-| isEvent     | Boolean  | ✅        |
-| event       | String   |          |
-| activity    | String   |          |
-| quantity    | Integer  | ✅        |
-| price       | Double   | ✅        |
-| date\_earned | Datetime | ✅        |
-| recorder    | String   | ✅        |
+| Key | Type | Required |
+| --- | --- | --- |
+| name | String | ✅ |
+| isEvent | Boolean | ✅ |
+| event | String |  |
+| activity | String |  |
+| quantity | Integer | ✅ |
+| price | Double | ✅ |
+| date_earned | Datetime | ✅ |
+| recorder | String | ✅ |
 
 ---
 
 ### 📉 `expenses`
-
-| Key           | Type     | Required | Default |
-| ------------- | -------- | -------- | ------- |
-| name          | String   | ✅        |         |
-| isEvent       | Boolean  | ✅        | `false` |
-| event         | String   |          |         |
-| activity\_name | String   |          |         |
-| quantity      | Integer  | ✅        | `1`     |
-| price         | Double   | ✅        |         |
-| date\_buy      | Datetime | ✅        |         |
-| recorder      | String   | ✅        |         |
+| Key | Type | Required | Default |
+| --- | --- | --- | --- |
+| name | String | ✅ |  |
+| isEvent | Boolean | ✅ | `false` |
+| event | String |  |  |
+| activity_name | String |  |  |
+| quantity | Integer | ✅ | `1` |
+| price | Double | ✅ |  |
+| date_buy | Datetime | ✅ |  |
+| recorder | String | ✅ |  |
 
 </details>
 
 ---
 
+## 🏆 Project Quality
+### Site-wide Performance Scanning
+This project uses **Unlighthouse** to scan the entire site for performance, accessibility, and SEO issues, ensuring a consistently high-quality experience across all pages.
+
+---
+
+## 🚧 Limitations & Known IssuesWhile functional, the current iteration has the following constraints:
+
+* **Scalability of Vanilla JS:** As the codebase grows, state management in Vanilla JS is becoming complex. Refactoring to a component-based framework may be necessary in the future.
+* **Manual Payments:** The system tracks payments, but does not *process* them. Students must still pay physically or via external e-wallets, then an admin manually updates the record.
+* **Internet Dependency:** The app requires an active internet connection to fetch data from Appwrite; there is currently no offline/PWA support.
+
+## 🚀 Roadmap & Future Improvements 
+* [ ] **Migration to React/Next.js:** To handle complex state management and improve routing.
+* [ ] **Payment Gateway Integration:** Integration with PayMongo or Xendit for real-time, automated payment verification.
+* [ ] **QR Code Attendance:** Generate QR codes for events to automate attendance tracking.
+* [ ] **Real-time Notifications:** Use Appwrite Realtime to notify students of new events or cleared payments instantly.
+
+---
+
 ## 🤝 Contribution Guide
-
-1.  **Create Branch:**
-    `git checkout -b <type>/<feature-name>` (e.g., `feat/add-payment-list-page`)
-
-2.  **Make Changes:**
-    Implement your feature or fix, adhering to the project's coding style.
-
-3.  **Commit Message Convention:**
-    Use conventional commits for clear history. (e.g., `git commit -m "feat: Add payment list page"`)
-
-4.  **Push & PR:**
-    Push your branch to the repository and open a pull request targeting the `main` branch.
+1. **Create Branch:**
+`git checkout -b <type>/<feature-name>` (e.g., `feat/add-payment-list-page`)
+2. **Make Changes:**
+Implement your feature or fix, adhering to the project's coding style.
+3. **Commit Message Convention:**
+Use conventional commits for clear history. (e.g., `git commit -m "feat: Add payment list page"`)
+4. **Push & PR:**
+Push your branch to the repository and open a pull request targeting the `main` branch.
 
 ---
 
 ## 📜 License
-
-This project is licensed under the **BSD 3-Clause License**. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **BSD 3-Clause License**. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
