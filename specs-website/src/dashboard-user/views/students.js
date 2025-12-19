@@ -1,3 +1,4 @@
+// --- IMPORTS ---
 import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
@@ -6,126 +7,201 @@ import { Modal } from 'bootstrap';
 import threeDotsVerticalIcon from 'bootstrap-icons/icons/three-dots-vertical.svg';
 import pencilFillIcon from 'bootstrap-icons/icons/pencil-fill.svg';
 import trashFillIcon from 'bootstrap-icons/icons/trash-fill.svg';
-import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
+import personIcon from 'bootstrap-icons/icons/person.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
-import peopleIcon from 'bootstrap-icons/icons/people.svg';
 import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
 import personPlusFillIcon from 'bootstrap-icons/icons/person-plus-fill.svg';
 import peopleFillIcon from 'bootstrap-icons/icons/people-fill.svg';
+import searchIcon from 'bootstrap-icons/icons/search.svg';
+import envelopeIcon from 'bootstrap-icons/icons/envelope.svg';
+import geoAltIcon from 'bootstrap-icons/icons/geo-alt.svg';
 
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_NON_OFFICER_STUDENT = import.meta.env.VITE_COLLECTION_NON_OFFICER_STUDENT;
-const COLLECTION_ID_PAYMENTS = import.meta.env.VITE_COLLECTION_ID_PAYMENTS; // For delete check
+const COLLECTION_ID_PAYMENTS = import.meta.env.VITE_COLLECTION_ID_PAYMENTS;
 
 // --- HELPERS ---
 const YEAR_LEVEL_OPTIONS = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B']
-    .map(section => `<option value="BSCS ${section}">BSCS ${section}</option>`).join('');
+    .map(s => `<option value="BSCS ${s}">BSCS ${s}</option>`).join('');
 
 // --- HTML TEMPLATE FUNCTIONS ---
+
+/**
+ * Creates a modern student card with a clean layout and action dropdown.
+ */
 function createStudentCardHTML(studentDoc) {
     const studentData = JSON.stringify(studentDoc).replace(/'/g, "\\'");
-    const dropdownIconStyle = "width: 1.1em; height: 1.1em; filter: var(--bs-dropdown-link-color-filter);";
-    const dangerIconStyle = "width: 1.1em; height: 1.1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);";
+
+    // Generate initials for avatar
+    const initials = studentDoc.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
     return `
-        <div class="col"><div class="card h-100">
-            <div class="card-body">
-                <div class="position-absolute top-0 end-0 p-2">
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
-                            <img src="${threeDotsVerticalIcon}" alt="Options">
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><button class="dropdown-item d-flex align-items-center gap-2 edit-student-btn" type="button" data-student='${studentData}'><img src="${pencilFillIcon}" alt="Edit" style="${dropdownIconStyle}">Edit</button></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item text-danger d-flex align-items-center gap-2 delete-student-btn" type="button" data-id="${studentDoc.$id}" data-name="${studentDoc.name}"><img src="${trashFillIcon}" alt="Delete" style="${dangerIconStyle}">Delete</button></li>
-                        </ul>
+        <div class="col">
+            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-card group">
+                <div class="card-body p-4 position-relative">
+                    <div class="position-absolute top-0 end-0 p-3">
+                        <div class="dropdown">
+                            <button class="btn btn-link text-muted p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="opacity: 0.6;">
+                                <img src="${threeDotsVerticalIcon}" width="20">
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-3 p-2">
+                                <li>
+                                    <button class="dropdown-item d-flex align-items-center gap-2 rounded-2 py-2 edit-student-btn" type="button" data-student='${studentData}'>
+                                        <img src="${pencilFillIcon}" width="14" class="opacity-50"> <span class="small fw-semibold">Edit Details</span>
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider my-2"></li>
+                                <li>
+                                    <button class="dropdown-item d-flex align-items-center gap-2 rounded-2 py-2 text-danger delete-student-btn" type="button" data-id="${studentDoc.$id}" data-name="${studentDoc.name}">
+                                        <img src="${trashFillIcon}" width="14" class="status-rejected-filter"> <span class="small fw-semibold">Delete Student</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-                </div>
-                <div class="d-flex align-items-center">
-                    <img src="${personCircleIcon}" alt="Avatar" class="fs-2 me-3 text-secondary" style="width: 2.5rem; height: 2.5rem; opacity: 0.5;">
-                    <div>
-                        <h6 class="card-title fw-bold mb-0">${studentDoc.name}</h6>
-                        <p class="card-text small text-muted mb-0">${studentDoc.email}</p>
+
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="file-icon-wrapper bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 56px; height: 56px; font-weight: 700; font-size: 1.2rem;">
+                            ${initials}
+                        </div>
+                        <div style="max-width: calc(100% - 80px);">
+                            <h6 class="fw-bold text-dark mb-1 text-truncate" title="${studentDoc.name}">${studentDoc.name}</h6>
+                            <span class="badge status-badge status-approved border border-success-subtle bg-success-subtle text-success px-2 py-1" style="font-size: 0.65rem;">${studentDoc.section}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex flex-column gap-2 border-top border-light pt-3">
+                        <div class="d-flex align-items-center gap-2 text-secondary" title="${studentDoc.email}">
+                            <div class="bg-light rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                <img src="${envelopeIcon}" width="12" style="opacity: 0.6;">
+                            </div>
+                            <span class="small text-truncate flex-grow-1">${studentDoc.email}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-secondary" title="${studentDoc.address || 'No address'}">
+                            <div class="bg-light rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                <img src="${geoAltIcon}" width="12" style="opacity: 0.6;">
+                            </div>
+                            <span class="small text-truncate flex-grow-1">${studentDoc.address || '<span class="text-muted fst-italic">No address provided</span>'}</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="card-footer bg-light small"><strong>Section:</strong> ${studentDoc.section}</div>
-        </div></div>`;
+        </div>`;
 }
 
 function getStudentHTML() {
-    const whiteIconStyle = "filter: invert(1);";
-    const primaryOutlineIconStyle = "filter: var(--bs-btn-color-filter);";
-    const secondaryOutlineIconStyle = "filter: var(--bs-btn-color-filter-secondary);";
-
     return `
-        <div class="student-directory-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
-            <div class="d-flex flex-column flex-lg-row justify-content-lg-between align-items-lg-center mb-4">
-                <h1 class="mb-3 mb-lg-0">Student Directory</h1>
-                <div class="d-flex flex-column flex-sm-row gap-2">
-                    <select id="sectionFilter" class="form-select" style="min-width: 200px;"><option value="all">All Sections</option>${YEAR_LEVEL_OPTIONS}</select>
-                    <input type="search" id="studentSearchInput" class="form-control" placeholder="Search by name or email...">
+        <div class="student-directory-container container-fluid py-4 px-md-5">
+            <header class="row align-items-center mb-5 gy-4">
+                <div class="col-12 col-lg-6">
+                    <h1 class="display-6 fw-bold text-dark mb-1">Student Directory</h1>
+                    <p class="text-muted mb-0">Manage non-officer student records efficiently.</p>
                 </div>
-            </div>
-            <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 flex-grow-1"></div>
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
+                        <select id="sectionFilter" class="form-select border-0 shadow-sm bg-white py-2 ps-3" style="max-width: 200px; cursor: pointer;">
+                            <option value="all">All Sections</option>
+                            ${YEAR_LEVEL_OPTIONS}
+                        </select>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden bg-white border-0" style="max-width: 300px;">
+                            <span class="input-group-text bg-white border-0 ps-3">
+                                <img src="${searchIcon}" width="16" style="opacity:0.4">
+                            </span>
+                            <input type="search" id="studentSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search by name or email...">
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
+                 </div>
         </div>
 
-        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addStudentModal" title="Add New Student">
-            <img src="${plusLgIcon}" alt="Add Student" style="width: 1.5rem; height: 1.5rem; ${whiteIconStyle}">
+        <button class="btn btn-primary rounded-pill position-fixed bottom-0 end-0 m-4 shadow-lg px-4 py-3 d-flex align-items-center gap-2" style="z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+            <img src="${plusLgIcon}" alt="Add" style="width: 1.2rem; filter: invert(1);">
+            <span class="fw-bold">Add Student</span>
         </button>
 
-        <div class="modal fade" id="addStudentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Add Student(s)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div id="add-student-choice-view">
-                    <p>How would you like to add students?</p>
-                    <div class="d-grid gap-3">
-                        <button class="btn btn-outline-primary p-3 d-flex align-items-center justify-content-center gap-2" id="show-single-add-btn"><img src="${personPlusFillIcon}" alt="Add Single" style="width: 1.5rem; height: 1.5rem; ${primaryOutlineIconStyle}">Add a Single Student</button>
-                        <button class="btn btn-outline-secondary p-3 d-flex align-items-center justify-content-center gap-2" id="show-bulk-add-btn"><img src="${peopleFillIcon}" alt="Add Bulk" style="width: 1.5rem; height: 1.5rem; ${secondaryOutlineIconStyle}">Add Students in Bulk</button>
+        <div class="modal fade" id="addStudentModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header border-0 pt-4 px-4">
+                        <h5 class="modal-title fw-bold">Add Student(s)</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                </div>
-                <form id="add-single-student-form" class="d-none">
-                    <div class="mb-3"><label for="singleStudentName" class="form-label">Full Name</label><input type="text" id="singleStudentName" class="form-control" required></div>
-                    <div class="mb-3"><label for="singleStudentEmail" class="form-label">Email</label><input type="email" id="singleStudentEmail" class="form-control" required></div>
-                    <div class="mb-3"><label for="singleStudentAddress" class="form-label">Address</label><input type="text" id="singleStudentAddress" class="form-control" placeholder="e.g., Brgy. Sample, Sample City" required></div>
-                    <div class="mb-3"><label for="singleStudentSection" class="form-label">Section</label><select id="singleStudentSection" class="form-select" required><option value="" disabled selected>-- Select a section --</option>${YEAR_LEVEL_OPTIONS}</select></div>
-                    <div class="d-flex justify-content-between mt-4">
-                        <button type="button" class="btn btn-secondary back-to-choice-btn">← Back</button>
-                        <button type="submit" class="btn btn-primary">Add Student</button>
-                    </div>
-                </form>
-                <form id="add-bulk-student-form" class="d-none">
-                    <div class="mb-3"><label for="bulkStudentData" class="form-label">Student Data</label><textarea id="bulkStudentData" class="form-control" rows="8" placeholder="Enter student data here..." required></textarea><div class="form-text">
-                        <strong>Required Pattern:</strong><br>
-                        <pre class="mb-0">SECTION (e.g., BSCS 1A)\n\nLastname, Firstname M.I. - email@example.com - Brgy, City, Province\nLastname, Firstname M.I. - email@example.com - Brgy, City, Province</pre>
-                    </div></div>
-                    <div class="d-flex justify-content-between mt-4">
-                        <button type="button" class="btn btn-secondary back-to-choice-btn">← Back</button>
-                        <button type="submit" class="btn btn-primary">Process & Add Students</button>
-                    </div>
-                </form>
-            </div>
-        </div></div></div>
+                    <div class="modal-body p-4">
+                        
+                        <div id="add-student-choice-view">
+                            <p class="text-muted small text-center mb-4">Choose a method to add students to the directory.</p>
+                            <div class="d-grid gap-3">
+                                <button class="btn btn-outline-light text-dark text-start p-3 border shadow-sm hover-shadow transition-all d-flex align-items-center gap-3 rounded-3" id="show-single-add-btn">
+                                    <div class="bg-primary-subtle text-primary p-3 rounded-circle"><img src="${personPlusFillIcon}" width="20" class="icon-primary-filter"></div>
+                                    <div>
+                                        <div class="fw-bold">Add Single Student</div>
+                                        <div class="small text-muted">Manually enter details for one student.</div>
+                                    </div>
+                                </button>
+                                <button class="btn btn-outline-light text-dark text-start p-3 border shadow-sm hover-shadow transition-all d-flex align-items-center gap-3 rounded-3" id="show-bulk-add-btn">
+                                    <div class="bg-warning-subtle text-warning p-3 rounded-circle"><img src="${peopleFillIcon}" width="20"></div>
+                                    <div>
+                                        <div class="fw-bold">Bulk Import</div>
+                                        <div class="small text-muted">Copy-paste a list of students to add at once.</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
 
-        <div class="modal fade" id="editStudentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-            <form id="editStudentForm">
-                <div class="modal-header"><h5 class="modal-title">Edit Student Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <input type="hidden" id="editStudentId">
-                    <div class="mb-3"><label for="editStudentName" class="form-label">Full Name</label><input type="text" id="editStudentName" class="form-control" required></div>
-                    <div class="mb-3"><label for="editStudentEmail" class="form-label">Email</label><input type="email" id="editStudentEmail" class="form-control" required></div>
-                    <div class="mb-3"><label for="editStudentAddress" class="form-label">Address</label><input type="text" id="editStudentAddress" class="form-control" required></div>
-                    <div class="mb-3"><label for="editStudentSection" class="form-label">Section</label><select id="editStudentSection" class="form-select" required>${YEAR_LEVEL_OPTIONS}</select></div>
+                        <form id="add-single-student-form" class="d-none">
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Full Name</label><input type="text" id="singleStudentName" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Email</label><input type="email" id="singleStudentEmail" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Address</label><input type="text" id="singleStudentAddress" class="form-control" placeholder="e.g., Brgy. Sample, City" required></div>
+                            <div class="mb-4"><label class="form-label fw-bold small text-muted text-uppercase">Section</label><select id="singleStudentSection" class="form-select" required><option value="" disabled selected>-- Select --</option>${YEAR_LEVEL_OPTIONS}</select></div>
+                            <div class="d-flex justify-content-between pt-2 border-top">
+                                <button type="button" class="btn btn-light back-to-choice-btn rounded-pill px-4">Back</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Add Student</button>
+                            </div>
+                        </form>
+
+                        <form id="add-bulk-student-form" class="d-none">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Raw Data Input</label>
+                                <textarea id="bulkStudentData" class="form-control font-monospace small" rows="8" placeholder="Format:&#10;BSCS 1A&#10;&#10;Doe, John A. - john@email.com - 123 Street&#10;Smith, Jane B. - jane@email.com - 456 Ave" required></textarea>
+                            </div>
+                            <div class="alert alert-light border small text-muted">
+                                <strong class="text-dark">Instructions:</strong> First line is the Section. Leave a blank line. Then list students: <code>Name - Email - Address</code>.
+                            </div>
+                            <div class="d-flex justify-content-between pt-2 border-top">
+                                <button type="button" class="btn btn-light back-to-choice-btn rounded-pill px-4">Back</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Process Import</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
-            </form>
-        </div></div></div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="editStudentModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <form id="editStudentForm">
+                        <div class="modal-header border-0 pt-4 px-4"><h5 class="modal-title fw-bold">Edit Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="editStudentId">
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Full Name</label><input type="text" id="editStudentName" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Email</label><input type="email" id="editStudentEmail" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Address</label><input type="text" id="editStudentAddress" class="form-control" required></div>
+                            <div class="mb-3"><label class="form-label fw-bold small text-muted text-uppercase">Section</label><select id="editStudentSection" class="form-select" required>${YEAR_LEVEL_OPTIONS}</select></div>
+                        </div>
+                        <div class="modal-footer border-0 pb-4 px-4"><button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Save Changes</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
     `;
 }
 
-// --- LOGIC AND EVENT LISTENERS ---
+// --- LOGIC ---
 async function attachEventListeners(currentUser, profile) {
     const container = document.querySelector('.student-directory-container');
     if (!container) return;
@@ -136,70 +212,64 @@ async function attachEventListeners(currentUser, profile) {
     const addStudentModal = new Modal(document.getElementById('addStudentModal'));
     const editStudentModal = new Modal(document.getElementById('editStudentModal'));
 
-    const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this,a), delay); }; };
-
     let allStudents = [];
     const currentUserSection = profile.yearLevel;
 
-    cardsContainer.innerHTML = `<div class="d-flex h-100 align-items-center justify-content-center"><div class="spinner-border text-primary" role="status"></div></div>`;
-
-    const renderStudentList = (students, reason = 'initial') => {
-        if (students.length > 0) {
-            cardsContainer.className = 'row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4';
-            cardsContainer.innerHTML = students.map(createStudentCardHTML).join('');
+    // Helper: State-Based Grid Rendering
+    const updateGridState = (state, data = []) => {
+        if (state === 'loading') {
+            cardsContainer.className = "d-flex flex-column align-items-center justify-content-center py-5";
+            cardsContainer.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>`;
+        } else if (state === 'empty') {
+            cardsContainer.className = "d-flex flex-column align-items-center justify-content-center py-5 text-center";
+            cardsContainer.innerHTML = `
+                <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                    <img src="${funnelIcon}" style="width: 40px; opacity: 0.2;">
+                </div>
+                <h4 class="fw-bold text-dark">No students found</h4>
+                <p class="text-muted">Try adjusting your filters or add a new student.</p>
+            `;
         } else {
-            cardsContainer.className = 'row flex-grow-1 align-items-center justify-content-center';
-            let icon, title, text;
-            if (reason === 'filter') {
-                icon = funnelIcon;
-                title = 'No Students Found';
-                text = 'Your search or section filter did not match any students in the directory.';
-            } else {
-                icon = peopleIcon;
-                title = 'Student Directory is Empty';
-                text = 'Add your first student by clicking the (+) button below.';
-            }
-            cardsContainer.innerHTML = `<div class="col-12"><div class="text-center text-muted py-5">
-                <div class="mb-3"><img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;"></div>
-                <h4 class="fw-light">${title}</h4><p>${text}</p>
-            </div></div>`;
+            cardsContainer.className = "row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5";
+            cardsContainer.innerHTML = data.map(createStudentCardHTML).join('');
         }
     };
 
+    // Filter Logic
     const applyFilters = () => {
         const selectedSection = sectionFilter.value;
         const searchTerm = searchInput.value.toLowerCase().trim();
-        let filteredList = allStudents;
-        if (selectedSection !== 'all') {
-            filteredList = filteredList.filter(s => s.section === selectedSection);
-        }
-        if (searchTerm) {
-            filteredList = filteredList.filter(s => s.name.toLowerCase().includes(searchTerm) || s.email.toLowerCase().includes(searchTerm));
-        }
-        const reason = allStudents.length > 0 ? 'filter' : 'initial';
-        renderStudentList(filteredList, reason);
+
+        let filtered = allStudents;
+        if (selectedSection !== 'all') filtered = filtered.filter(s => s.section === selectedSection);
+        if (searchTerm) filtered = filtered.filter(s => s.name.toLowerCase().includes(searchTerm) || s.email.toLowerCase().includes(searchTerm));
+
+        updateGridState(filtered.length > 0 ? 'success' : 'empty', filtered);
     };
 
-    const refreshAllStudents = async () => {
+    const loadData = async () => {
+        updateGridState('loading');
         try {
-            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, [Query.orderAsc('name'), Query.limit(5000)]);
-            allStudents = response.documents;
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, [Query.orderAsc('name'), Query.limit(5000)]);
+            allStudents = res.documents;
             applyFilters();
-        } catch (error) {
-            console.error("Failed to refresh student list:", error);
-            cardsContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Could not load directory. Please refresh the page.</div></div>`;
+        } catch (err) {
+            console.error(err);
+            cardsContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load directory.</div></div>`;
         }
     };
 
-    await refreshAllStudents();
-    if (sectionFilter.querySelector(`[value="${currentUserSection}"]`)) {
-        sectionFilter.value = currentUserSection;
-    }
+    // Init
+    await loadData();
+    if (sectionFilter.querySelector(`[value="${currentUserSection}"]`)) sectionFilter.value = currentUserSection;
     applyFilters();
 
+    // Listeners
     sectionFilter.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', debounce(applyFilters, 300));
+    searchInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') applyFilters(); }); // Search on Enter
+    searchInput.addEventListener('search', applyFilters); // Clear 'x' button support
 
+    // Modal UI Toggles
     const choiceView = document.getElementById('add-student-choice-view');
     const singleView = document.getElementById('add-single-student-form');
     const bulkView = document.getElementById('add-bulk-student-form');
@@ -207,175 +277,130 @@ async function attachEventListeners(currentUser, profile) {
         choiceView.classList.remove('d-none');
         singleView.classList.add('d-none');
         bulkView.classList.add('d-none');
-        singleView.reset();
-        bulkView.reset();
+        singleView.reset(); bulkView.reset();
     };
+
     document.getElementById('addStudentModal').addEventListener('hidden.bs.modal', resetAddModal);
     document.getElementById('show-single-add-btn').addEventListener('click', () => { choiceView.classList.add('d-none'); singleView.classList.remove('d-none'); });
     document.getElementById('show-bulk-add-btn').addEventListener('click', () => { choiceView.classList.add('d-none'); bulkView.classList.remove('d-none'); });
     document.querySelectorAll('.back-to-choice-btn').forEach(btn => btn.addEventListener('click', resetAddModal));
 
+    // Card Actions (Edit / Delete)
     container.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('.edit-student-btn');
         const deleteBtn = e.target.closest('.delete-student-btn');
 
         if (editBtn) {
-            const student = JSON.parse(editBtn.dataset.student.replace(/\\'/g, "'"));
-            document.getElementById('editStudentId').value = student.$id;
-            document.getElementById('editStudentName').value = student.name;
-            document.getElementById('editStudentEmail').value = student.email;
-            document.getElementById('editStudentAddress').value = student.address || '';
-            document.getElementById('editStudentSection').value = student.section;
+            const s = JSON.parse(editBtn.dataset.student.replace(/\\'/g, "'"));
+            document.getElementById('editStudentId').value = s.$id;
+            document.getElementById('editStudentName').value = s.name;
+            document.getElementById('editStudentEmail').value = s.email;
+            document.getElementById('editStudentAddress').value = s.address || '';
+            document.getElementById('editStudentSection').value = s.section;
             editStudentModal.show();
         }
 
         if (deleteBtn) {
-            const studentId = deleteBtn.dataset.id;
-            const studentName = deleteBtn.dataset.name;
+            const id = deleteBtn.dataset.id;
+            const name = deleteBtn.dataset.name;
             deleteBtn.disabled = true;
-            deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Checking...`;
+
             try {
-                const unpaidPaymentsRes = await databases.listDocuments(
-                    DATABASE_ID, COLLECTION_ID_PAYMENTS,
-                    [Query.equal('student_id', studentId), Query.equal('isPaid', false), Query.limit(1)]
-                );
-                if (unpaidPaymentsRes.total > 0) {
-                    alert(`Cannot delete ${studentName}. This student has outstanding payments.`);
+                // Pre-check for payments
+                const payments = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.equal('student_id', id), Query.equal('isPaid', false), Query.limit(1)]);
+                if (payments.total > 0) {
+                    alert(`Cannot delete ${name}. Outstanding payments found.`);
+                    deleteBtn.disabled = false;
                     return;
                 }
-                if (confirm(`Are you sure you want to delete ${studentName}? This student has no outstanding payments. This action cannot be undone.`)) {
-                    await databases.deleteDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, studentId);
-                    await refreshAllStudents();
-                    alert(`${studentName} was deleted successfully!`);
+
+                if (confirm(`Delete ${name}? This cannot be undone.`)) {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, id);
+                    allStudents = allStudents.filter(s => s.$id !== id); // Optimistic Update
+                    applyFilters();
                 }
-            } catch (error) {
-                console.error("Error during pre-delete check or deletion:", error);
-                alert(`An error occurred: ${error.message}`);
+            } catch (err) {
+                alert(`Error: ${err.message}`);
             } finally {
                 deleteBtn.disabled = false;
-                deleteBtn.innerHTML = `<img src="${trashFillIcon}" alt="Delete" style="width: 1.1em; height: 1.1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);" class="me-2">Delete`;
             }
         }
     });
 
+    // Form Submissions
     singleView.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const submitBtn = singleView.querySelector('button[type="submit"]');
-        submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Adding...`;
+        const btn = singleView.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.innerHTML = 'Adding...';
         try {
-            await databases.createDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, ID.unique(), {
+            const newStudent = await databases.createDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, ID.unique(), {
                 name: document.getElementById('singleStudentName').value,
                 email: document.getElementById('singleStudentEmail').value,
                 address: document.getElementById('singleStudentAddress').value,
                 section: document.getElementById('singleStudentSection').value,
             });
+            allStudents.push(newStudent);
+            allStudents.sort((a, b) => a.name.localeCompare(b.name));
+            applyFilters();
             addStudentModal.hide();
-            await refreshAllStudents();
-        } catch (error) {
-            console.error("Failed to add single student:", error); alert(`Error: ${error.message}`);
-        } finally {
-            submitBtn.disabled = false; submitBtn.innerHTML = 'Add Student';
-        }
+        } catch (err) { alert(`Error: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = 'Add Student'; }
     });
 
     bulkView.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const submitBtn = bulkView.querySelector('button[type="submit"]');
-        const data = document.getElementById('bulkStudentData').value.trim();
-        const parts = data.split('\n\n');
+        const btn = bulkView.querySelector('button[type="submit"]');
+        const raw = document.getElementById('bulkStudentData').value;
+        const parts = raw.split('\n\n');
 
-        if (parts.length < 2 || !parts[0].trim() || !parts[1].trim()) {
-            alert('Invalid format. Please provide a section, a double newline, and then the student list.'); return;
-        }
+        if (parts.length < 2) { alert('Invalid format. Section, empty line, then list.'); return; }
 
         const section = parts[0].trim();
-        const studentLines = parts[1].split('\n').filter(line => line.trim() !== '');
-
-        const parsedStudents = studentLines.map(line => {
-            const studentParts = line.split(' - ').map(s => s.trim());
-            if (studentParts.length !== 3) return null;
-            const [name, email, address] = studentParts;
-            if (!name || !email || !address) return null;
-            return { name, email, address, section };
+        const list = parts[1].split('\n').filter(l => l.trim()).map(l => {
+            const [n, e, a] = l.split(' - ').map(s => s.trim());
+            return (n && e && a) ? { name: n, email: e, address: a, section } : null;
         }).filter(Boolean);
 
-        if (parsedStudents.length === 0) {
-            alert('No valid student entries found to process. Please check the format for each line.'); return;
-        }
+        if(!list.length) { alert('No valid entries found.'); return; }
 
-        submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing ${parsedStudents.length}...`;
-
+        btn.disabled = true; btn.innerHTML = 'Processing...';
         try {
-            const existingNames = new Set(allStudents.map(s => s.name.toLowerCase()));
-            const studentsToCreate = [];
-            const skippedStudents = [];
+            // Filter out duplicates locally first to save API calls
+            const existing = new Set(allStudents.map(s => s.name.toLowerCase()));
+            const toAdd = list.filter(s => !existing.has(s.name.toLowerCase()));
 
-            for (const student of parsedStudents) {
-                if (existingNames.has(student.name.toLowerCase())) {
-                    skippedStudents.push(student);
-                } else {
-                    studentsToCreate.push(student);
-                }
+            if(toAdd.length) {
+                const results = await Promise.all(toAdd.map(s => databases.createDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, ID.unique(), s)));
+                allStudents.push(...results);
+                allStudents.sort((a, b) => a.name.localeCompare(b.name));
+                applyFilters();
+                alert(`Added ${results.length} students. ${list.length - results.length} duplicates skipped.`);
+            } else {
+                alert('All students listed already exist.');
             }
-
-            if (studentsToCreate.length > 0) {
-                const creationPromises = studentsToCreate.map(student =>
-                    databases.createDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, ID.unique(), student)
-                );
-                await Promise.all(creationPromises);
-            }
-
-            let summaryMessage = '';
-            if (studentsToCreate.length > 0) {
-                summaryMessage += `${studentsToCreate.length} students were added successfully.\n`;
-            }
-            if (skippedStudents.length > 0) {
-                summaryMessage += `\n${skippedStudents.length} students were skipped because they already exist:\n- ${skippedStudents.map(s => s.name).join('\n- ')}`;
-            }
-            if (summaryMessage === '') {
-                summaryMessage = 'No new students to add. All parsed students already exist in the directory.';
-            }
-
-            alert(summaryMessage.trim());
-
             addStudentModal.hide();
-            await refreshAllStudents();
-
-        } catch (error) {
-            console.error("Failed to bulk add students:", error);
-            alert(`Bulk add failed: ${error.message}`);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Process & Add Students';
-        }
+        } catch(err) { alert(`Error: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = 'Process Import'; }
     });
 
     document.getElementById('editStudentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const studentId = document.getElementById('editStudentId').value;
-        const updatedData = {
-            name: document.getElementById('editStudentName').value,
-            email: document.getElementById('editStudentEmail').value,
-            address: document.getElementById('editStudentAddress').value,
-            section: document.getElementById('editStudentSection').value,
-        };
-        submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+        const btn = e.target.querySelector('button[type="submit"]');
+        const id = document.getElementById('editStudentId').value;
+        btn.disabled = true; btn.innerHTML = 'Saving...';
         try {
-            await databases.updateDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, studentId, updatedData);
+            const updated = await databases.updateDocument(DATABASE_ID, COLLECTION_NON_OFFICER_STUDENT, id, {
+                name: document.getElementById('editStudentName').value,
+                email: document.getElementById('editStudentEmail').value,
+                address: document.getElementById('editStudentAddress').value,
+                section: document.getElementById('editStudentSection').value,
+            });
+            const idx = allStudents.findIndex(s => s.$id === id);
+            if(idx !== -1) allStudents[idx] = updated;
+            applyFilters();
             editStudentModal.hide();
-            await refreshAllStudents();
-        } catch (error) {
-            console.error("Failed to update student:", error);
-            alert(`Error updating student: ${error.message}`);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Save Changes';
-        }
+        } catch(err) { alert(`Error: ${err.message}`); } finally { btn.disabled = false; btn.innerHTML = 'Save Changes'; }
     });
 }
 
-// --- Main export ---
 export default function renderStudentView(user, profile) {
     return {
         html: getStudentHTML(),

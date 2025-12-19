@@ -5,7 +5,68 @@ const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STORIES = import.meta.env.VITE_COLLECTION_ID_STORIES;
+const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES;
+const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
+
+export async function fetchEvents(type = 'upcoming') {
+    const CACHE_KEY = `eventsCache_${type}`;
+    try {
+        const cachedItem = sessionStorage.getItem(CACHE_KEY);
+        if (cachedItem) {
+            const { timestamp, data } = JSON.parse(cachedItem);
+            if ((Date.now() - timestamp) < CACHE_DURATION_MS) {
+                return data;
+            }
+        }
+    } catch (error) {
+        console.error("Failed to read events from cache:", error);
+    }
+
+    try {
+        const queries = [
+            Query.equal('event_ended', type === 'past')
+        ];
+
+        if (type === 'past') {
+            queries.push(Query.orderDesc('date_to_held'));
+        } else {
+            queries.push(Query.orderAsc('date_to_held'));
+        }
+
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            COLLECTION_ID_EVENTS,
+            queries
+        );
+
+        const events = response.documents.map(doc => {
+             // Basic image URL, view layers can handle detailed resizing if needed
+             // but providing a preview here is useful.
+             const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, doc.image_file, 400, 250, 'center', 80);
+             return {
+                 id: doc.$id,
+                 title: doc.event_name,
+                 description: doc.description,
+                 date: new Date(doc.date_to_held),
+                 ended: doc.event_ended,
+                 collab: doc.collab,
+                 image: imageUrl
+             };
+        });
+
+        try {
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data: events }));
+        } catch (error) {
+            console.error("Failed to write events to cache:", error);
+        }
+
+        return events;
+    } catch (error) {
+        console.error(`Failed to fetch ${type} events:`, error);
+        return [];
+    }
+}
 
 export async function fetchHighlights(page = 1, limit = 10) {
     const offset = (page - 1) * limit;

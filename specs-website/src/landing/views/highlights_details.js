@@ -85,23 +85,5 @@ export async function renderHighlightDetailsPage(app, highlightId) {
         </section>
     </main>
 </div>
-
-<style>
-    .highlight-hero {
-        padding: 6rem 0;
-        background-size: cover;
-        background-position: center;
-    }
-    .highlight-content p {
-        line-height: 1.8;
-        font-size: 1.1rem;
-        margin-bottom: 1.5rem;
-    }
-    .highlight-content h2, .highlight-content h3 {
-        margin-top: 2.5rem;
-        margin-bottom: 1.25rem;
-        font-weight: 600;
-    }
-</style>
 `;
 }

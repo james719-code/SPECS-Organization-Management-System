@@ -1,3 +1,4 @@
+// --- IMPORTS ---
 import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
@@ -15,7 +16,8 @@ import eraserIcon from 'bootstrap-icons/icons/eraser.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import peopleIcon from 'bootstrap-icons/icons/people.svg';
 import personXIcon from 'bootstrap-icons/icons/person-x.svg';
-
+import searchIcon from 'bootstrap-icons/icons/search.svg';
+import wallet2Icon from 'bootstrap-icons/icons/wallet2.svg';
 
 // --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
@@ -34,40 +36,52 @@ let events = [];
 let currentStudent = null;
 let addPaymentModalInstance, editPaymentModalInstance;
 
-// --- HTML TEMPLATE FUNCTIONS ---
+// --- TEMPLATES ---
+
+/**
+ * Modern Card for Student Payment Status
+ */
 function createStudentPaymentCardHTML(student, paymentsForStudent) {
     const pendingPayments = paymentsForStudent.filter(p => !p.isPaid);
     const hasPaidRecords = paymentsForStudent.some(p => p.isPaid);
     const totalDue = pendingPayments.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const hasDues = totalDue > 0;
-    const statusClass = hasDues ? 'has-dues' : 'paid-up';
-    const statusText = hasDues ? `Due: ${formatCurrency(totalDue)}` : 'All Paid Up';
-    const studentName = student.fullname || student.name;
+
+    // Status Logic
+    const statusBadge = hasDues
+        ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2">Due: ${formatCurrency(totalDue)}</span>`
+        : `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2"><i class="bi bi-check-circle-fill me-1"></i> Paid</span>`;
+
+    const initials = (student.fullname || student.name).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
     return `
         <div class="col">
-            <div class="card student-payment-card h-100 ${statusClass}" role="button" data-student-id="${student.$id}">
-                <div class="card-body">
+            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-payment-card" role="button" data-student-id="${student.$id}">
+                <div class="card-body p-4 position-relative">
                     ${!hasDues && hasPaidRecords ? `
-                        <button class="btn btn-sm btn-light clear-student-records-btn" 
-                                title="Clear all paid records for ${studentName}" 
+                        <button class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-3 clear-student-records-btn" 
+                                title="Clear History" 
                                 data-student-id="${student.$id}" 
-                                data-student-name="${studentName}">
-                            <img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">
+                                data-student-name="${student.fullname || student.name}"
+                                style="width: 32px; height: 32px;">
+                            <img src="${eraserIcon}" style="width: 14px; opacity: 0.6;">
                         </button>
                     ` : ''}
-                    <div class="d-flex align-items-center">
-                         <div class="student-avatar">
-                            <img src="${personCircleIcon}" alt="Avatar">
+                    
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold fs-5" style="width: 50px; height: 50px;">
+                            ${initials}
                         </div>
-                        <div class="student-info">
-                            <h6 class="card-title mb-0" title="${studentName}">${studentName}</h6>
-                            <p class="card-text small text-body-secondary mb-0">${student.yearLevel || student.section}</p>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 140px;" title="${student.fullname || student.name}">${student.fullname || student.name}</h6>
+                            <small class="text-muted">${student.yearLevel || student.section}</small>
                         </div>
                     </div>
-                </div>
-                <div class="card-footer payment-status">
-                    <span class="status-badge">${statusText}</span>
+                    
+                    <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
+                        <span class="small fw-bold text-muted text-uppercase" style="letter-spacing: 0.5px;">Status</span>
+                        ${statusBadge}
+                    </div>
                 </div>
             </div>
         </div>
@@ -76,52 +90,69 @@ function createStudentPaymentCardHTML(student, paymentsForStudent) {
 
 function getInitialPaymentViewHTML(sectionOptionsHTML) {
     const eventOptions = events.map(event => `<option value="${event.event_name}">${event.event_name}</option>`).join('');
+
     return `
-        <style>
-            .student-payment-card { border-radius: .75rem; border: 1px solid var(--bs-border-color-translucent); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; overflow: hidden; }
-            .student-payment-card:hover { transform: translateY(-5px); box-shadow: var(--bs-card-box-shadow); }
-            .student-payment-card .card-body { padding: 1rem; position: relative; }
-            .student-payment-card .student-avatar img { width: 2.5rem; height: 2.5rem; margin-right: 1rem; filter: opacity(0.5); }
-            .student-payment-card .student-info .card-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-            .student-payment-card .payment-status { text-align: center; font-weight: 500; padding: 0.5rem 0.75rem; border-top: 1px solid var(--bs-border-color-translucent); transition: background-color 0.2s ease; }
-            .student-payment-card.has-dues { border-left: 4px solid var(--bs-danger); }
-            .student-payment-card.has-dues .student-avatar img { filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%); } /* Red */
-            .student-payment-card.has-dues .payment-status { background-color: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
-            .student-payment-card.paid-up { border-left: 4px solid var(--bs-success); }
-            .student-payment-card.paid-up .student-avatar img { filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%); } /* Green */
-            .student-payment-card.paid-up .payment-status { background-color: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
-            .clear-student-records-btn { position: absolute; top: .5rem; right: .5rem; z-index: 5; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items-center; justify-content: center; opacity: 0.6; }
-            .student-payment-card:hover .clear-student-records-btn { opacity: 1; }
-            .clear-student-records-btn:hover { background-color: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
-        </style>
-        <div class="admin-payments-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
-            <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4">
-                <h1 class="mb-3 mb-md-0">Student Payments</h1>
-                <div class="d-flex flex-column flex-sm-row gap-2">
-                    <select id="sectionFilter" class="form-select" style="min-width: 200px;"><option value="all">All Sections</option>${sectionOptionsHTML}</select>
-                    <input type="search" id="studentSearchInput" class="form-control" style="max-width: 400px;" placeholder="Search by student name...">
+        <div class="admin-payments-container container-fluid py-4 px-md-5">
+            <header class="row align-items-center mb-5 gy-4">
+                <div class="col-12 col-lg-6">
+                    <h1 class="display-6 fw-bold text-dark mb-1">Student Payments</h1>
+                    <p class="text-muted mb-0">Track dues, collect payments, and manage records.</p>
                 </div>
-            </div>
-            <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-4 flex-grow-1"></div>
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
+                        <select id="sectionFilter" class="form-select border-0 shadow-sm bg-white py-2 ps-3" style="max-width: 200px;">
+                            <option value="all">All Sections</option>
+                            ${sectionOptionsHTML}
+                        </select>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden bg-white border-0" style="max-width: 300px;">
+                            <span class="input-group-text bg-white border-0 ps-3">
+                                <img src="${searchIcon}" width="16" style="opacity:0.4">
+                            </span>
+                            <input type="search" id="studentSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search student...">
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
+                </div>
         </div>
-        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" title="Add New Payment">
-             <img src="${plusLgIcon}" alt="Add" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
+
+        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg hover-scale d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" title="Add Payment">
+             <img src="${plusLgIcon}" style="width: 1.5rem; filter: invert(1);">
         </button>
         
-        <!-- Add Payment Modal -->
-        <div class="modal fade" id="addPaymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="addPaymentForm">
-            <div class="modal-header"><h5 class="modal-title">Create New Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3"><label for="itemName" class="form-label">Item / Fee Name</label><input type="text" id="itemName" class="form-control" required></div>
-                <div class="row g-3 mb-3"><div class="col-sm-6"><label for="price" class="form-label">Price (PHP)</label><input type="number" id="price" class="form-control" min="0" step="0.01" required></div><div class="col-sm-6"><label for="quantity" class="form-label">Quantity</label><input type="number" id="quantity" class="form-control" value="1" min="1" required></div></div>
-                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="isEventCheckbox"><label class="form-check-label" for="isEventCheckbox">This is for an event</label></div>
-                <div id="activity-group" class="mb-3"><label for="activityName" class="form-label">Activity Name</label><input type="text" id="activityName" class="form-control"></div>
-                <div id="event-group" class="mb-3 d-none"><label for="eventName" class="form-label">Select Event</label><select id="eventName" class="form-select">${eventOptions}</select></div>
-                <hr>
-                <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" id="allStudentsCheckbox"><label class="form-check-label" for="allStudentsCheckbox">Apply to all non-officer students</label></div>
-                <div id="single-student-group" class="position-relative"><label for="studentName" class="form-label">Assign to Student</label><input type="text" id="studentName" class="form-control" autocomplete="off" required><div id="autocomplete-results" class="list-group position-absolute w-100" style="z-index: 1060;"></div></div>
+        <div class="modal fade" id="addPaymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><form id="addPaymentForm">
+            <div class="modal-header border-0 pt-4 px-4"><h5 class="modal-title fw-bold">New Payment Record</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
+                <div class="mb-3"><label class="form-label small fw-bold text-muted">ITEM NAME</label><input type="text" id="itemName" class="form-control" required placeholder="e.g. Membership Fee"></div>
+                <div class="row g-3 mb-3">
+                    <div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="price" class="form-control" min="0" step="0.01" required></div>
+                    <div class="col-5"><label class="form-label small fw-bold text-muted">QTY</label><input type="number" id="quantity" class="form-control" value="1" min="1" required></div>
+                </div>
+                
+                <div class="form-check form-switch mb-3 p-3 bg-light rounded-3 border">
+                    <input class="form-check-input ms-0 me-2" type="checkbox" id="isEventCheckbox" style="float:none;">
+                    <label class="form-check-label fw-medium" for="isEventCheckbox">Link to an Event</label>
+                </div>
+
+                <div id="activity-group" class="mb-3"><label class="form-label small fw-bold text-muted">ACTIVITY NAME</label><input type="text" id="activityName" class="form-control" placeholder="e.g. 1st Semester Collection"></div>
+                <div id="event-group" class="mb-3 d-none"><label class="form-label small fw-bold text-muted">SELECT EVENT</label><select id="eventName" class="form-select">${eventOptions}</select></div>
+                
+                <hr class="my-4 text-muted opacity-25">
+                
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="allStudentsCheckbox">
+                    <label class="form-check-label" for="allStudentsCheckbox">Assign to all non-officers</label>
+                </div>
+                
+                <div id="single-student-group" class="position-relative">
+                    <label class="form-label small fw-bold text-muted">ASSIGN TO</label>
+                    <input type="text" id="studentName" class="form-control" autocomplete="off" required placeholder="Search student name...">
+                    <div id="autocomplete-results" class="list-group position-absolute w-100 shadow-sm mt-1" style="z-index: 1060; max-height: 200px; overflow-y: auto;"></div>
+                </div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Add Payment</button></div>
+            <div class="modal-footer border-0 pb-4 px-4"><button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Create Payment</button></div>
         </form></div></div></div>
     `;
 }
@@ -132,74 +163,89 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
     const totalDue = pending.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const eventOptions = events.map(event => `<option value="${event.event_name}">${event.event_name}</option>`).join('');
 
-    // --- Icon styles for reuse ---
-    const iconStyle = "width: 1.1em; height: 1.1em;";
-    const successStyle = `${iconStyle} filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);`;
-    const defaultStyle = `${iconStyle} filter: var(--bs-dropdown-link-color-filter);`;
-    const dangerStyle = `${iconStyle} filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);`;
-    const secondaryStyle = `${iconStyle} filter: var(--bs-btn-color-filter);`;
-
-
     return `
-        <div class="student-payment-details-page">
-            <div class="d-flex align-items-center mb-4">
-                <button id="backToPaymentsBtn" class="btn btn-light me-3" title="Back to all students"><img src="${arrowLeftIcon}" alt="Back"></button>
-                <div><h1 class="mb-0">${student.fullname || student.name}'s Payments</h1><p class="text-muted mb-0">${student.yearLevel || student.section}</p></div>
+        <div class="student-payment-details-page container-fluid py-4 px-md-5">
+            <div class="d-flex align-items-center gap-3 mb-5">
+                <button id="backToPaymentsBtn" class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center hover-scale" style="width: 48px; height: 48px;">
+                    <img src="${arrowLeftIcon}" width="20" style="opacity: 0.6;">
+                </button>
+                <div>
+                     <h2 class="h3 fw-bold m-0 text-dark">${student.fullname || student.name}</h2>
+                     <p class="text-muted m-0 small">${student.yearLevel || student.section}</p>
+                </div>
             </div>
-            <div class="card mb-4">
-                <div class="card-header"><h5>Pending Payments</h5></div>
-                <div class="card-body">
-                    <p class="${totalDue > 0 ? 'text-danger' : 'text-success'} fs-5"><strong>Total Due:</strong> ${formatCurrency(totalDue)}</p>
-                    <div class="table-responsive"><table class="table table-striped align-middle">
-                        <thead><tr><th>Item</th><th>For</th><th class="text-end">Total</th><th class="text-center">Actions</th></tr></thead>
-                        <tbody>${pending.length > 0 ? pending.map(p => { const paymentData = JSON.stringify(p).replace(/'/g, "\\'"); return `<tr><td>${p.item_name}</td><td>${p.is_event ? p.event : p.activity}</td><td class="text-end">${formatCurrency(p.price * p.quantity)}</td><td class="text-center"><div class="dropdown"><button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown"><img src="${threeDotsIcon}" alt="Actions"></button><ul class="dropdown-menu dropdown-menu-end">
-                            <li><button class="dropdown-item d-flex align-items-center gap-2 paid-payment-btn" type="button" data-payment='${paymentData}'><img src="${checkCircleFillIcon}" alt="Paid" style="${successStyle}">Mark as Paid</button></li>
-                            <li><button class="dropdown-item d-flex align-items-center gap-2 edit-payment-btn" type="button" data-payment='${paymentData}'><img src="${pencilFillIcon}" alt="Edit" style="${defaultStyle}">Edit</button></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item d-flex align-items-center gap-2 delete-payment-btn text-danger" type="button" data-payment-id="${p.$id}" data-payment-name="${p.item_name}"><img src="${trashFillIcon}" alt="Delete" style="${dangerStyle}">Delete</button></li>
-                        </ul></div></td></tr>`}).join('') : '<tr><td colspan="4" class="text-center text-muted p-4">No pending payments.</td></tr>'}
+
+            <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+                <div class="card-header bg-warning-subtle border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold m-0 text-warning-emphasis d-flex align-items-center gap-2"><i class="bi bi-hourglass-split"></i> Pending Payments</h6>
+                    <span class="badge bg-warning text-dark rounded-pill px-3">${formatCurrency(totalDue)} Due</span>
+                </div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="bg-light text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Actions</th></tr></thead>
+                        <tbody>${pending.length > 0 ? pending.map(p => {
+        const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
+        return `<tr>
+                                <td class="ps-4 fw-medium text-dark">${p.item_name}</td>
+                                <td class="text-muted small">${p.is_event ? p.event : p.activity}</td>
+                                <td class="text-end fw-bold text-dark">${formatCurrency(p.price * p.quantity)}</td>
+                                <td class="text-end pe-4">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="dropdown"><img src="${threeDotsIcon}" width="16" style="opacity:0.5"></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                            <li><button class="dropdown-item d-flex gap-2 align-items-center paid-payment-btn text-success" data-payment='${paymentData}'><i class="bi bi-check-circle-fill"></i> Mark Paid</button></li>
+                                            <li><button class="dropdown-item d-flex gap-2 align-items-center edit-payment-btn" data-payment='${paymentData}'><i class="bi bi-pencil-fill text-muted"></i> Edit</button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button class="dropdown-item d-flex gap-2 align-items-center delete-payment-btn text-danger" data-payment-id="${p.$id}" data-payment-name="${p.item_name}"><i class="bi bi-trash-fill"></i> Delete</button></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>`}).join('') : '<tr><td colspan="4" class="text-center text-muted py-5 small">No pending payments. Good job!</td></tr>'}
                         </tbody>
-                    </table></div>
+                    </table>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>Payment History</h5>
-                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-secondary clear-paid-records-btn d-flex align-items-center gap-2" data-student-id="${student.$id}" data-student-name="${student.fullname || student.name}" title="Delete all paid records for this student"><img src="${eraserIcon}" alt="Clear" style="${secondaryStyle}">Clear Paid Records</button>` : ''}
+
+            <div class="card border-0 shadow-sm overflow-hidden">
+                <div class="card-header bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold m-0 text-secondary d-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> Payment History</h6>
+                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-danger border-0 clear-paid-records-btn" data-student-id="${student.$id}" data-student-name="${student.fullname || student.name}"><i class="bi bi-trash me-1"></i> Clear History</button>` : ''}
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive"><table class="table table-hover align-middle">
-                        <thead><tr><th>Item</th><th>For</th><th class="text-end">Total</th><th class="text-center">Status</th></tr></thead>
-                        <tbody>${paid.length > 0 ? paid.map(p => `<tr><td>${p.item_name}</td><td>${p.is_event ? p.event : p.activity}</td><td class="text-end">${formatCurrency(p.price * p.quantity)}</td><td class="text-center"><span class="badge bg-success-subtle text-success-emphasis rounded-pill">Paid</span></td></tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted p-4">No payment history.</td></tr>'}</tbody>
-                    </table></div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="bg-white text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Status</th></tr></thead>
+                        <tbody>${paid.length > 0 ? paid.map(p => `<tr><td class="ps-4 text-muted">${p.item_name}</td><td class="text-muted small">${p.is_event ? p.event : p.activity}</td><td class="text-end text-muted">${formatCurrency(p.price * p.quantity)}</td><td class="text-end pe-4"><span class="badge bg-success-subtle text-success rounded-pill px-2">Paid</span></td></tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted py-5 small">No payment history yet.</td></tr>'}</tbody>
+                    </table>
                 </div>
             </div>
         </div>
         
-        <!-- Edit Payment Modal -->
-        <div class="modal fade" id="editPaymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="editPaymentForm">
-            <div class="modal-header"><h5 class="modal-title">Edit Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
+        <div class="modal fade" id="editPaymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><form id="editPaymentForm">
+            <div class="modal-header border-0 pt-4 px-4"><h5 class="modal-title fw-bold">Edit Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
                 <input type="hidden" id="editPaymentId">
-                <div class="mb-3"><label for="editItemName" class="form-label">Item / Fee Name</label><input type="text" id="editItemName" class="form-control" required></div>
-                <div class="row g-3 mb-3"><div class="col-sm-6"><label for="editPrice" class="form-label">Price (PHP)</label><input type="number" id="editPrice" class="form-control" min="0" step="0.01" required></div><div class="col-sm-6"><label for="editQuantity" class="form-label">Quantity</label><input type="number" id="editQuantity" class="form-control" value="1" min="1" required></div></div>
-                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="editIsEventCheckbox"><label class="form-check-label" for="editIsEventCheckbox">This is for an event</label></div>
-                <div id="edit-activity-group" class="mb-3"><label for="editActivityName" class="form-label">Activity Name</label><input type="text" id="editActivityName" class="form-control"></div>
-                <div id="edit-event-group" class="mb-3 d-none"><label for="editEventName" class="form-label">Select Event</label><select id="editEventName" class="form-select">${eventOptions}</select></div>
+                <div class="mb-3"><label class="form-label small fw-bold text-muted">ITEM NAME</label><input type="text" id="editItemName" class="form-control" required></div>
+                <div class="row g-3 mb-3"><div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="editPrice" class="form-control" min="0" step="0.01" required></div><div class="col-5"><label class="form-label small fw-bold text-muted">QTY</label><input type="number" id="editQuantity" class="form-control" value="1" min="1" required></div></div>
+                <div class="form-check form-switch mb-3 p-3 bg-light rounded-3 border">
+                    <input class="form-check-input ms-0 me-2" type="checkbox" id="editIsEventCheckbox" style="float:none;">
+                    <label class="form-check-label fw-medium" for="editIsEventCheckbox">Link to Event</label>
+                </div>
+                <div id="edit-activity-group" class="mb-3"><label class="form-label small fw-bold text-muted">ACTIVITY NAME</label><input type="text" id="editActivityName" class="form-control"></div>
+                <div id="edit-event-group" class="mb-3 d-none"><label class="form-label small fw-bold text-muted">SELECT EVENT</label><select id="editEventName" class="form-select">${eventOptions}</select></div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            <div class="modal-footer border-0 pb-4 px-4"><button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Save</button></div>
         </form></div></div></div>
     `;
 }
 
-// --- RENDERING LOGIC ---
+// --- LOGIC ---
 
 const renderStudentCards = (studentsToRender, reason = 'initial') => {
     const cardsContainer = document.getElementById('student-cards-container');
     if (!cardsContainer) return;
 
     if (studentsToRender.length > 0) {
-        cardsContainer.className = 'row row-cols-1 row-cols-md-2 row-cols-xl-4 g-4';
+        cardsContainer.className = 'row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5';
         const paymentsByStudent = allPayments.reduce((acc, p) => {
             (acc[p.student_id] = acc[p.student_id] || []).push(p);
             return acc;
@@ -210,14 +256,21 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
         let icon, title, text;
         if (reason === 'filter') {
             icon = funnelIcon;
-            title = 'No Students Found';
-            text = 'Your search or section filter did not match any students.';
+            title = 'No Matches Found';
+            text = 'Try adjusting your filters or search terms.';
         } else {
             icon = peopleIcon;
-            title = 'No Student Data';
-            text = 'There are no non-officer students in the system to manage payments for.';
+            title = 'Directory Empty';
+            text = 'No non-officer students found.';
         }
-        cardsContainer.innerHTML = `<div class="col-12"><div class="text-center text-muted py-5"><div class="mb-3"><img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;"></div><h4 class="fw-light">${title}</h4><p>${text}</p></div></div>`;
+        cardsContainer.innerHTML = `
+            <div class="col-12"><div class="text-center text-muted py-5">
+                <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                    <img src="${icon}" style="width: 40px; opacity: 0.2;">
+                </div>
+                <h4 class="fw-bold text-dark">${title}</h4>
+                <p class="text-muted">${text}</p>
+            </div></div>`;
     }
 };
 
@@ -234,7 +287,7 @@ const renderInitialView = () => {
 const refreshStudentDetailsView = async (studentId) => {
     const wrapper = document.querySelector('.admin-payments-container-wrapper');
     if (!wrapper || !studentId) return;
-    wrapper.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" role="status"></div></div>`;
+    wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
         const [paymentsRes, studentRes] = await Promise.all([
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(5000), Query.equal('student_id', studentId)]),
@@ -244,7 +297,6 @@ const refreshStudentDetailsView = async (studentId) => {
         wrapper.innerHTML = getStudentDetailsPageHTML(studentRes, paymentsRes.documents);
         initializeModals();
     } catch (error) {
-        console.error("Error refreshing student details:", error);
         renderInitialView();
     }
 };
@@ -256,13 +308,13 @@ function initializeModals() {
     if (editModalEl && !Modal.getInstance(editModalEl)) editPaymentModalInstance = new Modal(editModalEl);
 }
 
-// --- EVENT HANDLING ---
+// --- MAIN LISTENER ---
 
 async function attachEventListeners(currentUser, profile) {
     const wrapper = document.querySelector('.admin-payments-container-wrapper');
     if (!wrapper) return;
 
-    wrapper.innerHTML = `<div class="flex-grow-1 d-flex justify-content-center align-items-center p-5"><div class="spinner-border text-primary" role="status"></div></div>`;
+    wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
         const [paymentsRes, eventsRes, nonOfficersRes] = await Promise.all([
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(5000)]),
@@ -274,7 +326,7 @@ async function attachEventListeners(currentUser, profile) {
         nonOfficerStudents = nonOfficersRes.documents;
 
         if (nonOfficerStudents.length === 0) {
-            wrapper.innerHTML = `<div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted"><div><img src="${personXIcon}" alt="No students" style="width: 5rem; height: 5rem; opacity: 0.5;"><h4 class="fw-light mt-3">Payments Module Unavailable</h4><p>There are no non-officer students currently in the system.</p></div></div>`;
+            wrapper.innerHTML = `<div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted"><div><img src="${personXIcon}" style="width: 60px; opacity: 0.2;"><h4 class="fw-bold mt-3">No Data</h4><p>No students available.</p></div></div>`;
             return;
         }
 
@@ -289,18 +341,13 @@ async function attachEventListeners(currentUser, profile) {
             const selectedSection = sectionFilter.value;
             const searchTerm = searchInput.value.toLowerCase().trim();
 
-            let filteredStudents = nonOfficerStudents.filter(student => {
-                const hasRecords = allPayments.some(p => p.student_id === student.$id);
-                return hasRecords;
-            });
+            let filteredStudents = nonOfficerStudents; // Show all by default, filter if needed
+            // Optional: Filter to only those with records if desired, currently showing all student cards is standard for a directory view
 
-            if (selectedSection !== 'all') {
-                filteredStudents = filteredStudents.filter(s => s.section === selectedSection);
-            }
-            if (searchTerm) {
-                filteredStudents = filteredStudents.filter(s => (s.fullname || s.name).toLowerCase().includes(searchTerm));
-            }
-            renderStudentCards(filteredStudents, (filteredStudents.length === 0 && (selectedSection !== 'all' || searchTerm)) ? 'filter' : 'initial');
+            if (selectedSection !== 'all') filteredStudents = filteredStudents.filter(s => s.section === selectedSection);
+            if (searchTerm) filteredStudents = filteredStudents.filter(s => (s.fullname || s.name).toLowerCase().includes(searchTerm));
+
+            renderStudentCards(filteredStudents, (filteredStudents.length === 0) ? 'filter' : 'initial');
         };
 
         const refreshDataAndRender = async () => {
@@ -322,53 +369,29 @@ async function attachEventListeners(currentUser, profile) {
         wrapper.addEventListener('click', async (e) => {
             const clearStudentBtn = e.target.closest('.clear-student-records-btn');
             if (clearStudentBtn) {
-                e.stopPropagation(); // Stop card click-through
-                const studentId = clearStudentBtn.dataset.studentId;
-                const studentName = clearStudentBtn.dataset.studentName;
-                if (confirm(`Are you sure you want to delete all paid records for ${studentName}? This cannot be undone.`)) {
-                    clearStudentBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+                e.stopPropagation();
+                if (confirm(`Clear paid records history for ${clearStudentBtn.dataset.studentName}?`)) {
                     clearStudentBtn.disabled = true;
                     try {
-                        const paidRecords = allPayments.filter(p => p.student_id === studentId && p.isPaid);
+                        const paidRecords = allPayments.filter(p => p.student_id === clearStudentBtn.dataset.studentId && p.isPaid);
                         if (paidRecords.length > 0) {
-                            const deletePromises = paidRecords.map(p => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, p.$id));
-                            await Promise.all(deletePromises);
-                            alert(`${paidRecords.length} paid record(s) for ${studentName} have been deleted.`);
-
-                            allPayments = allPayments.filter(p => !(p.student_id === studentId && p.isPaid));
-                            if (currentStudent) {
-                                await refreshStudentDetailsView(currentStudent.$id)
-                            } else {
-                                applyFilters();
-                            }
-                        } else {
-                            alert(`No paid records found for ${studentName} to delete.`);
-                            clearStudentBtn.innerHTML = `<img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">`;
-                            clearStudentBtn.disabled = false;
+                            await Promise.all(paidRecords.map(p => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, p.$id)));
+                            allPayments = allPayments.filter(p => !(p.student_id === clearStudentBtn.dataset.studentId && p.isPaid));
+                            applyFilters();
                         }
-                    } catch (error) {
-                        console.error("Failed to clear student records:", error);
-                        alert(`Error: ${error.message}`);
-                        clearStudentBtn.innerHTML = `<img src="${trashIcon}" alt="Clear Records" style="width: 1em; height: 1em;">`;
-                        clearStudentBtn.disabled = false;
-                    }
+                    } catch (error) { alert(`Error: ${error.message}`); } finally { clearStudentBtn.disabled = false; }
                 }
                 return;
             }
 
             const card = e.target.closest('.student-payment-card');
-            if (card) {
-                await refreshStudentDetailsView(card.dataset.studentId);
-                return;
-            }
+            if (card) { await refreshStudentDetailsView(card.dataset.studentId); return; }
 
             const backBtn = e.target.closest('#backToPaymentsBtn');
             if (backBtn) {
                 renderInitialView();
                 const newFilter = document.getElementById('sectionFilter');
-                if (newFilter && profile && profile.yearLevel && newFilter.querySelector(`[value="${profile.yearLevel}"]`)) {
-                    newFilter.value = profile.yearLevel;
-                }
+                if (newFilter && profile?.yearLevel) newFilter.value = profile.yearLevel;
                 applyFilters();
                 return;
             }
@@ -395,16 +418,14 @@ async function attachEventListeners(currentUser, profile) {
                 form.querySelector('#edit-event-group').classList.toggle('d-none', !payment.is_event);
                 if (payment.is_event) form.querySelector('#editEventName').value = payment.event;
                 else form.querySelector('#editActivityName').value = payment.activity;
-                if (editPaymentModalInstance) editPaymentModalInstance.show();
+                editPaymentModalInstance.show();
                 return;
             }
 
             const paidBtn = e.target.closest('.paid-payment-btn');
             if (paidBtn) {
                 const payment = JSON.parse(paidBtn.dataset.payment.replace(/\\'/g, "'"));
-                if (confirm(`Mark "${payment.item_name || 'item'}" as paid?`)) {
-                    paidBtn.disabled = true;
-                    paidBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processing...`;
+                if (confirm(`Mark "${payment.item_name}" as Paid?`)) {
                     try {
                         await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
                             name: `${payment.item_name} (Paid by ${currentStudent.name})`,
@@ -418,26 +439,26 @@ async function attachEventListeners(currentUser, profile) {
                         });
                         await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { isPaid: true, date_paid: new Date().toISOString() });
                         await refreshDataAndRender();
-                    } catch (error) {
-                        console.error("Payment failed:", error);
-                        alert(`Error: ${error.message}`);
-                        await refreshDataAndRender();
-                    }
+                    } catch (error) { alert(`Error: ${error.message}`); }
                 }
                 return;
             }
 
             const deleteBtn = e.target.closest('.delete-payment-btn');
-            if (deleteBtn) {
-                if(confirm(`Delete payment for "${deleteBtn.dataset.paymentName}"? This cannot be undone.`)) {
-                    try {
-                        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, deleteBtn.dataset.paymentId);
-                        await refreshDataAndRender();
-                    } catch (error) {
-                        console.error("Delete failed:", error);
-                        alert(`Error: ${error.message}`);
-                    }
-                }
+            if (deleteBtn && confirm(`Delete "${deleteBtn.dataset.paymentName}"?`)) {
+                try {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, deleteBtn.dataset.paymentId);
+                    await refreshDataAndRender();
+                } catch (error) { alert(`Error: ${error.message}`); }
+            }
+
+            const clearPaidBtn = e.target.closest('.clear-paid-records-btn');
+            if(clearPaidBtn && confirm('Clear all paid history for this student?')) {
+                try {
+                    const paid = allPayments.filter(p => p.student_id === currentStudent.$id && p.isPaid);
+                    await Promise.all(paid.map(p => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, p.$id)));
+                    await refreshDataAndRender();
+                } catch(err) { alert('Failed.'); }
             }
         });
 
@@ -447,10 +468,7 @@ async function attachEventListeners(currentUser, profile) {
             } else if (e.target.id === 'studentName') {
                 const results = document.getElementById('autocomplete-results');
                 const searchTerm = e.target.value.toLowerCase();
-                if (searchTerm.length < 2) {
-                    results.innerHTML = '';
-                    return;
-                }
+                if (searchTerm.length < 2) { results.innerHTML = ''; return; }
                 results.innerHTML = nonOfficerStudents.filter(s => (s.fullname || s.name).toLowerCase().includes(searchTerm))
                     .slice(0, 5)
                     .map(s => `<a href="#" class="list-group-item list-group-item-action" data-id="${s.$id}" data-name="${s.fullname || s.name}">${s.fullname || s.name}</a>`)
@@ -460,16 +478,12 @@ async function attachEventListeners(currentUser, profile) {
 
         wrapper.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formId = e.target.id;
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            if (!submitBtn) return;
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Processing...`;
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.innerHTML = 'Processing...';
             try {
-                if (formId === 'addPaymentForm') {
+                if (e.target.id === 'addPaymentForm') {
                     const isForAll = document.getElementById('allStudentsCheckbox').checked;
-                    const basePaymentData = {
+                    const base = {
                         item_name: document.getElementById('itemName').value,
                         price: parseFloat(document.getElementById('price').value),
                         quantity: parseInt(document.getElementById('quantity').value, 10),
@@ -478,84 +492,54 @@ async function attachEventListeners(currentUser, profile) {
                         activity: document.getElementById('activityName').value,
                         isPaid: false
                     };
+
                     if (isForAll) {
-                        if (!confirm(`Create payment for all ${nonOfficerStudents.length} students?`)) throw new Error("Cancelled by user.");
-                        const createPromises = nonOfficerStudents.map(s => databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...basePaymentData, student_id: s.$id }));
-                        await Promise.all(createPromises);
-                        alert(`Payment created for ${nonOfficerStudents.length} students.`);
+                        if (confirm(`Assign to all ${nonOfficerStudents.length} students?`)) {
+                            await Promise.all(nonOfficerStudents.map(s => databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...base, student_id: s.$id })));
+                        }
                     } else {
-                        if (!selectedStudentId) throw new Error("Please select a student.");
-                        await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...basePaymentData, student_id: selectedStudentId });
-                        alert('Payment created.');
+                        if (!selectedStudentId) throw new Error("Select a student.");
+                        await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...base, student_id: selectedStudentId });
                     }
-                    if (addPaymentModalInstance) addPaymentModalInstance.hide();
+                    addPaymentModalInstance.hide();
                     e.target.reset();
-                    document.getElementById('autocomplete-results').innerHTML = '';
-                    selectedStudentId = null;
-                } else if (formId === 'editPaymentForm') {
-                    const paymentId = document.getElementById('editPaymentId').value;
-                    const updatedData = {
+                } else if (e.target.id === 'editPaymentForm') {
+                    await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, document.getElementById('editPaymentId').value, {
                         item_name: document.getElementById('editItemName').value,
                         price: parseFloat(document.getElementById('editPrice').value),
                         quantity: parseInt(document.getElementById('editQuantity').value, 10),
                         is_event: document.getElementById('editIsEventCheckbox').checked,
                         event: document.getElementById('editEventName').value,
                         activity: document.getElementById('editActivityName').value
-                    };
-                    await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId, updatedData);
-                    if (editPaymentModalInstance) editPaymentModalInstance.hide();
+                    });
+                    editPaymentModalInstance.hide();
                 }
                 await refreshDataAndRender();
-            } catch (error) {
-                if (error.message !== "Cancelled by user.") alert(`Error: ${error.message}`);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            }
+            } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
         });
 
         wrapper.addEventListener('change', e => {
-            const target = e.target;
-            if (target.id === 'sectionFilter') {
-                applyFilters();
-                return;
+            if(e.target.id === 'sectionFilter') applyFilters();
+            if (e.target.id.includes('IsEventCheckbox')) {
+                const isEdit = e.target.id.includes('edit');
+                const form = e.target.closest('form');
+                form.querySelector(isEdit ? '#edit-activity-group' : '#activity-group').classList.toggle('d-none', e.target.checked);
+                form.querySelector(isEdit ? '#edit-event-group' : '#event-group').classList.toggle('d-none', !e.target.checked);
             }
-
-            const form = target.closest('form');
-            if (!form) return;
-
-            if (target.id === 'isEventCheckbox' || target.id === 'editIsEventCheckbox') {
-                const isEdit = target.id.startsWith('edit');
-                const activityGroup = form.querySelector(isEdit ? '#edit-activity-group' : '#activity-group');
-                const eventGroup = form.querySelector(isEdit ? '#edit-event-group' : '#event-group');
-                if (activityGroup && eventGroup) {
-                    activityGroup.classList.toggle('d-none', target.checked);
-                    eventGroup.classList.toggle('d-none', !target.checked);
-                }
-            } else if (target.id === 'allStudentsCheckbox') {
-                const studentNameInput = form.querySelector('#studentName');
-                if (studentNameInput) {
-                    studentNameInput.disabled = target.checked;
-                    studentNameInput.required = !target.checked;
-                    if (target.checked) {
-                        studentNameInput.value = '';
-                        document.getElementById('autocomplete-results').innerHTML = '';
-                        selectedStudentId = null;
-                    }
-                }
+            if (e.target.id === 'allStudentsCheckbox') {
+                const inp = document.getElementById('studentName');
+                inp.disabled = e.target.checked;
+                inp.required = !e.target.checked;
+                if(e.target.checked) { inp.value = ''; selectedStudentId = null; }
             }
         });
 
-    } catch (error) {
-        console.error("Failed to load initial data:", error);
-        wrapper.innerHTML = `<div class="alert alert-danger">Could not load the payments module. Please try refreshing the page.</div>`;
-    }
+    } catch (error) { wrapper.innerHTML = `<div class="alert alert-danger">Error loading module.</div>`; }
 }
 
-// --- Main export ---
 export default function renderPaymentView(currentUser, profile) {
     return {
-        html: `<div class="admin-payments-container-wrapper d-flex flex-column" style="min-height: calc(100vh - 120px);"></div>`,
+        html: `<div class="admin-payments-container-wrapper d-flex flex-column" style="min-height: 100vh;"></div>`,
         afterRender: () => attachEventListeners(currentUser, profile)
     };
 }

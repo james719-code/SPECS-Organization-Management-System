@@ -22,144 +22,181 @@ const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
 
+/**
+ * Creates an event card using your defined .card and Deep Teal styles.
+ */
 function createEventCard(eventDoc, userLookup, currentUserId) {
-    const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 400, 250);
+    const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 600, 400);
     const eventDate = new Date(eventDoc.date_to_held);
-    const formattedDate = eventDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const formattedTime = eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
     const canManage = eventDoc.added_by === currentUserId;
-    const creatorName = userLookup[eventDoc.added_by] || 'Unknown';
     const isEnded = eventDoc.event_ended === true;
 
-    // SVG icon styles
-    const iconStyle = "width: 1.1em; height: 1.1em; opacity: 0.7;";
-    const btnIconStyleSecondary = "width: 1em; height: 1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);";
-    const btnIconStyleSuccess = "width: 1em; height: 1em; filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);";
-    const btnIconStyleDanger = "width: 1em; height: 1em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);";
-
-    const collaboratorsHTML = (eventDoc.collab && eventDoc.collab.length > 0)
-        ? `<div class="small text-muted mb-2 mt-2 d-flex align-items-center gap-1"><img src="${peopleFill}" alt="Collaborators" style="${iconStyle}"> <strong>Collaborators:</strong> ${eventDoc.collab.join(', ')}</div>` : '';
-
-    const actionButtons = canManage ? `
-        <div class="btn-group">
-            <button class="btn btn-sm btn-outline-secondary edit-event-btn" data-doc-id="${eventDoc.$id}" title="Edit this event"><img src="${pencilSquare}" alt="Edit" style="${btnIconStyleSecondary}"></button>
-            ${!isEnded ? `<button class="btn btn-sm btn-outline-success mark-ended-btn" data-doc-id="${eventDoc.$id}" title="Mark as ended"><img src="${checkCircle}" alt="Mark as ended" style="${btnIconStyleSuccess}"></button>` : ''}
-            <button class="btn btn-sm btn-outline-danger delete-event-btn" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}" title="Delete this event"><img src="${trash}" alt="Delete" style="${btnIconStyleDanger}"></button>
-        </div>` : '';
+    // Mapping to your SCSS status classes
+    const statusClass = isEnded ? 'status-rejected' : 'status-approved';
+    const statusText = isEnded ? 'Ended' : 'Upcoming';
 
     return `
-        <div class="col"><div class="card h-100 ${isEnded ? 'opacity-75' : ''}">
-            <img src="${imageUrl}" class="card-img-top" alt="${eventDoc.event_name}" style="height: 200px; object-fit: cover;">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">${eventDoc.event_name}</h5>
-                <div class="card-subtitle mb-2 text-body-secondary small d-flex align-items-center gap-1"><img src="${calendar3}" alt="Date" style="${iconStyle}"> ${formattedDate}</div>
-                ${collaboratorsHTML}
-                <p class="card-text flex-grow-1 small">${eventDoc.description || 'No description provided.'}</p>
-                <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
-                    <small class="text-body-secondary d-flex align-items-center gap-1"><img src="${person}" alt="Creator" style="${iconStyle}"> ${creatorName}</small>
-                    ${actionButtons}
+        <div class="col">
+            <div class="card event-card h-100 ${isEnded ? 'opacity-75' : ''}">
+                <div class="position-relative overflow-hidden" style="border-radius: 12px 12px 0 0;">
+                    <img src="${imageUrl}" class="card-img-top" alt="${eventDoc.event_name}" style="height: 200px; object-fit: cover;">
+                    <div class="position-absolute top-0 end-0 m-3">
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
                 </div>
-            </div>
-        </div></div>`;
-}
+                <div class="card-body d-flex flex-column">
+                    <h5 class="fw-bold mb-1 text-truncate" title="${eventDoc.event_name}">${eventDoc.event_name}</h5>
+                    
+                    <div class="d-flex align-items-center gap-2 mb-3 text-primary small fw-semibold">
+                        <img src="${calendar3}" class="icon-primary-filter" style="width: 14px;">
+                        <span>${formattedDate} • ${formattedTime}</span>
+                    </div>
 
-function getEventsHTML() {
-    return `
-    <div class="events-view-container d-flex flex-column" style="min-height: calc(100vh - 120px);">
-        <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4">
-            <h1 class="mb-3 mb-md-0">Events Management</h1>
-            <input type="search" id="eventSearchInput" class="form-control" style="max-width: 400px;" placeholder="Search all events...">
-        </div>
-        
-        <div id="events-list-wrapper" class="flex-grow-1 d-flex flex-column">
-            <div class="flex-grow-1 d-flex align-items-center justify-content-center">
-                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                    <span class="visually-hidden">Loading events...</span>
+                    <p class="card-text text-muted small flex-grow-1 line-clamp-3">
+                        ${eventDoc.description || 'No description provided.'}
+                    </p>
+
+                    ${eventDoc.collab?.length > 0 ? `
+                        <div class="mt-3 py-2 border-top border-light">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="${peopleFill}" style="width: 14px; opacity: 0.5;">
+                                <span class="small text-muted text-truncate">With ${eventDoc.collab.join(', ')}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                <img src="${person}" style="width: 14px; opacity: 0.7;">
+                            </div>
+                            <span class="small text-secondary fw-semibold">${userLookup[eventDoc.added_by] || 'Member'}</span>
+                        </div>
+                        
+                        ${canManage ? `
+                            <div class="btn-group-custom">
+                                <button class="btn edit-event-btn" data-doc-id="${eventDoc.$id}"><img src="${pencilSquare}" width="14"></button>
+                                ${!isEnded ? `<button class="btn mark-ended-btn" data-doc-id="${eventDoc.$id}"><img src="${checkCircle}" width="14" class="text-success"></button>` : ''}
+                                <button class="btn delete-event-btn" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}"><img src="${trash}" width="14" class="text-danger"></button>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        </div>
-        
-        <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addEventModal" title="Add New Event">
-            <img src="${plusLg}" alt="Add Event" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
-        </button>
-
-        <div class="modal fade" id="addEventModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="addEventForm">
-            <div class="modal-header"><h5 class="modal-title">Add a New Event</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3"><label for="eventName" class="form-label">Event Name</label><input type="text" id="eventName" class="form-control" required></div>
-                <div class="mb-3"><label for="eventDate" class="form-label">Date & Time</label><input type="datetime-local" id="eventDate" class="form-control" required></div>
-                <div class="mb-3"><label for="eventImage" class="form-label">Event Image</label><input type="file" id="eventImage" class="form-control" accept="image/*" required></div>
-                <div class="mb-3"><label for="eventDescription" class="form-label">Description</label><textarea id="eventDescription" class="form-control" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label">Collaborators</label><div id="collaborators-list"></div><button type="button" id="add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2 d-flex align-items-center gap-1"><img src="${plusCircle}" alt="Add" style="width:1.1em; height:1.1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);"> Add Collaborator</button></div>
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Create Event</button></div>
-        </form></div></div></div>
-
-        <div class="modal fade" id="editEventModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="editEventForm">
-            <div class="modal-header"><h5 class="modal-title">Edit Event</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" id="editEventId">
-                <input type="hidden" id="editEventFileId">
-                <div class="mb-3"><label for="editEventName" class="form-label">Event Name</label><input type="text" id="editEventName" class="form-control" required></div>
-                <div class="mb-3"><label for="editEventDate" class="form-label">Date & Time</label><input type="datetime-local" id="editEventDate" class="form-control" required></div>
-                <div class="mb-3"><label for="editEventImage" class="form-label">New Event Image (Optional)</label><input type="file" id="editEventImage" class="form-control" accept="image/*"></div>
-                <div class="mb-3"><label for="editEventDescription" class="form-label">Description</label><textarea id="editEventDescription" class="form-control" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label">Collaborators</label><div id="edit-collaborators-list"></div><button type="button" id="edit-add-collaborator-btn" class="btn btn-sm btn-outline-secondary mt-2 d-flex align-items-center gap-1"><img src="${plusCircle}" alt="Add" style="width:1.1em; height:1.1em; filter: invert(39%) sepia(11%) saturate(306%) hue-rotate(174deg) brightness(95%) contrast(91%);"> Add Collaborator</button></div>
-            </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
-        </form></div></div></div>
-    </div>`;
-}
-
-// --- RENDER HELPERS ---
-function renderEventsToContainer(events, container, userLookup, currentUserId) {
-    if (events.length > 0) {
-        container.innerHTML = events.map(doc => createEventCard(doc, userLookup, currentUserId)).join('');
-    } else {
-        const message = container.id.includes('upcoming') ? 'No upcoming events found.' : 'No ended events found.';
-        container.innerHTML = `<div class="col-12"><div class="text-center text-muted p-4"><img src="${calendarX}" alt="No events" style="width: 2.5rem; height: 2.5rem; opacity: 0.6;"><p class="mt-2 mb-0">${message}</p></div></div>`;
-    }
-}
-
-function renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId) {
-    wrapper.innerHTML = `
-        <h2 class="h4">Upcoming Events</h2><hr>
-        <div id="upcoming-events-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 mb-5"></div>
-        <h2 class="h4">Ended Events</h2><hr>
-        <div id="ended-events-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4"></div>
-    `;
-    renderEventsToContainer(upcoming, document.getElementById('upcoming-events-container'), userLookup, currentUserId);
-    renderEventsToContainer(ended, document.getElementById('ended-events-container'), userLookup, currentUserId);
-}
-
-function renderEmptyState(wrapper, type, searchTerm = '') {
-    let icon, title, text;
-    if (type === 'initial') {
-        icon = calendar2Plus;
-        title = 'No Events Yet';
-        text = `Click the <span class="btn btn-sm btn-primary pe-none rounded-circle d-inline-flex align-items-center justify-content-center" style="width:1.5rem; height:1.5rem;"><img src="${plusLg}" alt="Add" style="width:0.8rem; height:0.8rem; filter: invert(1);"></span> button to create the first event.`;
-    } else { // 'search'
-        icon = search;
-        title = 'No Events Found';
-        text = `Your search for "<strong>${searchTerm}</strong>" did not match any events.`;
-    }
-    wrapper.innerHTML = `
-        <div class="flex-grow-1 d-flex align-items-center justify-content-center text-center text-muted">
-            <div>
-                <img src="${icon}" alt="${title}" style="width: 5rem; height: 5rem; opacity: 0.5;">
-                <h4 class="fw-light mt-3">${title}</h4>
-                <p>${text}</p>
             </div>
         </div>`;
 }
 
-// --- EVENT LISTENERS ---
+function getEventsHTML() {
+    return `
+    <div class="events-view-container container-fluid py-4 px-md-5">
+        <header class="row align-items-center mb-5 gy-4">
+            <div class="col-12 col-lg-7">
+                <h1 class="display-6 fw-bold text-dark mb-1">Events</h1>
+                <p class="text-muted mb-0">Manage and browse upcoming community activities.</p>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="input-group shadow-sm rounded-3 overflow-hidden border-0">
+                    <span class="input-group-text bg-white border-0 ps-3"><img src="${search}" width="18" style="opacity:0.4"></span>
+                    <input type="search" id="eventSearchInput" class="form-control border-0 py-2 ps-2" placeholder="Search events...">
+                </div>
+            </div>
+        </header>
+        
+        <div id="events-list-wrapper">
+            <div class="d-flex justify-content-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn btn-primary rounded-pill position-fixed bottom-0 end-0 m-4 shadow-lg px-4 py-3 d-flex align-items-center gap-2" style="z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addEventModal">
+            <img src="${plusLg}" alt="Add" style="width: 1.2rem; filter: invert(1);">
+            <span class="fw-bold">New Event</span>
+        </button>
+
+        <div class="modal fade" id="addEventModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                    <form id="addEventForm">
+                        <div class="modal-header border-0 pt-4 px-4">
+                            <h5 class="modal-title fw-bold">Create Event</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-8"><label class="form-label fw-bold small">Event Name</label><input type="text" id="eventName" class="form-control" required></div>
+                                <div class="col-md-4"><label class="form-label fw-bold small">Date & Time</label><input type="datetime-local" id="eventDate" class="form-control" required></div>
+                                <div class="col-12"><label class="form-label fw-bold small">Banner Image</label><input type="file" id="eventImage" class="form-control" accept="image/*" required></div>
+                                <div class="col-12"><label class="form-label fw-bold small">Description</label><textarea id="eventDescription" class="form-control" rows="3"></textarea></div>
+                                <div class="col-12"><label class="form-label fw-bold small">Collaborators</label><div id="collaborators-list"></div><button type="button" id="add-collaborator-btn" class="btn btn-sm btn-outline-primary mt-2">+ Add</button></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pb-4 px-4">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create Event</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="editEventModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                    <form id="editEventForm">
+                        <div class="modal-header border-0 pt-4 px-4"><h5 class="modal-title fw-bold">Edit Event</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="editEventId"><input type="hidden" id="editEventFileId">
+                            <div class="row g-3">
+                                <div class="col-md-8"><label class="form-label fw-bold small">Event Name</label><input type="text" id="editEventName" class="form-control" required></div>
+                                <div class="col-md-4"><label class="form-label fw-bold small">Date & Time</label><input type="datetime-local" id="editEventDate" class="form-control" required></div>
+                                <div class="col-12"><label class="form-label fw-bold small">New Banner (Optional)</label><input type="file" id="editEventImage" class="form-control" accept="image/*"></div>
+                                <div class="col-12"><label class="form-label fw-bold small">Description</label><textarea id="editEventDescription" class="form-control" rows="3"></textarea></div>
+                                <div class="col-12"><label class="form-label fw-bold small">Collaborators</label><div id="edit-collaborators-list"></div><button type="button" id="edit-add-collaborator-btn" class="btn btn-sm btn-outline-primary mt-2">+ Add</button></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pb-4 px-4"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// --- LOGIC FUNCTIONS ---
+
+function renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId) {
+    wrapper.innerHTML = `
+        <div class="mb-5">
+            <div class="d-flex align-items-center gap-2 mb-4"><h2 class="h4 fw-bold mb-0">Upcoming</h2><span class="badge bg-primary rounded-pill">${upcoming.length}</span></div>
+            <div id="upcoming-events-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4"></div>
+        </div>
+        <div class="opacity-75">
+            <div class="d-flex align-items-center gap-2 mb-4"><h2 class="h4 fw-bold mb-0 text-secondary">Ended</h2><span class="badge bg-secondary rounded-pill">${ended.length}</span></div>
+            <div id="ended-events-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4"></div>
+        </div>`;
+    renderEventsToContainer(upcoming, document.getElementById('upcoming-events-container'), userLookup, currentUserId);
+    renderEventsToContainer(ended, document.getElementById('ended-events-container'), userLookup, currentUserId);
+}
+
+function renderEventsToContainer(events, container, userLookup, currentUserId) {
+    if (events.length > 0) {
+        container.innerHTML = events.map(doc => createEventCard(doc, userLookup, currentUserId)).join('');
+    } else {
+        container.innerHTML = `<div class="col-12"><div class="text-center text-muted p-5 bg-white rounded-3 border border-dashed">No events found.</div></div>`;
+    }
+}
+
 function attachEventListeners(currentUser, userLookup) {
     const currentUserId = currentUser.$id;
     const addEventModal = new Modal(document.getElementById('addEventModal'));
     const editEventModal = new Modal(document.getElementById('editEventModal'));
     const eventsViewContainer = document.querySelector('.events-view-container');
     const searchInput = document.getElementById('eventSearchInput');
-    const debounce = (func, delay) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func.apply(this,a), delay); }; };
 
     let allEventsCache = [];
 
@@ -168,87 +205,18 @@ function attachEventListeners(currentUser, userLookup) {
         try {
             const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(5000), Query.orderDesc('date_to_held')]);
             allEventsCache = response.documents;
-
-            if (allEventsCache.length === 0) {
-                renderEmptyState(wrapper, 'initial');
-            } else {
-                const upcoming = allEventsCache.filter(e => !e.event_ended);
-                const ended = allEventsCache.filter(e => e.event_ended);
-                renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId);
-            }
+            const upcoming = allEventsCache.filter(e => !e.event_ended);
+            const ended = allEventsCache.filter(e => e.event_ended);
+            renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId);
         } catch (error) {
-            console.error("Failed to fetch events:", error);
+            console.error(error);
             wrapper.innerHTML = `<div class="alert alert-danger">Failed to load events.</div>`;
         }
     };
+
     loadAllEvents();
 
-    // --- FORM SUBMISSION LISTENERS ---
-    document.getElementById('addEventForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const imageFile = document.getElementById('eventImage').files[0];
-        const collaborators = Array.from(document.querySelectorAll('#collaborators-list .collaborator-input')).map(i => i.value.trim()).filter(Boolean);
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Creating...`;
-        try {
-            const uploadedImage = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), imageFile);
-            const data = {
-                event_name: document.getElementById('eventName').value,
-                date_to_held: document.getElementById('eventDate').value,
-                description: document.getElementById('eventDescription').value,
-                image_file: uploadedImage.$id,
-                added_by: currentUserId,
-                collab: collaborators,
-                event_ended: false
-            };
-            await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), data);
-            addEventModal.hide();
-            e.target.reset();
-            document.getElementById('collaborators-list').innerHTML = '';
-            await loadAllEvents();
-        } catch (error) {
-            console.error('Failed to create event:', error);
-            alert('Failed to create event. Please check the console for details.');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Create Event';
-        }
-    });
-
-    document.getElementById('editEventForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const docId = document.getElementById('editEventId').value;
-        const currentFileId = document.getElementById('editEventFileId').value;
-        const newImageFile = document.getElementById('editEventImage').files[0];
-        const collaborators = Array.from(document.querySelectorAll('#edit-collaborators-list .collaborator-input')).map(i => i.value.trim()).filter(Boolean);
-
-        let updatedData = {
-            event_name: document.getElementById('editEventName').value,
-            date_to_held: document.getElementById('editEventDate').value,
-            description: document.getElementById('editEventDescription').value,
-            collab: collaborators,
-        };
-
-        submitBtn.disabled = true; submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving...`;
-        try {
-            if (newImageFile) {
-                const uploadedImage = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), newImageFile);
-                updatedData.image_file = uploadedImage.$id;
-                await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, currentFileId);
-            }
-            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, docId, updatedData);
-            editEventModal.hide();
-            loadAllEvents();
-        } catch (error) {
-            console.error('Failed to update event:', error); alert('Failed to update event.');
-        } finally {
-            submitBtn.disabled = false; submitBtn.textContent = 'Save Changes';
-        }
-    });
-
+    // delegated clicks
     eventsViewContainer.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('.edit-event-btn');
         const markEndedBtn = e.target.closest('.mark-ended-btn');
@@ -259,96 +227,91 @@ function attachEventListeners(currentUser, userLookup) {
         if (addCollabBtn) {
             const list = addCollabBtn.previousElementSibling;
             const inputGroup = document.createElement('div');
-            inputGroup.className = 'input-group mb-2';
-            inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" placeholder="Name of collaborator"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><img src="${xLg}" alt="Remove" style="width:0.8em; height:0.8em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);"></button>`;
+            inputGroup.className = 'input-group mb-2 shadow-sm rounded-3 overflow-hidden';
+            inputGroup.innerHTML = `<input type="text" class="form-control border-0 bg-light collaborator-input" placeholder="Name"><button class="btn btn-light border-0 remove-collaborator-btn" type="button"><img src="${xLg}" width="12"></button>`;
             list.appendChild(inputGroup);
+            inputGroup.querySelector('input').focus();
         }
 
-        if (removeCollabBtn) {
-            removeCollabBtn.closest('.input-group').remove();
-        }
+        if (removeCollabBtn) removeCollabBtn.closest('.input-group').remove();
 
         if (editBtn) {
-            const docId = editBtn.dataset.docId;
-            const eventData = allEventsCache.find(event => event.$id === docId);
-            if (!eventData) return;
-
-            document.getElementById('editEventId').value = docId;
-            document.getElementById('editEventFileId').value = eventData.image_file;
-            document.getElementById('editEventName').value = eventData.event_name;
-            document.getElementById('editEventDate').value = new Date(eventData.date_to_held).toISOString().slice(0, 16);
-            document.getElementById('editEventDescription').value = eventData.description || '';
-            document.getElementById('editEventImage').value = '';
-
-            const editCollabList = document.getElementById('edit-collaborators-list');
-            editCollabList.innerHTML = '';
-            (eventData.collab || []).forEach(name => {
-                const inputGroup = document.createElement('div');
-                inputGroup.className = 'input-group mb-2';
-                inputGroup.innerHTML = `<input type="text" class="form-control collaborator-input" value="${name}"><button class="btn btn-outline-danger remove-collaborator-btn" type="button"><img src="${xLg}" alt="Remove" style="width:0.8em; height:0.8em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);"></button>`;
-                editCollabList.appendChild(inputGroup);
-            });
+            const ev = allEventsCache.find(x => x.$id === editBtn.dataset.docId);
+            if (!ev) return;
+            document.getElementById('editEventId').value = ev.$id;
+            document.getElementById('editEventFileId').value = ev.image_file;
+            document.getElementById('editEventName').value = ev.event_name;
+            document.getElementById('editEventDate').value = new Date(ev.date_to_held).toISOString().slice(0, 16);
+            document.getElementById('editEventDescription').value = ev.description || '';
+            document.getElementById('edit-collaborators-list').innerHTML = (ev.collab || []).map(n => `<div class="input-group mb-2 shadow-sm rounded-3 overflow-hidden"><input type="text" class="form-control border-0 bg-light collaborator-input" value="${n}"><button class="btn btn-light border-0 remove-collaborator-btn" type="button"><img src="${xLg}" width="12"></button></div>`).join('');
             editEventModal.show();
         }
 
-        if (markEndedBtn) {
-            if (!confirm('Are you sure you want to mark this event as ended?')) return;
-            markEndedBtn.disabled = true;
-            markEndedBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
-            try {
-                await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, markEndedBtn.dataset.docId, { event_ended: true });
-                loadAllEvents();
-            } catch (error) {
-                console.error('Failed to mark event as ended:', error);
-                alert('Could not update the event.');
-                markEndedBtn.disabled = false;
-                markEndedBtn.innerHTML = `<img src="${checkCircle}" alt="Mark as ended" style="width: 1em; height: 1em; filter: invert(54%) sepia(55%) saturate(511%) hue-rotate(85deg) brightness(96%) contrast(88%);">`;
-            }
+        if (markEndedBtn && confirm('End this event?')) {
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, markEndedBtn.dataset.docId, { event_ended: true });
+            loadAllEvents();
         }
 
-        if (deleteBtn) {
-            if (!confirm('Are you sure you want to permanently delete this event? This cannot be undone.')) return;
-            deleteBtn.disabled = true;
-            deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
-            try {
-                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, deleteBtn.dataset.docId);
-                await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, deleteBtn.dataset.fileId);
-                loadAllEvents();
-            } catch (error) {
-                console.error('Failed to delete event:', error);
-                alert('Could not delete the event.');
-                deleteBtn.disabled = false;
-                deleteBtn.innerHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; filter: invert(32%) sepia(70%) saturate(2311%) hue-rotate(336deg) brightness(90%) contrast(98%);">`;
-            }
+        if (deleteBtn && confirm('Delete permanently?')) {
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, deleteBtn.dataset.docId);
+            await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, deleteBtn.dataset.fileId);
+            loadAllEvents();
         }
     });
 
-    // --- Search Logic ---
-    const performSearch = (searchTerm) => {
+    // Submissions
+    document.getElementById('addEventForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        try {
+            const uploadedImage = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), document.getElementById('eventImage').files[0]);
+            await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), {
+                event_name: document.getElementById('eventName').value,
+                date_to_held: document.getElementById('eventDate').value,
+                description: document.getElementById('eventDescription').value,
+                image_file: uploadedImage.$id,
+                added_by: currentUserId,
+                collab: Array.from(document.querySelectorAll('#collaborators-list .collaborator-input')).map(i => i.value.trim()).filter(Boolean),
+                event_ended: false
+            });
+            addEventModal.hide(); e.target.reset(); await loadAllEvents();
+        } catch (error) { alert('Failed to create event'); } finally { submitBtn.disabled = false; }
+    });
+
+    document.getElementById('editEventForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        try {
+            let data = {
+                event_name: document.getElementById('editEventName').value,
+                date_to_held: document.getElementById('editEventDate').value,
+                description: document.getElementById('editEventDescription').value,
+                collab: Array.from(document.querySelectorAll('#edit-collaborators-list .collaborator-input')).map(i => i.value.trim()).filter(Boolean),
+            };
+            const newImg = document.getElementById('editEventImage').files[0];
+            if (newImg) {
+                const uploaded = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), newImg);
+                data.image_file = uploaded.$id;
+                await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, document.getElementById('editEventFileId').value);
+            }
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, document.getElementById('editEventId').value, data);
+            editEventModal.hide(); await loadAllEvents();
+        } catch (error) { alert('Update failed'); } finally { submitBtn.disabled = false; }
+    });
+
+    // Search
+    const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+    searchInput.addEventListener('input', debounce((e) => {
+        const term = e.target.value.toLowerCase().trim();
         const wrapper = document.getElementById('events-list-wrapper');
-        if (!searchTerm) {
-            loadAllEvents();
-            return;
-        }
-
-        const filtered = allEventsCache.filter(e =>
-            e.event_name.toLowerCase().includes(searchTerm) ||
-            (e.description && e.description.toLowerCase().includes(searchTerm)) ||
-            (e.collab && e.collab.some(c => c.toLowerCase().includes(searchTerm)))
-        );
-
-        if (filtered.length === 0) {
-            renderEmptyState(wrapper, 'search', searchTerm);
-        } else {
-            const upcoming = filtered.filter(e => !e.event_ended);
-            const ended = filtered.filter(e => e.event_ended);
-            renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId);
-        }
-    };
-    searchInput.addEventListener('input', debounce((e) => performSearch(e.target.value.toLowerCase().trim()), 300));
+        if (!term) return loadAllEvents();
+        const filtered = allEventsCache.filter(ev => ev.event_name.toLowerCase().includes(term) || ev.description?.toLowerCase().includes(term) || ev.collab?.some(c => c.toLowerCase().includes(term)));
+        renderEventLists(wrapper, filtered.filter(e => !e.event_ended), filtered.filter(e => e.event_ended), userLookup, currentUserId);
+    }, 300));
 }
 
-// --- Main export ---
 export default function renderEventsView(initialEvents, user, userLookup) {
     return {
         html: getEventsHTML(),
