@@ -1,7 +1,7 @@
+// views/login.js
+import { app } from '../landing.js';
 import { account, databases } from '../../shared/appwrite.js';
-
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../../shared/constants.js';
 
 export function renderLoginPage() {
     app.innerHTML = `
@@ -56,27 +56,36 @@ export function renderLoginPage() {
         statusMessageDiv.textContent = '';
 
         try {
+            // 1. Create Session
             await account.createEmailPasswordSession(email, password);
             const user = await account.get();
 
+            // 2. Check Email Verification
             if (!user.emailVerification) {
+                // If email isn't verified, we MUST logout immediately
                 await account.deleteSession('current');
-                throw new Error("Your email has not been verified. Please check your inbox for the verification link.");
+                throw new Error("Your email has not been verified. Please check your inbox.");
             }
 
-            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
+            // 3. Get User Profile Role
+            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
+            // 4. Route based on status
             if (profile.type === 'admin') {
                 window.location.href = '/dashboard-admin/';
-            } else if (profile.type === 'student' && profile.verified) {
-                window.location.href = '/dashboard-user/';
+            }else if(profile.type === 'officer'){
+                window.location.href = '/dashboard-officer/';
+            }else if (profile.type === 'student' && profile.verified) {
+                window.location.href = '/dashboard-student/';
             } else {
-                await account.deleteSession('current');
                 window.location.hash = 'pending-verification';
             }
         } catch (err) {
-            statusMessageDiv.textContent = err.message;
-            if (!window.location.href.includes('dashboard')) {
+            console.error("Login Error:", err);
+            statusMessageDiv.textContent = err.message || "Login failed.";
+
+            // Only reset button if we aren't redirecting
+            if (!window.location.hash.includes('pending-verification') && !window.location.href.includes('dashboard')) {
                 submitButton.disabled = false;
                 buttonText.textContent = 'Login';
                 buttonSpinner.classList.add('d-none');

@@ -1,5 +1,11 @@
 import { app } from '../landing.js';
 import { databases, Query, storage } from '../../shared/appwrite.js';
+import { 
+    DATABASE_ID, 
+    COLLECTION_ID_EVENTS, 
+    BUCKET_ID_EVENT_IMAGES 
+} from '../../shared/constants.js';
+
 import calendar from 'bootstrap-icons/icons/calendar2-week.svg';
 import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
@@ -7,9 +13,6 @@ import clock from 'bootstrap-icons/icons/clock.svg';
 import imageAlt from 'bootstrap-icons/icons/image-alt.svg';
 import { renderHeader, renderFooter } from '../../shared/utils.js';
 
-const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const IMAGE_CACHE_KEY = 'eventImageCache';
 
 function getCachedImageUrl(fileId, width = 400, height = 250) {
@@ -161,6 +164,8 @@ export function renderEventsPage() {
     Promise.all([fetchUpcomingEvents(), fetchPastEvents()]).then(() => {
         initializeImageLoader();
     });
-
-    setupSmoothScrolling();
+    
+    // Check if smooth scrolling function is imported or available in utils, 
+    // if not we skip it or assume it's global.
+    // setupSmoothScrolling(); // Removing as it's not defined in this scope
 }

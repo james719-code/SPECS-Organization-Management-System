@@ -31,8 +31,9 @@ export default defineConfig({
       input: {
         main: resolve(process.cwd(), 'src/index.html'),
         landing: resolve(process.cwd(), 'src/landing/index.html'),
-        userDashboard: resolve(process.cwd(), 'src/dashboard-user/index.html'),
+        officerDashboard: resolve(process.cwd(), 'src/dashboard-officer/index.html'),
         adminDashboard: resolve(process.cwd(), 'src/dashboard-admin/index.html'),
+        studentDashboard: resolve(process.cwd(), 'src/dashboard-student/index.html'),
       },
       output: {
         manualChunks(id) {

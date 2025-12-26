@@ -5,6 +5,7 @@ import '../guard/auth.js';
 
 // Appwrite SDK and Bootstrap components
 import { account, databases } from "../shared/appwrite.js";
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from "../shared/constants.js";
 import { Offcanvas, Dropdown } from 'bootstrap';
 
 // --- Admin View Modules ---
@@ -22,16 +23,12 @@ import folderFill from 'bootstrap-icons/icons/folder-fill.svg';
 import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 
-// --- DATABASE CONFIG ---
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
-
 export default async function renderDashboardAdmin() {
     const app = document.getElementById("app");
 
     try {
         const user = await account.get();
-        const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
+        const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
         if (profile.type !== 'admin') {
             console.error("Access Denied: User is not an admin.");
@@ -196,6 +193,3 @@ export default async function renderDashboardAdmin() {
         window.location.href = "/landing/#login";
     }
 }
-
-// Execute the main function to render the admin dashboard.
-renderDashboardAdmin();

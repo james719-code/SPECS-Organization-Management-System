@@ -1,5 +1,10 @@
 // --- IMPORTS ---
 import { databases, storage } from '../../shared/appwrite.js';
+import { 
+    DATABASE_ID, 
+    COLLECTION_ID_EVENTS, 
+    BUCKET_ID_EVENT_IMAGES 
+} from '../../shared/constants.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
@@ -11,16 +16,8 @@ import trash from 'bootstrap-icons/icons/trash.svg';
 import calendar3 from 'bootstrap-icons/icons/calendar3.svg';
 import person from 'bootstrap-icons/icons/person.svg';
 import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
-import plusCircle from 'bootstrap-icons/icons/plus-circle.svg';
-import calendarX from 'bootstrap-icons/icons/calendar-x.svg';
-import calendar2Plus from 'bootstrap-icons/icons/calendar2-plus.svg';
 import search from 'bootstrap-icons/icons/search.svg';
 import xLg from 'bootstrap-icons/icons/x-lg.svg';
-
-// --- CONFIGURATION ---
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
-const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
 
 /**
  * Creates an event card using your defined .card and Deep Teal styles.
@@ -31,6 +28,9 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
     const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const formattedTime = eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
+    // Allow admins/officers to manage all events or just their own?
+    // Assuming Officers can manage all for now or check logic.
+    // Logic says "canManage" if added_by === currentUserId.
     const canManage = eventDoc.added_by === currentUserId;
     const isEnded = eventDoc.event_ended === true;
 

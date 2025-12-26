@@ -1,5 +1,14 @@
 // views/renderAdmin/accounts.js
 import { databases, storage, functions } from '../../shared/appwrite.js';
+import { 
+    DATABASE_ID, 
+    COLLECTION_ID_ACCOUNTS, 
+    COLLECTION_ID_STUDENTS,
+    BUCKET_ID_RESUMES, 
+    BUCKET_ID_SCHEDULES, 
+    FUNCTION_PROMOTE_OFFICER, 
+    FUNCTION_ACCEPT_STUDENT 
+} from '../../shared/constants.js';
 import { Query } from 'appwrite';
 import { Modal, Dropdown } from 'bootstrap';
 
@@ -14,48 +23,68 @@ import calendarWeek from 'bootstrap-icons/icons/calendar-week.svg';
 import funnelFill from 'bootstrap-icons/icons/funnel-fill.svg';
 import sortAlphaDown from 'bootstrap-icons/icons/sort-alpha-down.svg';
 import sortNumericDown from 'bootstrap-icons/icons/sort-numeric-down.svg';
-
-
-// --- CONFIGURATION ---
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
-const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES;
-const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
-const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID;
+import award from 'bootstrap-icons/icons/award.svg';
 
 // --- Reusable Icon HTML strings ---
-const acceptIconHTML = `<img src="${checkCircle}" alt="Accept" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; filter: invert(42%) sepia(93%) saturate(1352%) hue-rotate(87deg) brightness(119%) contrast(119%);">Accept User`;
+const acceptIconHTML = `<img src="${checkCircle}" alt="Accept" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; filter: invert(42%) sepia(93%) saturate(1352%) hue-rotate(87deg) brightness(119%) contrast(119%);">Accept Student`;
+const promoteIconHTML = `<img src="${award}" alt="Promote" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; opacity: 0.6;">Promote to Officer`;
 const deleteIconHTML = `<img src="${trash}" alt="Delete" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; filter: invert(21%) sepia(30%) saturate(7469%) hue-rotate(348deg) brightness(98%) contrast(92%);">Delete User`;
 
 // --- HTML TEMPLATE FUNCTIONS ---
 
-function createAccountCardHTML(profile) {
-    const isVerified = profile.verified === true;
-    const statusBadge = isVerified
-        ? `<span class="badge bg-success-subtle text-success-emphasis rounded-pill px-3 py-2 border border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i> Verified</span>`
-        : `<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-3 py-2 border border-warning-subtle"><i class="bi bi-exclamation-circle-fill me-1"></i> Pending</span>`;
+function createAccountCardHTML(account) {
+    const isVerified = account.verified === true;
+    const isOfficer = account.type === 'officer';
+    const isStudent = account.type === 'student';
 
-    const joinedDate = new Date(profile.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let statusBadge = '';
+    if (isOfficer) {
+        statusBadge = `<span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 border border-info-subtle"><i class="bi bi-person-badge me-1"></i> Officer</span>`;
+    } else if (isVerified) {
+        statusBadge = `<span class="badge bg-success-subtle text-success-emphasis rounded-pill px-3 py-2 border border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i> Student (Verified)</span>`;
+    } else {
+        statusBadge = `<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-3 py-2 border border-warning-subtle"><i class="bi bi-exclamation-circle-fill me-1"></i> Pending</span>`;
+    }
 
-    // Actions are now inside a Bootstrap dropdown (kebab menu)
-    const acceptActionItem = !isVerified
-        ? `<li><a class="dropdown-item accept-btn fw-medium text-success" href="#" data-docid="${profile.$id}">${acceptIconHTML}</a></li>`
-        : '';
-    const deleteActionItem = `<li><a class="dropdown-item delete-btn fw-medium text-danger" href="#" data-docid="${profile.$id}">${deleteIconHTML}</a></li>`;
+    const joinedDate = new Date(account.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // --- Actions ---
+    let actions = '';
+    
+    // Accept (only for unverified students)
+    if (!isVerified && isStudent) {
+        actions += `<li><a class="dropdown-item accept-btn fw-medium text-success" href="#" data-docid="${account.$id}">${acceptIconHTML}</a></li>`;
+    }
+    
+    // Promote (only for verified students who are not officers)
+    if (isVerified && isStudent) {
+        actions += `<li><a class="dropdown-item promote-btn fw-medium text-primary" href="#" data-docid="${account.$id}">${promoteIconHTML}</a></li>`;
+    }
+
+    // Delete (always available)
+    actions += `<li><a class="dropdown-item delete-btn fw-medium text-danger" href="#" data-docid="${account.$id}">${deleteIconHTML}</a></li>`;
+
+    // --- Data Extraction ---
+    // account.students is the relationship. If expanded, it's an object. If not, it's an ID.
+    // We try to access fields if expanded.
+    const studentData = (account.students && typeof account.students === 'object') ? account.students : {};
+    const displayName = studentData.name || account.username;
+    const displayEmail = studentData.email || 'No email linked';
+    const displayYear = studentData.yearLevel ? `Year ${studentData.yearLevel}` : 'Year not set';
 
     return `
         <div class="col">
-            <div class="card h-100 shadow-sm account-card border-0" data-docid="${profile.$id}">
+            <div class="card h-100 shadow-sm account-card border-0" data-docid="${account.$id}">
                 <div class="card-body d-flex flex-column p-4">
                     <!-- Card Header: Name, Email, and Actions Menu -->
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div class="d-flex align-items-center" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#userDetailsModal">
                             <div class="avatar-placeholder bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold fs-5 shadow-sm" style="width: 48px; height: 48px;">
-                                ${profile.fullname.charAt(0).toUpperCase()}
+                                ${displayName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <h6 class="card-title fw-bold mb-0 text-dark">${profile.fullname}</h6>
-                                <small class="text-muted d-block text-truncate" style="max-width: 150px;">${profile.email || 'No email'}</small>
+                                <h6 class="card-title fw-bold mb-0 text-dark">${displayName}</h6>
+                                <small class="text-muted d-block text-truncate" style="max-width: 150px;">${displayEmail}</small>
                             </div>
                         </div>
                         <div class="dropdown">
@@ -63,8 +92,7 @@ function createAccountCardHTML(profile) {
                                 <img src="${threeDotsVertical}" alt="Options" style="width: 1.25rem; height: 1.25rem;">
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3">
-                                ${acceptActionItem}
-                                ${deleteActionItem}
+                                ${actions}
                             </ul>
                         </div>
                     </div>
@@ -73,11 +101,11 @@ function createAccountCardHTML(profile) {
                     <div class="py-2 mb-2" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#userDetailsModal">
                          <div class="d-flex align-items-center mb-2 text-secondary small">
                             <img src="${person}" class="me-2 opacity-50" style="width: 1rem;"> 
-                            <span class="text-dark fw-medium">${profile.username}</span>
+                            <span class="text-dark fw-medium">@${account.username}</span>
                         </div>
                         <div class="d-flex align-items-center mb-2 text-secondary small">
                             <img src="${mortarboard}" class="me-2 opacity-50" style="width: 1rem;"> 
-                            <span>${profile.yearLevel || 'Year not set'}</span>
+                            <span>${displayYear}</span>
                         </div>
                         <div class="d-flex align-items-center text-secondary small">
                             <i class="bi bi-clock me-2 opacity-50" style="font-size: 1rem;"></i>
@@ -104,7 +132,7 @@ function getAccountsHTML() {
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 gap-3">
                 <div>
                     <h2 class="fw-bold m-0">Account Management</h2>
-                    <p class="text-muted m-0 small">Manage student accounts and verifications</p>
+                    <p class="text-muted m-0 small">Manage accounts, verifications, and officer promotions</p>
                 </div>
                 
                 <div class="d-flex gap-2">
@@ -149,18 +177,20 @@ async function attachAccountsListeners() {
     const searchInput = document.getElementById('userSearchInput');
     const sortOptions = document.querySelectorAll('[data-sort]');
     
-    // Bootstrap Modals/Dropdowns need re-initialization sometimes if content is replaced
     const userDetailsModalEl = document.getElementById('userDetailsModal');
     const userDetailsModal = new Modal(userDetailsModalEl);
     const userDetailsModalBody = document.getElementById('userDetailsModalBody');
 
-    let allUsers = [];
+    let allAccounts = [];
     let currentSort = 'name_asc';
 
-    const sortUsers = (users, criteria) => {
-        const sorted = [...users];
+    const sortUsers = (accounts, criteria) => {
+        const sorted = [...accounts];
+        // Helper to get name from expanded relationship or fallback to username
+        const getName = (a) => (a.students && a.students.name) ? a.students.name : a.username;
+
         if (criteria === 'name_asc') {
-            sorted.sort((a, b) => a.fullname.localeCompare(b.fullname));
+            sorted.sort((a, b) => getName(a).localeCompare(getName(b)));
         } else if (criteria === 'date_desc') {
             sorted.sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
         } else if (criteria === 'date_asc') {
@@ -169,10 +199,10 @@ async function attachAccountsListeners() {
         return sorted;
     };
 
-    const renderUserList = (users) => {
-        const studentUsers = users.filter(user => user.type !== 'admin');
+    const renderUserList = (accounts) => {
+        const filtered = accounts.filter(acc => acc.type !== 'admin');
         
-        if (studentUsers.length === 0) {
+        if (filtered.length === 0) {
             cardsContainer.innerHTML = `
                 <div class="col-12">
                     <div class="card card-body text-center border-0 bg-transparent py-5">
@@ -184,87 +214,99 @@ async function attachAccountsListeners() {
             return;
         }
         
-        // Sort before rendering
-        const sortedUsers = sortUsers(studentUsers, currentSort);
-        cardsContainer.innerHTML = sortedUsers.map(createAccountCardHTML).join('');
+        const sorted = sortUsers(filtered, currentSort);
+        cardsContainer.innerHTML = sorted.map(createAccountCardHTML).join('');
         
-        // Re-init dropdowns
         document.querySelectorAll('.dropdown-toggle').forEach(dd => new Dropdown(dd));
     };
 
     try {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]);
-        allUsers = response.documents;
-        renderUserList(allUsers);
+        // Fetch accounts, filtering by type != admin would be nice but Appwrite filter syntax on enum might be specific.
+        // We'll fetch all and filter client side or use queries if possible.
+        // We MUST expand 'students' to get name/email details.
+        // NOTE: In Appwrite, you expand by the attribute name of the relationship. In 'accounts' collection, it is 'students'.
+        const response = await databases.listDocuments(
+            DATABASE_ID, 
+            COLLECTION_ID_ACCOUNTS, 
+            [
+                Query.limit(100) 
+            ]
+        );
+        allAccounts = response.documents;
+        renderUserList(allAccounts);
     } catch (error) {
-        console.error("Failed to load users:", error);
+        console.error("Failed to load accounts:", error);
         cardsContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger shadow-sm border-0">Error loading users. Please refresh.</div></div>`;
     }
 
     // Search Listener
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase().trim();
-        const filteredUsers = allUsers.filter(user =>
-            user.fullname.toLowerCase().includes(searchTerm) ||
-            (user.email && user.email.toLowerCase().includes(searchTerm))
-        );
-        renderUserList(filteredUsers);
+        const filtered = allAccounts.filter(acc => {
+            const studentData = acc.students || {};
+            const name = studentData.name || acc.username;
+            const email = studentData.email || '';
+            return name.toLowerCase().includes(searchTerm) || email.toLowerCase().includes(searchTerm);
+        });
+        renderUserList(filtered);
     });
 
     // Sort Listener
     sortOptions.forEach(option => {
         option.addEventListener('click', (e) => {
             e.preventDefault();
-            // Update active state
             sortOptions.forEach(opt => opt.classList.remove('active'));
             e.currentTarget.classList.add('active');
             
             currentSort = e.currentTarget.dataset.sort;
-            
-            // Re-filter based on current search
-            const searchTerm = searchInput.value.toLowerCase().trim();
-            const filteredUsers = allUsers.filter(user =>
-                user.fullname.toLowerCase().includes(searchTerm) ||
-                (user.email && user.email.toLowerCase().includes(searchTerm))
-            );
-            
-            renderUserList(filteredUsers);
+            // Re-render handled by reusing current list state logic if we refetch or just resort
+            // Simplified: re-trigger search input event to re-filter & sort
+            searchInput.dispatchEvent(new Event('input'));
         });
     });
 
     cardsContainer.addEventListener('click', async (e) => {
         const target = e.target;
-
         const acceptBtn = target.closest('.accept-btn');
+        const promoteBtn = target.closest('.promote-btn');
         const deleteBtn = target.closest('.delete-btn');
+        const card = target.closest('.account-card');
 
+        // --- ACCEPT ACTION ---
         if (acceptBtn) {
             e.preventDefault();
             const docId = acceptBtn.dataset.docid;
             acceptBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Accepting...`;
 
             try {
-                // --- STEP 1: Update the document to set 'verified: true' ---
-                await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, docId, { verified: true });
+                // Determine user ID (account owner ID usually matches doc ID if setup that way, or we read it)
+                // In this schema, $id of account doc IS the user ID usually? Or just a random ID?
+                // Assuming Account Doc ID != User ID, we need User ID for team addition.
+                // However, usually we store UserID in the doc or make DocID = UserID. 
+                // Let's assume we pass the DocID and let the function figure it out or we need the owner ID.
+                // The 'accounts' collection often uses UserID as Document ID.
+                const userId = docId; 
 
-                const userToUpdate = allUsers.find(u => u.$id === docId);
-                if (userToUpdate) {
-                    userToUpdate.verified = true;
+                const execution = await functions.createExecution(
+                    FUNCTION_ACCEPT_STUDENT,
+                    JSON.stringify({ userId: userId, accountDocId: docId }),
+                    false
+                );
+                
+                if (execution.status === 'completed') {
+                    // Update local state optimistic
+                     const acc = allAccounts.find(u => u.$id === docId);
+                     if(acc) acc.verified = true;
+                     renderUserList(allAccounts);
+                     alert('Student accepted successfully.');
+                } else {
+                    console.error('Function execution status:', execution.status, execution.response);
+                    alert('Acceptance processed. Refreshing list...');
+                    // Refetch
+                    const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS);
+                    allAccounts = res.documents;
+                    renderUserList(allAccounts);
                 }
-
-                // --- STEP 2: Explicitly execute the back-end function ---
-                try {
-                    await functions.createExecution(
-                        FUNCTION_ID,
-                        JSON.stringify(userToUpdate),
-                        false
-                    );
-                } catch (functionError) {
-                    console.error("Failed to execute team assignment function:", functionError);
-                    alert("User verified, but team assignment failed. Check logs.");
-                }
-
-                renderUserList(allUsers);
 
             } catch (error) {
                 alert('Failed to accept user: ' + error.message);
@@ -273,20 +315,47 @@ async function attachAccountsListeners() {
             return;
         }
 
+        // --- PROMOTE ACTION ---
+        if (promoteBtn) {
+            e.preventDefault();
+            if (!confirm("Are you sure you want to promote this student to Officer? They will gain access to the Officer Dashboard.")) return;
+            
+            const docId = promoteBtn.dataset.docid;
+            promoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Promoting...`;
+
+            try {
+                const userId = docId;
+                const execution = await functions.createExecution(
+                    FUNCTION_PROMOTE_OFFICER,
+                    JSON.stringify({ userId: userId, accountDocId: docId }),
+                    false
+                );
+                 
+                // Refetch to show changes
+                setTimeout(async () => {
+                     const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS);
+                     allAccounts = res.documents;
+                     renderUserList(allAccounts);
+                     alert('User promoted to Officer.');
+                }, 1000);
+
+            } catch (error) {
+                alert('Failed to promote user: ' + error.message);
+                promoteBtn.innerHTML = promoteIconHTML;
+            }
+            return;
+        }
+
+        // --- DELETE ACTION ---
         if (deleteBtn) {
             e.preventDefault(); 
             if (!confirm(`Are you sure you want to permanently delete this user's profile? This cannot be undone.`)) return;
             const docId = deleteBtn.dataset.docid;
             deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
             try {
-                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, docId);
-                allUsers = allUsers.filter(u => u.$id !== docId);
-                const searchTerm = searchInput.value.toLowerCase().trim();
-                const filteredUsers = allUsers.filter(user =>
-                    user.fullname.toLowerCase().includes(searchTerm) ||
-                    (user.email && user.email.toLowerCase().includes(searchTerm))
-                );
-                renderUserList(filteredUsers);
+                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, docId);
+                allAccounts = allAccounts.filter(u => u.$id !== docId);
+                renderUserList(allAccounts);
             } catch (error) {
                 alert('Failed to delete user profile: ' + error.message);
                 deleteBtn.innerHTML = deleteIconHTML;
@@ -298,62 +367,47 @@ async function attachAccountsListeners() {
             return;
         }
 
-        const card = target.closest('.account-card');
+        // --- VIEW DETAILS ---
         if (card) {
             const docId = card.dataset.docid;
-            const userProfile = allUsers.find(u => u.$id === docId);
-            if (!userProfile) return;
+            const account = allAccounts.find(u => u.$id === docId);
+            if (!account) return;
 
-            document.getElementById('userDetailsModalLabel').textContent = userProfile.fullname;
-            if (userProfile.type === 'student' && userProfile.verified) {
-                const resumeHTML = userProfile.haveResume ? `<a href="${storage.getFileView(BUCKET_ID_RESUMES, userProfile.resumeId)}" target="_blank" class="btn btn-outline-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2"><img src="${fileEarmarkPerson}" style="width: 1.2em;">View Resume</a>` : `<div class="p-3 bg-light rounded text-center text-muted"><i class="bi bi-file-earmark-x mb-2 d-block fs-4"></i>No resume uploaded</div>`;
-                const scheduleHTML = userProfile.haveSchedule ? `<a href="${storage.getFileView(BUCKET_ID_SCHEDULES, userProfile.scheduleId)}" target="_blank" class="btn btn-outline-info w-100 py-2 d-flex align-items-center justify-content-center gap-2"><img src="${calendarWeek}" style="width: 1.2em;">View Schedule</a>` : `<div class="p-3 bg-light rounded text-center text-muted"><i class="bi bi-calendar-x mb-2 d-block fs-4"></i>No schedule uploaded</div>`;
-                
-                userDetailsModalBody.innerHTML = `
-                    <div class="text-center mb-4">
-                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow" style="width: 80px; height: 80px; font-size: 2rem; font-weight: bold;">
-                             ${userProfile.fullname.charAt(0).toUpperCase()}
-                        </div>
-                        <h5 class="fw-bold">${userProfile.fullname}</h5>
-                        <p class="text-muted">${userProfile.yearLevel}</p>
+            const student = account.students || {};
+            const name = student.name || account.username;
+            
+            document.getElementById('userDetailsModalLabel').textContent = name;
+            
+            // Build modal content
+            let detailsHTML = `
+                <div class="text-center mb-4">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow" style="width: 80px; height: 80px; font-size: 2rem; font-weight: bold;">
+                            ${name.charAt(0).toUpperCase()}
                     </div>
-                    <div class="row g-3">
-                        <div class="col-6">${resumeHTML}</div>
-                        <div class="col-6">${scheduleHTML}</div>
+                    <h5 class="fw-bold">${name}</h5>
+                    <p class="text-muted">${student.yearLevel ? 'Year ' + student.yearLevel : 'No Year Level'}</p>
+                </div>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Username</span>
+                        <span class="fw-medium">@${account.username}</span>
                     </div>
-                    <div class="mt-4 pt-3 border-top">
-                        <p class="small text-muted mb-1"><strong>Email:</strong> ${userProfile.email}</p>
-                        <p class="small text-muted mb-1"><strong>Username:</strong> ${userProfile.username}</p>
-                        <p class="small text-muted mb-0"><strong>Joined:</strong> ${new Date(userProfile.$createdAt).toLocaleDateString()}</p>
+                     <div class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Email</span>
+                        <span class="fw-medium">${student.email || 'N/A'}</span>
                     </div>
-                `;
-            } else if (userProfile.type === 'student' && !userProfile.verified) {
-                userDetailsModalBody.innerHTML = `
-                    <div class="text-center py-4">
-                        <i class="bi bi-shield-exclamation text-warning display-1 mb-3"></i>
-                        <h5 class="fw-bold">Verification Pending</h5>
-                        <p class="text-muted px-4">This student's account is still waiting for approval. Uploaded documents will be visible here once verified.</p>
-                        <button class="btn btn-success mt-2 accept-btn" data-docid="${userProfile.$id}"><i class="bi bi-check-circle me-2"></i>Verify Now</button>
-                    </div>`;
-                
-                // Attach event listener for the button inside modal
-                setTimeout(() => {
-                    const modalAcceptBtn = userDetailsModalBody.querySelector('.accept-btn');
-                    if(modalAcceptBtn) {
-                         modalAcceptBtn.addEventListener('click', async () => {
-                             userDetailsModal.hide();
-                             // Trigger the logic by finding the button in the main list or simulating it
-                             // For simplicity, we just reload the page/list or call the logic. 
-                             // But since we are inside a specific click handler scope, we can just let the user use the main card action for now to avoid complexity duplication.
-                             // Actually, let's just close it.
-                             alert("Please use the 'Accept' action in the card menu.");
-                         });
-                    }
-                }, 100);
-
-            } else {
-                userDetailsModalBody.innerHTML = `<p class="text-center">Details for this user type are not applicable.</p>`;
-            }
+                     <div class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Status</span>
+                        <span class="fw-medium">${account.verified ? 'Verified' : 'Pending'}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Role</span>
+                        <span class="fw-medium text-uppercase">${account.type}</span>
+                    </div>
+                </div>
+            `;
+            
+            userDetailsModalBody.innerHTML = detailsHTML;
         }
     });
 }

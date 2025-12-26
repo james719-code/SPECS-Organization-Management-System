@@ -1,0 +1,34 @@
+export const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
+
+// Core Collections
+export const COLLECTION_ID_ACCOUNTS = import.meta.env.VITE_COLLECTION_ID_ACCOUNTS;
+export const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+export const COLLECTION_ID_OFFICERS = import.meta.env.VITE_COLLECTION_ID_OFFICERS;
+export const COLLECTION_ID_ADMINS = import.meta.env.VITE_COLLECTION_ID_ADMINS;
+
+// Events & Attendance
+export const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
+export const COLLECTION_ID_ATTENDANCE = import.meta.env.VITE_COLLECTION_ID_ATTENDANCE;
+
+// Finance
+export const COLLECTION_ID_PAYMENTS = import.meta.env.VITE_COLLECTION_ID_PAYMENTS;
+export const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES;
+export const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
+
+// Content & Files
+export const COLLECTION_ID_STORIES = import.meta.env.VITE_COLLECTION_ID_STORIES;
+export const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
+
+// Buckets
+export const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES;
+export const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
+export const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
+export const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES;
+
+// Functions
+export const FUNCTION_PROMOTE_OFFICER = import.meta.env.VITE_FUNCTION_PROMOTE_OFFICER;
+export const FUNCTION_ACCEPT_STUDENT = import.meta.env.VITE_FUNCTION_ACCEPT_STUDENT;
+
+// Teams
+export const TEAM_ID_STUDENTS = import.meta.env.VITE_TEAM_ID_STUDENTS;
+export const TEAM_ID_OFFICERS = import.meta.env.VITE_TEAM_ID_OFFICERS;

@@ -1,9 +1,10 @@
 // dashboard.js
 
-import './dashboardUser.scss';
+import './dashboardOfficer.scss';
 import '../guard/auth.js';
 
 import { account, databases } from "../shared/appwrite.js";
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_EVENTS, COLLECTION_ID_FILES } from "../shared/constants.js";
 import { Query } from "appwrite";
 import { Offcanvas, Dropdown } from 'bootstrap';
 
@@ -24,10 +25,6 @@ import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
-const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
-const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const FILES_PAGE_LIMIT = 10;
 
 export default async function renderDashboard() {
@@ -36,20 +33,23 @@ export default async function renderDashboard() {
     try {
         // --- DATA FETCHING ---
         const user = await account.get();
-        const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
+        // Use ACCOUNTS collection
+        const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
-        const [filesResponse, eventsResponse, studentsResponse] = await Promise.all([
+        const [filesResponse, eventsResponse, accountsResponse] = await Promise.all([
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)]),
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.orderDesc('date_to_held')]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)])
+            databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)])
         ]);
 
         const initialFilesData = { files: filesResponse.documents, total: filesResponse.total };
         const initialEventsData = eventsResponse.documents;
-        const userLookup = studentsResponse.documents.reduce((map, student) => {
-            map[student.$id] = student.fullname || student.username;
+        const userLookup = accountsResponse.documents.reduce((map, acc) => {
+            const name = (acc.students && acc.students.name) ? acc.students.name : acc.username;
+            map[acc.$id] = name;
             return map;
         }, {});
+        
         app.innerHTML = `
       <div class="d-flex" style="min-height: 100vh;">
         <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3 bg-primary" style="width: 280px;" tabindex="-1" id="sidebar">
