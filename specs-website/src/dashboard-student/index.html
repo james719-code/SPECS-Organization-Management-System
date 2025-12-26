@@ -1,58 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Dashboard</title>
-  </head>
-  <body>
-    <div id="app">
-        <!-- Dashboard Layout -->
-        <div class="d-flex" style="min-height: 100vh;">
-            <!-- Sidebar -->
-            <nav class="d-flex flex-column flex-shrink-0 p-3 bg-light" style="width: 280px;">
-                <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-dark text-decoration-none">
-                <span class="fs-4 fw-bold">Student Portal</span>
-                </a>
-                <hr>
-                <ul class="nav nav-pills flex-column mb-auto">
-                <li class="nav-item">
-                    <a href="#events" class="nav-link sidebar-link active" aria-current="page">
-                        Events
-                    </a>
-                </li>
-                <li>
-                    <a href="#profile" class="nav-link link-dark sidebar-link">
-                        Profile
-                    </a>
-                </li>
-                <li>
-                    <a href="#payments" class="nav-link link-dark sidebar-link">
-                        Payments
-                    </a>
-                </li>
-                </ul>
-                <hr>
-                <div class="dropdown">
-                <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle" id="dropdownUser2" data-bs-toggle="dropdown" aria-expanded="false">
-                    <strong id="user-name-display">User</strong>
-                </a>
-                <ul class="dropdown-menu text-small shadow" aria-labelledby="dropdownUser2">
-                    <li><a class="dropdown-item" href="#" id="logout-btn">Sign out</a></li>
-                </ul>
-                </div>
-            </nav>
-            
-            <!-- Main Content -->
-            <main class="flex-grow-1 p-4 bg-white" style="overflow-y: auto; max-height: 100vh;">
-                <h2 id="page-title" class="mb-4">Dashboard</h2>
-                <div id="main-content">
-                    <!-- Content injected here -->
-                </div>
-            </main>
-        </div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d6b66">
+    <title>SPECS - Student Portal</title>
+    <meta name="description" content="The official portal for the Society of Programmers and Enthusiasts in Computer Science (SPECS) at Partido State University.">
+
+    <link rel="icon" href="/logo.webp" sizes="any">
+    <style>
+        #loading-placeholder {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+            background-color: #f4fefc;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .loading-logo {
+            width: 60px;
+            height: 60px;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .loading-text {
+            margin-top: 1.25rem;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #0f172a;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="loading-placeholder">
+        <svg class="loading-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10.125 7.125L12 3.375L13.875 7.125M12 3.375V10.875M16.875 13.875L20.625 12L16.875 10.125M20.625 12H13.125M7.125 10.125L3.375 12L7.125 13.875M3.375 12H10.875M13.875 16.875L12 20.625L10.125 16.875M12 20.625V13.125" stroke="#0d6b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p class="loading-text">Loading Dashboard</p>
     </div>
-    <script type="module" src="./dashboardStudent.js"></script>
-  </body>
+</div>
+
+<noscript>
+    <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>This web application requires JavaScript to function. Please enable it in your browser settings and refresh the page.</p>
+    </div>
+</noscript>
+
+<script type="module" src="./dashboardStudent.js"></script>
+
+</body>
 </html>

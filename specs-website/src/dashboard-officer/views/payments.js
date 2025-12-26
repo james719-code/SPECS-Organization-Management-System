@@ -1,13 +1,5 @@
 // --- IMPORTS ---
-import { databases } from '../../shared/appwrite.js';
-import { 
-    DATABASE_ID, 
-    COLLECTION_ID_PAYMENTS, 
-    COLLECTION_ID_REVENUE, 
-    COLLECTION_ID_EVENTS, 
-    COLLECTION_ID_ACCOUNTS 
-} from '../../shared/constants.js';
-import { Query, ID } from 'appwrite';
+import { api } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 
 // --- SVG ICON IMPORTS ---
@@ -38,9 +30,6 @@ let addPaymentModalInstance, editPaymentModalInstance;
 
 // --- TEMPLATES ---
 
-/**
- * Modern Card for Student Payment Status
- */
 function createStudentPaymentCardHTML(student, paymentsForStudent) {
     const pendingPayments = paymentsForStudent.filter(p => !p.is_paid);
     const hasPaidRecords = paymentsForStudent.some(p => p.is_paid);
@@ -187,12 +176,9 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                         <thead class="bg-light text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Actions</th></tr></thead>
                         <tbody>${pending.length > 0 ? pending.map(p => {
         const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
-        // Resolve event name if it's an event
         let forName = p.activity;
         if (p.is_event && p.events) {
-             // If relationship is expanded, p.events is object
              if (p.events.event_name) forName = p.events.event_name;
-             // If not expanded, we might just have ID, we can lookup in global events list
              else {
                  const ev = events.find(e => e.$id === p.events || e.$id === p.events.$id);
                  forName = ev ? ev.event_name : 'Linked Event';
@@ -268,8 +254,6 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
     if (studentsToRender.length > 0) {
         cardsContainer.className = 'row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5';
         
-        // Map payments to the student ID (from ACCOUNTS collection id usually if that's the link)
-        // Schema says `payments` has `students` relationship. So `p.students.$id` or `p.students`.
         const paymentsByStudent = allPayments.reduce((acc, p) => {
             const sId = (p.students && p.students.$id) ? p.students.$id : p.students;
             if (sId) {
@@ -279,14 +263,6 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
         }, {});
         
         cardsContainer.innerHTML = studentsToRender.map(student => {
-            // student is an account document. 
-            // We need to link by student document ID if the relationship points to students collection doc, 
-            // OR by account ID if points to account.
-            // Schema says `students` (One-to-many with `payments`). 
-            // This means `payments` points to `students` collection document.
-            // BUT `allStudents` here are `accounts` documents. 
-            // So we need to match `p.students` (student doc ID) with `account.students.$id` (student doc ID).
-            
             const studentDocId = (student.students && student.students.$id) ? student.students.$id : student.students;
             return createStudentPaymentCardHTML(student, paymentsByStudent[studentDocId] || []);
         }).join('');
@@ -326,19 +302,12 @@ const refreshStudentDetailsView = async (accountId) => {
     if (!wrapper || !accountId) return;
     wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
-        const studentAccount = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
-        
-        // We need payments linked to the STUDENT document, not the account document directly,
-        // because the relationship is on the students collection.
+        const studentAccount = await api.users.getAccount(accountId);
         const studentDocId = (studentAccount.students && studentAccount.students.$id) ? studentAccount.students.$id : studentAccount.students;
 
         if (!studentDocId) throw new Error("No linked student profile found.");
 
-        const paymentsRes = await databases.listDocuments(
-            DATABASE_ID, 
-            COLLECTION_ID_PAYMENTS, 
-            [Query.limit(5000), Query.equal('students', studentDocId)]
-        );
+        const paymentsRes = await api.payments.listForStudent(studentDocId);
         
         currentStudent = studentAccount;
         wrapper.innerHTML = getStudentDetailsPageHTML(studentAccount, paymentsRes.documents);
@@ -365,16 +334,20 @@ async function attachEventListeners(currentUser, profile) {
     wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
         const [paymentsRes, eventsRes, accountsRes] = await Promise.all([
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(5000)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.equal('event_ended', false), Query.orderAsc('date_to_held')]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000), Query.equal('type', 'student')])
+            api.payments.list(),
+            api.events.list(5000, false), // Check logic for order asc/desc if needed
+            api.users.listStudents()
         ]);
         allPayments = paymentsRes.documents;
-        events = eventsRes.documents;
-        allStudents = accountsRes.documents; // Only students
+        events = eventsRes.documents.filter(e => !e.event_ended); // Filter in code or query? Query was event_ended=false. API `list` doesn't filter by `event_ended` by default.
+        // Actually api.events.list only sorts. We should probably filter.
+        // Or we can update api.events.list to accept filters. For now, filter in memory is safer or I update api.js.
+        // Let's stick to memory filter for simplicity as we already fetched.
+        
+        allStudents = accountsRes.documents;
 
         renderInitialView();
-        let selectedStudentDocId = null; // We need the Student Doc ID for the relationship
+        let selectedStudentDocId = null; 
 
         const applyFilters = () => {
             const searchInput = document.getElementById('studentSearchInput');
@@ -397,7 +370,7 @@ async function attachEventListeners(currentUser, profile) {
             if (currentStudent) {
                 await refreshStudentDetailsView(currentStudent.$id);
             } else {
-                const paymentsRes = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(5000)]);
+                const paymentsRes = await api.payments.list();
                 allPayments = paymentsRes.documents;
                 applyFilters();
             }
@@ -419,7 +392,7 @@ async function attachEventListeners(currentUser, profile) {
             const autocompleteLink = e.target.closest('#autocomplete-results a');
             if (autocompleteLink) {
                 e.preventDefault();
-                selectedStudentDocId = autocompleteLink.dataset.studentdocid; // ID of 'students' doc
+                selectedStudentDocId = autocompleteLink.dataset.studentdocid; 
                 document.getElementById('studentName').value = autocompleteLink.dataset.name;
                 document.getElementById('autocomplete-results').innerHTML = '';
                 return;
@@ -438,8 +411,6 @@ async function attachEventListeners(currentUser, profile) {
                 form.querySelector('#edit-event-group').classList.toggle('d-none', !payment.is_event);
                 
                 if (payment.is_event) {
-                    // Preselect event dropdown using ID
-                    // If payment.events is expanded object, use $id.
                     const evId = (payment.events && payment.events.$id) ? payment.events.$id : payment.events;
                     form.querySelector('#editEventId').value = evId || '';
                 } else {
@@ -458,17 +429,7 @@ async function attachEventListeners(currentUser, profile) {
                         const sData = currentStudent.students || {};
                         const sName = sData.name || currentStudent.username;
                         
-                        await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
-                            name: `${payment.item_name} (Paid by ${sName})`,
-                            isEvent: payment.is_event,
-                            event: (payment.is_event && payment.events) ? ((payment.events.$id) ? payment.events.$id : payment.events) : null,
-                            activity: payment.is_event ? null : payment.activity,
-                            quantity: payment.quantity,
-                            price: payment.price,
-                            date_earned: new Date().toISOString(),
-                            recorder: currentUser.$id
-                        });
-                        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { is_paid: true, date_paid: new Date().toISOString() });
+                        await api.payments.markPaid(payment, currentUser.$id, sName);
                         await refreshDataAndRender();
                     } catch (error) { alert(`Error: ${error.message}`); }
                 }
@@ -478,7 +439,7 @@ async function attachEventListeners(currentUser, profile) {
             const deleteBtn = e.target.closest('.delete-payment-btn');
             if (deleteBtn && confirm(`Delete "${deleteBtn.dataset.paymentName}"?`)) {
                 try {
-                    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, deleteBtn.dataset.paymentId);
+                    await api.payments.delete(deleteBtn.dataset.paymentId);
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
             }
@@ -499,7 +460,6 @@ async function attachEventListeners(currentUser, profile) {
 
                 results.innerHTML = matches.map(s => {
                     const name = (s.students && s.students.name) ? s.students.name : s.username;
-                    // We need the student doc ID for the relationship
                     const sDocId = (s.students && s.students.$id) ? s.students.$id : s.students;
                     return `<a href="#" class="list-group-item list-group-item-action" data-studentdocid="${sDocId}" data-name="${name}">${name}</a>`;
                 }).join('');
@@ -520,32 +480,31 @@ async function attachEventListeners(currentUser, profile) {
                         price: parseFloat(document.getElementById('price').value),
                         quantity: parseInt(document.getElementById('quantity').value, 10),
                         is_event: isEvent,
-                        events: isEvent ? document.getElementById('eventId').value : null, // Corrected field
+                        events: isEvent ? document.getElementById('eventId').value : null, 
                         activity: isEvent ? null : document.getElementById('activityName').value,
                         is_paid: false,
-                        date_paid: new Date().toISOString() // Required field
+                        date_paid: new Date().toISOString() 
                     };
 
                     if (isForAll) {
                         if (confirm(`Assign to all ${allStudents.length} students?`)) {
-                            // Extract student doc IDs
                             const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
-                            await Promise.all(ids.map(id => databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...base, students: id })));
+                            await Promise.all(ids.map(id => api.payments.create({ ...base, students: id })));
                         }
                     } else {
                         if (!selectedStudentDocId) throw new Error("Select a student.");
-                        await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), { ...base, students: selectedStudentDocId });
+                        await api.payments.create({ ...base, students: selectedStudentDocId });
                     }
                     addPaymentModalInstance.hide();
                     e.target.reset();
                 } else if (e.target.id === 'editPaymentForm') {
                     const isEvent = document.getElementById('editIsEventCheckbox').checked;
-                    await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, document.getElementById('editPaymentId').value, {
+                    await api.payments.update(document.getElementById('editPaymentId').value, {
                         item_name: document.getElementById('editItemName').value,
                         price: parseFloat(document.getElementById('editPrice').value),
                         quantity: parseInt(document.getElementById('editQuantity').value, 10),
                         is_event: isEvent,
-                        events: isEvent ? document.getElementById('editEventId').value : null, // Corrected field
+                        events: isEvent ? document.getElementById('editEventId').value : null,
                         activity: isEvent ? null : document.getElementById('editActivityName').value
                     });
                     editPaymentModalInstance.hide();

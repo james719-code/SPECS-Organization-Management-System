@@ -1,5 +1,8 @@
 import { databases } from '../../shared/appwrite.js';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../../shared/constants.js';
+import {
+    DATABASE_ID,
+    COLLECTION_ID_STUDENTS
+} from '../../shared/constants.js';
 
 function getProfileHTML() {
     return `
@@ -11,7 +14,7 @@ function getProfileHTML() {
                             ?
                         </div>
                         <h3 id="profile-name" class="fw-bold mb-1">Loading...</h3>
-                        <p id="profile-username" class="text-muted">@username</p>
+                        <p id="profile-email-display" class="text-muted">...</p>
                          <span id="profile-status" class="badge bg-secondary">Loading Status</span>
                     </div>
 
@@ -29,10 +32,6 @@ function getProfileHTML() {
                             <p id="profile-year" class="fs-5 text-dark border-bottom pb-2">--</p>
                         </div>
                          <div class="col-md-6">
-                            <label class="small text-muted fw-bold text-uppercase">Email</label>
-                            <p id="profile-email" class="fs-5 text-dark border-bottom pb-2">--</p>
-                        </div>
-                        <div class="col-12">
                             <label class="small text-muted fw-bold text-uppercase">Address</label>
                             <p id="profile-address" class="fs-5 text-dark border-bottom pb-2">--</p>
                         </div>
@@ -43,66 +42,56 @@ function getProfileHTML() {
     `;
 }
 
-async function attachProfileListeners(accountProfile) {
-    // accountProfile is passed from the dashboard init. 
-    // It is the document from 'accounts' collection.
-    // It should have 'students' relationship expanded if we fetched it that way, 
-    // BUT the dashboard init might not have expanded it. 
-    // Let's refetch to be safe or check if it exists.
-    
+async function attachProfileListeners(currentUser) {
+    console.log("🔹 [Profile] Attempting to find Student Document with ID:", currentUser.$id);
+
     try {
-        // If we need to fetch student details:
-        // accountProfile.students might be an ID or an object.
-        let studentData = null;
+        // --- DIRECT FETCH: Look for Student Document using Auth ID ---
+        const studentData = await databases.getDocument(
+            DATABASE_ID,
+            COLLECTION_ID_STUDENTS,
+            currentUser.$id  // <--- USING AUTH ID DIRECTLY
+        );
 
-        // If 'students' is just an ID (standard if not expanded), fetch it.
-        // If it's an object, use it.
-        // Or if it's null, handle it.
-        
-        if (accountProfile.students) {
-            if (typeof accountProfile.students === 'string') {
-                 studentData = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, accountProfile.students);
-            } else if (typeof accountProfile.students === 'object') {
-                studentData = accountProfile.students;
-            }
-        }
+        console.log("✅ [Profile] Student Document Found:", studentData);
 
-        const name = studentData ? studentData.name : accountProfile.username;
-        const username = accountProfile.username;
-        const verified = accountProfile.verified;
-        
+        // --- Update UI ---
+        // Prefer name from database, fallback to auth name
+        const name = studentData.name || currentUser.name || "User";
+
         document.getElementById('profile-name').textContent = name;
         document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
-        document.getElementById('profile-username').textContent = '@' + username;
-        
+        document.getElementById('profile-email-display').textContent = studentData.email || currentUser.email;
+
+        // Since we aren't checking 'accounts', we don't have a verified status
+        // We can hide it or set it based on some other logic
         const statusEl = document.getElementById('profile-status');
-        if (verified) {
-            statusEl.className = 'badge bg-success';
-            statusEl.textContent = 'Verified Student';
-        } else {
-            statusEl.className = 'badge bg-warning text-dark';
-            statusEl.textContent = 'Verification Pending';
+        if (statusEl) {
+            statusEl.style.display = 'none'; // Hide status since it's in the other collection
         }
 
-        if (studentData) {
-            document.getElementById('profile-student-id').textContent = studentData.student_id || 'N/A';
-            document.getElementById('profile-section').textContent = studentData.section || 'N/A';
-            document.getElementById('profile-year').textContent = studentData.yearLevel || 'N/A';
-            document.getElementById('profile-email').textContent = studentData.email || 'N/A';
-             document.getElementById('profile-address').textContent = studentData.address || 'N/A';
-        } else {
-             // If no student data linked yet
-             document.getElementById('profile-student-id').innerHTML = '<span class="text-muted fst-italic">Profile incomplete</span>';
-        }
+        // Fill in Student Details
+        document.getElementById('profile-student-id').textContent = studentData.student_id || 'N/A';
+        document.getElementById('profile-section').textContent = studentData.section || 'N/A';
+        document.getElementById('profile-year').textContent = studentData.yearLevel || 'N/A';
+        document.getElementById('profile-address').textContent = studentData.address || 'N/A';
 
     } catch (error) {
-        console.error("Error loading profile:", error);
+        console.error("❌ [Profile] Error:", error);
+
+        if (error.code === 404) {
+            document.getElementById('profile-name').innerHTML = "<span class='text-danger'>Profile Not Found</span>";
+            document.getElementById('profile-student-id').innerHTML =
+                "<span class='text-danger text-sm'>No student document matches your Login ID.<br>Make sure the Student Doc ID was created using your Auth ID.</span>";
+        } else {
+            document.getElementById('profile-name').textContent = "Error loading data";
+        }
     }
 }
 
-export default function renderProfileView(accountProfile) {
+export default function renderProfileView(currentUser) {
     return {
         html: getProfileHTML(),
-        afterRender: () => attachProfileListeners(accountProfile)
+        afterRender: () => attachProfileListeners(currentUser)
     };
 }

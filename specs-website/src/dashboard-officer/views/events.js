@@ -1,11 +1,6 @@
 // --- IMPORTS ---
-import { databases, storage } from '../../shared/appwrite.js';
-import { 
-    DATABASE_ID, 
-    COLLECTION_ID_EVENTS, 
-    BUCKET_ID_EVENT_IMAGES 
-} from '../../shared/constants.js';
-import { Query, ID } from 'appwrite';
+import { api } from '../../shared/api.js';
+import { ID } from 'appwrite'; 
 import { Modal } from 'bootstrap';
 
 // --- SVG ICON IMPORTS ---
@@ -18,23 +13,20 @@ import person from 'bootstrap-icons/icons/person.svg';
 import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import search from 'bootstrap-icons/icons/search.svg';
 import xLg from 'bootstrap-icons/icons/x-lg.svg';
+import listCheck from 'bootstrap-icons/icons/list-check.svg';
 
 /**
  * Creates an event card using your defined .card and Deep Teal styles.
  */
 function createEventCard(eventDoc, userLookup, currentUserId) {
-    const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 600, 400);
+    const imageUrl = api.files.getFilePreview(eventDoc.image_file);
     const eventDate = new Date(eventDoc.date_to_held);
     const formattedDate = eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const formattedTime = eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-    // Allow admins/officers to manage all events or just their own?
-    // Assuming Officers can manage all for now or check logic.
-    // Logic says "canManage" if added_by === currentUserId.
     const canManage = eventDoc.added_by === currentUserId;
     const isEnded = eventDoc.event_ended === true;
 
-    // Mapping to your SCSS status classes
     const statusClass = isEnded ? 'status-rejected' : 'status-approved';
     const statusText = isEnded ? 'Ended' : 'Upcoming';
 
@@ -78,6 +70,7 @@ function createEventCard(eventDoc, userLookup, currentUserId) {
                         
                         ${canManage ? `
                             <div class="btn-group-custom">
+                                <button class="btn take-attendance-btn" data-doc-id="${eventDoc.$id}" data-event-name="${eventDoc.event_name}" title="Attendance"><img src="${listCheck}" width="14"></button>
                                 <button class="btn edit-event-btn" data-doc-id="${eventDoc.$id}"><img src="${pencilSquare}" width="14"></button>
                                 ${!isEnded ? `<button class="btn mark-ended-btn" data-doc-id="${eventDoc.$id}"><img src="${checkCircle}" width="14" class="text-success"></button>` : ''}
                                 <button class="btn delete-event-btn" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}"><img src="${trash}" width="14" class="text-danger"></button>
@@ -118,6 +111,7 @@ function getEventsHTML() {
             <span class="fw-bold">New Event</span>
         </button>
 
+        <!-- ADD EVENT MODAL -->
         <div class="modal fade" id="addEventModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
@@ -144,6 +138,7 @@ function getEventsHTML() {
             </div>
         </div>
 
+        <!-- EDIT EVENT MODAL -->
         <div class="modal fade" id="editEventModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
@@ -164,6 +159,41 @@ function getEventsHTML() {
                 </div>
             </div>
         </div>
+        
+        <!-- ATTENDANCE MODAL -->
+        <div class="modal fade" id="attendanceModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                    <div class="modal-header border-0 pt-4 px-4">
+                        <div>
+                            <h5 class="modal-title fw-bold">Attendance</h5>
+                            <p class="text-muted small mb-0" id="attendanceEventName">Event Name</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-4">
+                            <div class="input-group shadow-sm rounded-3 overflow-hidden border-0">
+                                <span class="input-group-text bg-white border-0 ps-3"><img src="${search}" width="16" style="opacity:0.4"></span>
+                                <input type="text" id="studentAttendanceSearch" class="form-control border-0 py-2 ps-2" placeholder="Search student name to mark present...">
+                            </div>
+                            <div id="attendance-autocomplete" class="list-group mt-1 shadow-sm position-absolute" style="z-index: 1060; width: calc(100% - 3rem); display:none; max-height:200px; overflow-y:auto;"></div>
+                        </div>
+                        
+                        <h6 class="fw-bold text-muted small text-uppercase mb-3">Present Students</h6>
+                        <div class="table-responsive rounded-3 border">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="bg-light text-secondary small"><tr><th class="ps-3 border-0">Name</th><th class="text-end pe-3 border-0">Action</th></tr></thead>
+                                <tbody id="attendanceListBody">
+                                    <tr><td colspan="2" class="text-center text-muted small py-3">No students marked present yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>`;
 }
 
@@ -195,15 +225,19 @@ function attachEventListeners(currentUser, userLookup) {
     const currentUserId = currentUser.$id;
     const addEventModal = new Modal(document.getElementById('addEventModal'));
     const editEventModal = new Modal(document.getElementById('editEventModal'));
+    const attendanceModal = new Modal(document.getElementById('attendanceModal'));
+    
     const eventsViewContainer = document.querySelector('.events-view-container');
     const searchInput = document.getElementById('eventSearchInput');
 
     let allEventsCache = [];
+    let allStudentsCache = [];
+    let currentAttendanceEventId = null;
 
     const loadAllEvents = async () => {
         const wrapper = document.getElementById('events-list-wrapper');
         try {
-            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(5000), Query.orderDesc('date_to_held')]);
+            const response = await api.events.list(5000);
             allEventsCache = response.documents;
             const upcoming = allEventsCache.filter(e => !e.event_ended);
             const ended = allEventsCache.filter(e => e.event_ended);
@@ -213,14 +247,47 @@ function attachEventListeners(currentUser, userLookup) {
             wrapper.innerHTML = `<div class="alert alert-danger">Failed to load events.</div>`;
         }
     };
+    
+    // Pre-fetch students for attendance search
+    api.users.listStudents().then(res => { allStudentsCache = res.documents; });
 
     loadAllEvents();
 
-    // delegated clicks
+    // ATTENDANCE LOGIC
+    const refreshAttendanceList = async (eventId) => {
+        const tbody = document.getElementById('attendanceListBody');
+        tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>`;
+        try {
+            const res = await api.attendance.listForEvent(eventId);
+            if(res.documents.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small py-3">No students marked present yet.</td></tr>`;
+                return;
+            }
+            // Fetch student names (or use pre-fetched lookup if optimized, but here we might have IDs)
+            // Attendance record has `students` relationship. It expands to student profile doc.
+            tbody.innerHTML = res.documents.map(rec => {
+                let name = "Unknown";
+                if(rec.students) {
+                    name = rec.students.name || "Student";
+                }
+                return `<tr>
+                    <td class="ps-3 border-bottom border-light">${name}</td>
+                    <td class="text-end pe-3 border-bottom border-light">
+                        <button class="btn btn-sm btn-light text-danger delete-attendance-btn" data-id="${rec.$id}">&times;</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(e) { console.error(e); tbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger small py-3">Error loading list.</td></tr>`; }
+    };
+
+    // DELEGATED CLICKS
     eventsViewContainer.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('.edit-event-btn');
         const markEndedBtn = e.target.closest('.mark-ended-btn');
         const deleteBtn = e.target.closest('.delete-event-btn');
+        const attendanceBtn = e.target.closest('.take-attendance-btn');
+        
+        // Collab logic
         const addCollabBtn = e.target.closest('#add-collaborator-btn, #edit-add-collaborator-btn');
         const removeCollabBtn = e.target.closest('.remove-collaborator-btn');
 
@@ -235,6 +302,15 @@ function attachEventListeners(currentUser, userLookup) {
 
         if (removeCollabBtn) removeCollabBtn.closest('.input-group').remove();
 
+        if (attendanceBtn) {
+            currentAttendanceEventId = attendanceBtn.dataset.docId;
+            document.getElementById('attendanceEventName').textContent = attendanceBtn.dataset.eventName;
+            document.getElementById('studentAttendanceSearch').value = '';
+            document.getElementById('attendance-autocomplete').style.display = 'none';
+            attendanceModal.show();
+            refreshAttendanceList(currentAttendanceEventId);
+        }
+
         if (editBtn) {
             const ev = allEventsCache.find(x => x.$id === editBtn.dataset.docId);
             if (!ev) return;
@@ -248,14 +324,62 @@ function attachEventListeners(currentUser, userLookup) {
         }
 
         if (markEndedBtn && confirm('End this event?')) {
-            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, markEndedBtn.dataset.docId, { event_ended: true });
+            await api.events.markEnded(markEndedBtn.dataset.docId);
             loadAllEvents();
         }
 
         if (deleteBtn && confirm('Delete permanently?')) {
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, deleteBtn.dataset.docId);
-            await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, deleteBtn.dataset.fileId);
+            await api.events.delete(deleteBtn.dataset.docId);
+            await api.files.deleteEventImage(deleteBtn.dataset.fileId);
             loadAllEvents();
+        }
+    });
+
+    // ATTENDANCE SEARCH & ADD
+    const attSearch = document.getElementById('studentAttendanceSearch');
+    const attResults = document.getElementById('attendance-autocomplete');
+    
+    attSearch.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        if(term.length < 2) { attResults.style.display = 'none'; return; }
+        
+        const matches = allStudentsCache.filter(s => {
+            const name = (s.students && s.students.name) ? s.students.name : s.username;
+            return name.toLowerCase().includes(term);
+        }).slice(0, 5);
+        
+        attResults.innerHTML = matches.map(s => {
+            const name = (s.students && s.students.name) ? s.students.name : s.username;
+            // Need Student Profile ID
+            const sId = (s.students && s.students.$id) ? s.students.$id : s.students;
+            return `<a href="#" class="list-group-item list-group-item-action" data-sid="${sId}" data-name="${name}">${name}</a>`;
+        }).join('');
+        attResults.style.display = matches.length ? 'block' : 'none';
+    });
+    
+    attResults.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const link = e.target.closest('a');
+        if(!link) return;
+        
+        const sId = link.dataset.sid;
+        const name = link.dataset.name;
+        
+        if(confirm(`Mark ${name} as present?`)) {
+            try {
+                await api.attendance.create(currentAttendanceEventId, sId, currentUserId, "Present");
+                attSearch.value = '';
+                attResults.style.display = 'none';
+                refreshAttendanceList(currentAttendanceEventId);
+            } catch(err) { alert(err.message); }
+        }
+    });
+
+    document.getElementById('attendanceListBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.delete-attendance-btn');
+        if(btn && confirm('Remove this attendance record?')) {
+             await api.attendance.delete(btn.dataset.id);
+             refreshAttendanceList(currentAttendanceEventId);
         }
     });
 
@@ -265,8 +389,8 @@ function attachEventListeners(currentUser, userLookup) {
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         try {
-            const uploadedImage = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), document.getElementById('eventImage').files[0]);
-            await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), {
+            const uploadedImage = await api.files.uploadEventImage(document.getElementById('eventImage').files[0]);
+            await api.events.create({
                 event_name: document.getElementById('eventName').value,
                 date_to_held: document.getElementById('eventDate').value,
                 description: document.getElementById('eventDescription').value,
@@ -292,11 +416,11 @@ function attachEventListeners(currentUser, userLookup) {
             };
             const newImg = document.getElementById('editEventImage').files[0];
             if (newImg) {
-                const uploaded = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), newImg);
+                const uploaded = await api.files.uploadEventImage(newImg);
                 data.image_file = uploaded.$id;
-                await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, document.getElementById('editEventFileId').value);
+                await api.files.deleteEventImage(document.getElementById('editEventFileId').value);
             }
-            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, document.getElementById('editEventId').value, data);
+            await api.events.update(document.getElementById('editEventId').value, data);
             editEventModal.hide(); await loadAllEvents();
         } catch (error) { alert('Update failed'); } finally { submitBtn.disabled = false; }
     });
