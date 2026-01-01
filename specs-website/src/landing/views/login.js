@@ -8,29 +8,37 @@ export function renderLoginPage() {
     <div class="container auth-container">
         <div class="row justify-content-center">
             <div class="col-md-7 col-lg-5 col-xl-4">
-                <div class="card shadow-lg">
+                <div class="card shadow-lg border-0">
                     <div class="card-body p-4 p-md-5">
                         <form id="login-form" novalidate>
-                            <h2 class="text-center fw-bold mb-4">Login Account</h2>
+                            <div class="text-center mb-4">
+                                <h2 class="fw-bold mb-2">Welcome Back</h2>
+                                <p class="text-muted small">Sign in to your account</p>
+                            </div>
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label for="email" class="form-label">Email Address</label>
-                                    <input id="email" name="email" type="email" class="form-control" placeholder="your-id@parsu.edu.ph" required />
+                                    <label for="email" class="form-label fw-semibold">Email Address</label>
+                                    <input id="email" name="email" type="email" class="form-control form-control-lg" placeholder="your-id@parsu.edu.ph" required />
                                 </div>
                                 <div class="col-12">
-                                    <label for="password" class="form-label">Password</label>
-                                    <input id="password" name="password" type="password" class="form-control" placeholder="Enter your password" required />
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label for="password" class="form-label fw-semibold mb-0">Password</label>
+                                        <a href="#forgot-password" class="small text-decoration-none">Forgot password?</a>
+                                    </div>
+                                    <input id="password" name="password" type="password" class="form-control form-control-lg" placeholder="Enter your password" required />
                                 </div>
                             </div>
                             <div id="status-message" class="text-center small text-danger mt-3" aria-live="polite"></div>
                             <div class="d-grid mt-4">
-                               <button type="submit" class="btn btn-primary">
-                                    <span class="button-text">Login</span>
+                               <button type="submit" class="btn btn-primary btn-lg">
+                                    <span class="button-text">Sign In</span>
                                     <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
                                </button>
                             </div>
-                            <p class="text-center small mt-4 mb-0">Don't have an account? <a href="#signup">Sign up</a></p>
-                            <p class="text-center small mt-2 mb-0"><a href="#home">Back to Home</a></p>
+                            <div class="text-center mt-4">
+                                <p class="text-muted small mb-2">Don't have an account? <a href="#signup" class="fw-semibold">Sign up</a></p>
+                                <a href="#home" class="text-muted small text-decoration-none">← Back to Home</a>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -51,7 +59,7 @@ export function renderLoginPage() {
         const password = e.target.password.value;
 
         submitButton.disabled = true;
-        buttonText.textContent = 'Authenticating...';
+        buttonText.textContent = 'Signing in...';
         buttonSpinner.classList.remove('d-none');
         statusMessageDiv.textContent = '';
 
@@ -87,9 +95,183 @@ export function renderLoginPage() {
             // Only reset button if we aren't redirecting
             if (!window.location.hash.includes('pending-verification') && !window.location.href.includes('dashboard')) {
                 submitButton.disabled = false;
-                buttonText.textContent = 'Login';
+                buttonText.textContent = 'Sign In';
                 buttonSpinner.classList.add('d-none');
             }
+        }
+    };
+}
+
+export function renderForgotPasswordPage() {
+    app.innerHTML = `
+    <div class="container auth-container">
+        <div class="row justify-content-center">
+            <div class="col-md-7 col-lg-5 col-xl-4">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-4 p-md-5">
+                        <form id="forgot-password-form" novalidate>
+                            <div class="text-center mb-4">
+                                <h2 class="fw-bold mb-2">Reset Password</h2>
+                                <p class="text-muted small">Enter your email to receive a password reset link</p>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="email" class="form-label fw-semibold">Email Address</label>
+                                    <input id="email" name="email" type="email" class="form-control form-control-lg" placeholder="your-id@parsu.edu.ph" required />
+                                </div>
+                            </div>
+                            <div id="status-message" class="text-center small mt-3" aria-live="polite"></div>
+                            <div class="d-grid mt-4">
+                               <button type="submit" class="btn btn-primary btn-lg">
+                                    <span class="button-text">Send Reset Link</span>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                               </button>
+                            </div>
+                            <div class="text-center mt-4">
+                                <p class="text-muted small mb-2">Remember your password? <a href="#login" class="fw-semibold">Sign in</a></p>
+                                <a href="#home" class="text-muted small text-decoration-none">← Back to Home</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    const forgotForm = document.getElementById('forgot-password-form');
+    const submitButton = forgotForm.querySelector('button[type="submit"]');
+    const buttonText = submitButton.querySelector('.button-text');
+    const buttonSpinner = submitButton.querySelector('.spinner-border');
+    const statusMessageDiv = document.getElementById('status-message');
+
+    forgotForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = e.target.email.value;
+
+        submitButton.disabled = true;
+        buttonText.textContent = 'Sending...';
+        buttonSpinner.classList.remove('d-none');
+        statusMessageDiv.textContent = '';
+        statusMessageDiv.classList.remove('text-danger', 'text-success');
+
+        try {
+            const resetUrl = `${window.location.origin}/landing/#reset-password`;
+            await account.createRecovery(email, resetUrl);
+            
+            statusMessageDiv.classList.add('text-success');
+            statusMessageDiv.textContent = 'Password reset link sent! Check your email.';
+            
+            setTimeout(() => {
+                window.location.hash = 'login';
+            }, 3000);
+        } catch (err) {
+            console.error("Password reset error:", err);
+            statusMessageDiv.classList.add('text-danger');
+            statusMessageDiv.textContent = err.message || "Failed to send reset link.";
+            
+            submitButton.disabled = false;
+            buttonText.textContent = 'Send Reset Link';
+            buttonSpinner.classList.add('d-none');
+        }
+    };
+}
+
+export function renderResetPasswordPage() {
+    app.innerHTML = `
+    <div class="container auth-container">
+        <div class="row justify-content-center">
+            <div class="col-md-7 col-lg-5 col-xl-4">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-4 p-md-5">
+                        <form id="reset-password-form" novalidate>
+                            <div class="text-center mb-4">
+                                <h2 class="fw-bold mb-2">Create New Password</h2>
+                                <p class="text-muted small">Enter your new password below</p>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="password" class="form-label fw-semibold">New Password</label>
+                                    <input id="password" name="password" type="password" class="form-control form-control-lg" placeholder="At least 8 characters" required minlength="8" />
+                                </div>
+                                <div class="col-12">
+                                    <label for="password2" class="form-label fw-semibold">Confirm Password</label>
+                                    <input id="password2" name="password2" type="password" class="form-control form-control-lg" placeholder="Retype your password" required />
+                                </div>
+                            </div>
+                            <div id="status-message" class="text-center small mt-3" aria-live="polite"></div>
+                            <div class="d-grid mt-4">
+                               <button type="submit" class="btn btn-primary btn-lg">
+                                    <span class="button-text">Reset Password</span>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                               </button>
+                            </div>
+                            <div class="text-center mt-4">
+                                <a href="#login" class="text-muted small text-decoration-none">← Back to Login</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    const resetForm = document.getElementById('reset-password-form');
+    const submitButton = resetForm.querySelector('button[type="submit"]');
+    const buttonText = submitButton.querySelector('.button-text');
+    const buttonSpinner = submitButton.querySelector('.spinner-border');
+    const statusMessageDiv = document.getElementById('status-message');
+
+    resetForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const password = e.target.password.value;
+        const password2 = e.target.password2.value;
+
+        statusMessageDiv.textContent = '';
+        statusMessageDiv.classList.remove('text-danger', 'text-success');
+
+        if (password.length < 8) {
+            statusMessageDiv.classList.add('text-danger');
+            statusMessageDiv.textContent = "Password must be at least 8 characters long.";
+            return;
+        }
+
+        if (password !== password2) {
+            statusMessageDiv.classList.add('text-danger');
+            statusMessageDiv.textContent = "Passwords do not match.";
+            return;
+        }
+
+        submitButton.disabled = true;
+        buttonText.textContent = 'Resetting...';
+        buttonSpinner.classList.remove('d-none');
+
+        try {
+            const url = new URL(window.location.href);
+            const userId = url.searchParams.get('userId');
+            const secret = url.searchParams.get('secret');
+
+            if (!userId || !secret) {
+                throw new Error("Invalid reset link.");
+            }
+
+            await account.updateRecovery(userId, secret, password);
+            
+            statusMessageDiv.classList.add('text-success');
+            statusMessageDiv.textContent = 'Password reset successful! Redirecting to login...';
+            
+            setTimeout(() => {
+                window.location.hash = 'login';
+            }, 2000);
+        } catch (err) {
+            console.error("Reset password error:", err);
+            statusMessageDiv.classList.add('text-danger');
+            statusMessageDiv.textContent = err.message || "Failed to reset password.";
+            
+            submitButton.disabled = false;
+            buttonText.textContent = 'Reset Password';
+            buttonSpinner.classList.add('d-none');
         }
     };
 }

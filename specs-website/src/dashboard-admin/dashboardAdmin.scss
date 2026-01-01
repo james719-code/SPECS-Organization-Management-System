@@ -10,53 +10,60 @@
 @import "bootstrap/scss/forms";
 @import "bootstrap/scss/tables";
 
-// Sidebar-specific styles
+// =====================================================
+// ADMIN DASHBOARD - MINIMALIST THEME
+// =====================================================
+
+// --- SIDEBAR (Minimal Light) ---
 #adminSidebar {
-  background-color: $dark !important; // Darker professional look
-  border-right: 1px solid rgba(255,255,255,0.05);
+  background-color: $white !important;
+  border-right: 1px solid $gray-200;
+  
+  // GPU acceleration to prevent glitching on mobile
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
 
   .nav-link {
-    color: rgba(255, 255, 255, 0.75);
-    transition: all 0.2s ease-in-out;
+    color: $gray-600;
     border-radius: 6px;
-    margin-bottom: 0.25rem;
-    padding: 0.75rem 1rem;
+    margin-bottom: 0.15rem;
+    padding: 0.65rem 0.85rem;
     font-weight: 500;
+    font-size: 0.875rem;
 
     &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-      color: $white;
-      transform: translateX(4px);
+      background-color: $gray-100;
+      color: $gray-800;
     }
 
     &.active {
       background-color: $primary;
       color: $white;
-      box-shadow: 0 4px 12px rgba($primary, 0.4);
       
       img {
         filter: brightness(0) invert(1);
       }
     }
 
-    // Vertically align the SVG icons with the link text
     img {
       position: relative;
-      top: -2px;
-      opacity: 0.8;
-      transition: opacity 0.2s;
+      top: -1px;
+      opacity: 0.7;
     }
     
-    &:hover img, &.active img {
+    &:hover img {
       opacity: 1;
     }
   }
 }
 
-// Main content area styles
+// --- MAIN CONTENT ---
 #admin-content {
   background-color: $gray-100;
   min-height: 100%;
+  padding: 1.5rem;
   
   canvas {
     max-width: 100%;
@@ -64,51 +71,47 @@
   }
 }
 
-// Card Stats Improvements
+// --- STAT CARDS ---
 .admin-dashboard-container {
   .card {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-    transition: transform 0.2s ease;
+    border: 1px solid $gray-200;
+    border-radius: 8px;
+    box-shadow: none;
     
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+      border-color: $gray-300;
     }
   }
   
-  .bg-primary-subtle { background-color: rgba($primary, 0.1) !important; color: $primary !important; }
-  .bg-warning-subtle { background-color: rgba($warning, 0.1) !important; color: darken($warning, 15%) !important; }
-  .bg-info-subtle { background-color: rgba($info, 0.1) !important; color: darken($info, 15%) !important; }
-  .bg-secondary-subtle { background-color: rgba($dark, 0.1) !important; color: $dark !important; }
+  .bg-primary-subtle { background-color: rgba($primary, 0.08) !important; color: $primary !important; }
+  .bg-warning-subtle { background-color: rgba($warning, 0.08) !important; color: darken($warning, 20%) !important; }
+  .bg-info-subtle { background-color: rgba($info, 0.08) !important; color: darken($info, 20%) !important; }
+  .bg-secondary-subtle { background-color: $gray-100 !important; color: $gray-700 !important; }
 }
 
-
+// --- TIMELINE (Simplified) ---
 .timeline {
   list-style: none;
-  padding: 1rem 0 1rem 1.5rem;
+  padding: 1rem 0 1rem 1.25rem;
   margin: 0;
   position: relative;
 
-  // The main vertical line of the timeline
   &::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 40px;
+    left: 36px;
     height: 100%;
-    width: 2px;
-    background: $gray-300;
-    border-radius: 2px;
+    width: 1px;
+    background: $gray-200;
   }
 }
 
-// A single item/event in the timeline
 .timeline-item {
   position: relative;
-  margin-bottom: 2rem;
-  padding-left: 50px;
+  margin-bottom: 1.5rem;
+  padding-left: 45px;
+  
   &:last-child {
     margin-bottom: 0;
   }
@@ -116,47 +119,46 @@
 
 .timeline-icon {
   position: absolute;
-  left: 20px;
+  left: 18px;
   top: 0;
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   background-color: $white;
   color: $primary;
-  border: 2px solid $primary;
+  border: 1px solid $gray-200;
   border-radius: 50%;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-// Responsive Tables
+// --- TABLES ---
 .table-responsive {
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  background-color: white;
+  border: 1px solid $gray-200;
+  background-color: $white;
   
   table {
     margin-bottom: 0;
     
     thead th {
-      background-color: $gray-100;
+      background-color: $gray-50;
       color: $gray-600;
       font-weight: 600;
       text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 0.5px;
-      padding: 1rem;
-      border-bottom: none;
+      font-size: 0.7rem;
+      letter-spacing: 0.3px;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid $gray-200;
     }
     
     tbody td {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
       vertical-align: middle;
       border-bottom: 1px solid $gray-100;
-      color: $body-color;
+      font-size: 0.875rem;
     }
     
     tbody tr:last-child td {
@@ -165,10 +167,330 @@
   }
 }
 
-// Account Card Grid
+// --- ACCOUNT CARDS ---
 .admin-accounts-container {
   .card {
-     // Specific tweaks for account cards if needed
-     height: 100%;
+    height: 100%;
+  }
+}
+
+// =====================================================
+// ADMIN MOBILE-SPECIFIC STYLES
+// =====================================================
+
+@include media-breakpoint-down(lg) {
+  #adminSidebar {
+    width: 280px !important;
+    max-width: 85vw;
+    z-index: 1055 !important;
+    
+    // GPU acceleration for smooth animations
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    
+    // Smooth transitions
+    transition: transform 0.3s ease-in-out !important;
+    
+    // Prevent content jumping
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+  
+  .offcanvas-backdrop {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 1050 !important;
+    
+    // Prevent flickering
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+}
+
+@include media-breakpoint-down(md) {
+  // --- MOBILE ADMIN CONTENT ---
+  #admin-content {
+    padding: 1rem !important;
+  }
+  
+  // --- MOBILE HEADERS ---
+  .admin-accounts-container,
+  .admin-dashboard-container {
+    h2 {
+      font-size: 1.25rem !important;
+    }
+    
+    p {
+      font-size: 0.8rem !important;
+    }
+    
+    // Search and filter controls
+    .d-flex.gap-2 {
+      flex-direction: column;
+      width: 100%;
+      
+      .input-group {
+        max-width: 100% !important;
+      }
+      
+      .dropdown {
+        width: 100%;
+        
+        .btn {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+    }
+  }
+  
+  // --- MOBILE ACCOUNT CARDS ---
+  .account-card {
+    .card-body {
+      padding: 1rem !important;
+    }
+    
+    .avatar-placeholder {
+      width: 42px !important;
+      height: 42px !important;
+      font-size: 1rem !important;
+    }
+    
+    .card-title {
+      font-size: 0.9rem;
+    }
+    
+    .text-truncate {
+      max-width: 120px !important;
+    }
+  }
+  
+  // --- MOBILE STAT CARDS ---
+  .admin-dashboard-container {
+    .row.g-4 {
+      --bs-gutter-x: 0.75rem;
+      --bs-gutter-y: 0.75rem;
+    }
+    
+    .col-md-6.col-lg-3 {
+      .card-body {
+        padding: 1rem !important;
+        
+        h2 {
+          font-size: 1.5rem !important;
+        }
+        
+        .small {
+          font-size: 0.7rem !important;
+        }
+      }
+    }
+  }
+  
+  // --- MOBILE TIMELINE ---
+  .timeline {
+    padding-left: 0.5rem;
+    
+    &::before {
+      left: 24px;
+    }
+  }
+  
+  .timeline-item {
+    padding-left: 35px;
+  }
+  
+  .timeline-icon {
+    width: 30px;
+    height: 30px;
+    left: 9px;
+    
+    img {
+      width: 14px;
+    }
+  }
+  
+  // --- MOBILE CHARTS ---
+  .chart-container {
+    height: 250px !important;
+    
+    canvas {
+      max-height: 250px !important;
+    }
+  }
+  
+  // --- MOBILE TABLES TO CARDS ---
+  .table-responsive {
+    border: none !important;
+    background: transparent !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    
+    table {
+      min-width: 500px;
+    }
+  }
+  
+  // --- MOBILE MODALS ---
+  .modal-dialog {
+    margin: 0.75rem;
+    max-width: calc(100% - 1.5rem);
+    
+    .modal-content {
+      border-radius: 12px;
+    }
+    
+    .modal-body {
+      padding: 1rem !important;
+      
+      .row.g-3 {
+        --bs-gutter-x: 0.5rem;
+        --bs-gutter-y: 0.75rem;
+      }
+    }
+  }
+}
+
+// --- MOBILE CARD LIST ALTERNATIVE FOR TABLES ---
+.mobile-admin-card-list {
+  display: none;
+  
+  @include media-breakpoint-down(md) {
+    display: block;
+  }
+}
+
+.mobile-admin-item {
+  background: $white;
+  border: 1px solid $gray-200;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  
+  .item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid $gray-100;
+    
+    .item-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: $primary;
+      color: $white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    
+    .item-info {
+      flex: 1;
+      min-width: 0;
+      
+      .item-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: $gray-800;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      .item-email {
+        font-size: 0.75rem;
+        color: $gray-500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+    
+    .item-menu {
+      flex-shrink: 0;
+    }
+  }
+  
+  .item-details {
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.35rem 0;
+      
+      &:not(:last-child) {
+        border-bottom: 1px dashed $gray-100;
+      }
+      
+      .label {
+        font-size: 0.7rem;
+        color: $gray-500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      
+      .value {
+        font-size: 0.85rem;
+        color: $gray-700;
+      }
+    }
+  }
+  
+  .item-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid $gray-100;
+  }
+}
+
+// --- EXTRA SMALL SCREENS ---
+@include media-breakpoint-down(sm) {
+  #admin-content {
+    padding: 0.75rem !important;
+  }
+  
+  .admin-accounts-container,
+  .admin-dashboard-container {
+    h2 {
+      font-size: 1.1rem !important;
+    }
+    
+    .mb-4 {
+      margin-bottom: 0.75rem !important;
+    }
+  }
+  
+  .account-card {
+    .card-body {
+      padding: 0.85rem !important;
+    }
+    
+    .avatar-placeholder {
+      width: 38px !important;
+      height: 38px !important;
+    }
+  }
+  
+  .mobile-admin-item {
+    padding: 0.85rem;
+    
+    .item-avatar {
+      width: 36px;
+      height: 36px;
+      font-size: 0.85rem;
+    }
   }
 }

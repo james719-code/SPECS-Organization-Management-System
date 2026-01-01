@@ -3,6 +3,12 @@ import './landing.scss';
 import { Collapse, Dropdown } from 'bootstrap';
 
 import { renderHeader, renderFooter, updateActiveNavLink, setupNavbarToggler } from '../shared/utils.js';
+import { cache } from '../shared/cache.js';
+
+// Import cache dev tools for debugging (only in development)
+if (import.meta.env.DEV) {
+    import('../shared/cache-tools.js');
+}
 
 // Import page rendering functions from view modules
 import { renderHomePage } from './views/home.js';
@@ -10,9 +16,12 @@ import { renderEventsPage } from './views/events.js';
 import { renderAboutUsPage } from './views/about_us.js';
 import { renderResourcesPage } from './views/resources.js';
 import { renderStoriesPage } from './views/stories.js';
-import { renderLoginPage } from './views/login.js';
+import { renderLoginPage, renderForgotPasswordPage, renderResetPasswordPage } from './views/login.js';
 import { renderSignupPage, renderVerifyEmailPage, renderPendingVerificationPage, renderCheckEmailPage } from './views/signup.js';
 import { renderHighlightDetailsPage } from "./views/highlights_details.js";
+
+// Initialize cache system on app start
+cache.init();
 
 export const app = document.getElementById('app');
 
@@ -30,7 +39,9 @@ const fullPageRoutes = {
     'signup': renderSignupPage,
     'verify-email': renderVerifyEmailPage,
     'pending-verification': renderPendingVerificationPage,
-    'check-email': renderCheckEmailPage
+    'check-email': renderCheckEmailPage,
+    'forgot-password': renderForgotPasswordPage,
+    'reset-password': renderResetPasswordPage
 };
 
 function initializeLayout() {

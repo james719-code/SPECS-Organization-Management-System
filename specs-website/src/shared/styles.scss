@@ -7,7 +7,18 @@ $danger: #e76f51; // Burnt Orange
 $dark: #264653; // Dark Blue-Green - softer than pure black
 $light: #f1faee; // Off-white
 
-$body-bg: #f8f9fa;
+// Gray scale for minimal design
+$gray-50: #f9fafb;
+$gray-100: #f3f4f6;
+$gray-200: #e5e7eb;
+$gray-300: #d1d5db;
+$gray-400: #9ca3af;
+$gray-500: #6b7280;
+$gray-600: #4b5563;
+$gray-700: #374151;
+$gray-800: #1f2937;
+
+$body-bg: #f9fafb;
 $body-color: #264653;
 $font-family-sans-serif: 'Poppins', 'Segoe UI', Roboto, sans-serif;
 
@@ -69,10 +80,9 @@ body {
 }
 
 .btn {
-  border-radius: 8px; // Slightly more rounded
+  border-radius: 6px;
   font-weight: 500;
-  padding: 0.5rem 1.25rem;
-  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
   
   &:active {
     transform: scale(0.98);
@@ -82,48 +92,44 @@ body {
 .btn-primary {
   background-color: $primary;
   border-color: $primary;
-  box-shadow: 0 4px 6px rgba($primary, 0.2);
 
   &:hover {
     background-color: darken($primary, 5%);
     border-color: darken($primary, 5%);
-    box-shadow: 0 6px 12px rgba($primary, 0.3);
-    transform: translateY(-1px);
   }
 }
 
 .card {
-  border: none;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); // Tailwind-ish shadow
-  border-radius: 12px; // Modern rounded corners
+  border: 1px solid $gray-200;
+  box-shadow: none;
+  border-radius: 8px;
   background-color: white;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
 
   .card-header {
-    background-color: transparent;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
+    background-color: $gray-50;
+    border-bottom: 1px solid $gray-200;
     font-weight: 600;
-    padding: 1rem 1.25rem;
+    padding: 0.85rem 1rem;
   }
 
   .card-body {
-    padding: 1.25rem;
+    padding: 1rem;
     color: $body-color;
   }
 
   .card-footer {
-    background-color: transparent;
-    border-top: 1px solid rgba(0,0,0,0.05);
+    background-color: $gray-50;
+    border-top: 1px solid $gray-200;
   }
 }
 
 .badge-custom {
-  background-color: $info;
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.75rem;
+  background-color: $gray-100;
+  color: $gray-700;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 main {

@@ -154,15 +154,6 @@ async function attachEventListeners(currentUser, profile) {
 
     const loadData = async () => {
         try {
-            // Fetch accounts from ACCOUNTS collection
-            // Note: We are NOT expanding explicitly here in JS SDK standard call unless supported.
-            // If the server doesn't return expanded objects, we might just get IDs.
-            // For now, we assume simple list. If names are missing, it's because of non-expansion.
-            // Fixing this:
-            // Since we can't easily force expand in listDocuments without config, we rely on username if needed
-            // or we could fetch students collection separately and map. 
-            // BUT, the goal was to fix "Add Student" errors. The add student feature was removed from this view 
-            // in favor of just accepting signups (which is safer/consistent with Schema).
             const res = await databases.listDocuments(
                 DATABASE_ID, 
                 COLLECTION_ID_ACCOUNTS, 

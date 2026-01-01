@@ -1,4 +1,3 @@
-// utils.js
 import boxArrowInRight from 'bootstrap-icons/icons/box-arrow-in-right.svg';
 import envelopeFill from 'bootstrap-icons/icons/envelope-fill.svg';
 import facebook from 'bootstrap-icons/icons/facebook.svg';
@@ -49,15 +48,11 @@ export function renderFooter() {
 }
 
 export function updateActiveNavLink(path) {
-    // Ensure the header is actually on the page before trying to update it
     const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
     if (!navLinks.length) return;
 
     navLinks.forEach(link => {
-        // Normalize href to match the path format
         const linkPath = new URL(link.href).hash;
-
-        // Add 'active' class if the link's href matches the current path
         if (linkPath === path) {
             link.classList.add('active');
         } else {

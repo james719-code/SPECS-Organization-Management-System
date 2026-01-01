@@ -1,6 +1,7 @@
 // views/renderAdmin/events.js
-import { databases, storage } from '../../shared/appwrite.js';
+import { databases } from '../../shared/appwrite.js';
 import { Query } from 'appwrite';
+import { imageCache, dataCache, generateCacheKey } from '../../shared/cache.js';
 
 // --- SVG Icon Imports ---
 import calendarEvent from 'bootstrap-icons/icons/calendar-event.svg';
@@ -23,7 +24,8 @@ function createTimelineItemHTML(eventDoc, userLookup) {
     const formattedDate = eventDate.toLocaleDateString('en-US', {
         year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit'
     });
-    const imageUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 150, 100);
+    // Use centralized image cache
+    const imageUrl = imageCache.get(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 150, 100);
     const trashIconHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; pointer-events: none;">`;
 
     return `

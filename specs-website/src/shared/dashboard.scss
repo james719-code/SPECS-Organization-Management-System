@@ -17,22 +17,23 @@
 @import "bootstrap/scss/tooltip";
 @import "bootstrap/scss/modal";
 
-// --- GLOBAL UTILITIES & FILTERS ---
+// =====================================================
+// MINIMALIST DASHBOARD THEME
+// =====================================================
+
+// --- GLOBAL UTILITIES ---
 .transition-all {
-  transition: all 0.2s ease-in-out;
+  transition: all 0.15s ease;
 }
 
-// Deep Teal Filter (#0d6b66)
 .icon-primary-filter {
   filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);
 }
 
-// Burnt Orange Filter (#e76f51)
 .status-rejected-filter {
   filter: invert(53%) sepia(35%) saturate(3500%) hue-rotate(335deg) brightness(95%) contrast(90%);
 }
 
-// Line Clamping Mixins
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -51,38 +52,36 @@
   font-size: 0.7rem;
 }
 
-// --- SHARED COMPONENTS ---
-
-// Unified Status Badges
+// --- STATUS BADGES (Minimal) ---
 .status-badge {
-  padding: 0.5rem 1rem;
-  border-radius: 50px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
 
   &.status-pending {
-    background-color: rgba($warning, 0.15);
-    color: darken($warning, 20%);
+    background-color: rgba($warning, 0.12);
+    color: darken($warning, 25%);
   }
 
   &.status-approved {
-    background-color: rgba($success, 0.15);
-    color: $success;
+    background-color: rgba($success, 0.12);
+    color: darken($success, 10%);
   }
 
   &.status-rejected {
-    background-color: rgba($danger, 0.15);
+    background-color: rgba($danger, 0.12);
     color: $danger;
   }
 }
 
-// Action Button Groups
+// --- ACTION BUTTONS (Minimal) ---
 .btn-group-custom {
-  background: white;
-  border: 1px solid rgba(0,0,0,0.05);
-  border-radius: 8px;
+  background: $white;
+  border: 1px solid $gray-200;
+  border-radius: 6px;
   display: flex;
   overflow: hidden;
   z-index: 5;
@@ -91,107 +90,139 @@
   .btn {
     border: none;
     background: transparent;
-    padding: 0.4rem 0.6rem;
-    transition: background 0.2s;
+    padding: 0.35rem 0.5rem;
 
     &:hover {
-      background-color: #f8f9fa;
+      background-color: $gray-100;
     }
 
     &:not(:last-child) {
-      border-right: 1px solid #f0f0f0;
+      border-right: 1px solid $gray-200;
     }
 
     img {
-      opacity: 0.6;
+      opacity: 0.5;
     }
   }
 }
 
-// --- LAYOUT & NAVIGATION ---
-
+// --- LAYOUT ---
 #dashboard-content {
   min-height: calc(100vh - 56px);
-  background-color: $body-bg;
+  background-color: $gray-100;
+  padding: 1.5rem;
 
   @include media-breakpoint-up(lg) {
     min-height: 100vh;
+    padding: 2rem;
   }
 }
 
+// --- SIDEBAR (Minimal) ---
 .offcanvas-start.bg-primary {
-  background-color: $primary !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: $white !important;
+  border-right: 1px solid $gray-200;
 
   .nav-link {
-    color: rgba(255, 255, 255, 0.85);
-    margin-bottom: 0.25rem;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
+    color: $gray-600;
+    margin-bottom: 0.15rem;
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
     font-weight: 500;
-    transition: all 0.2s ease;
+    font-size: 0.875rem;
 
     &:hover,
     &:focus {
-      color: $white;
-      background-color: rgba(255, 255, 255, 0.1);
-      transform: translateX(3px);
+      color: $primary;
+      background-color: rgba($primary, 0.06);
     }
 
     &.active {
       color: $primary;
-      background-color: $white;
+      background-color: rgba($primary, 0.1);
       font-weight: 600;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
       img {
-        // Matching Deep Teal
         filter: invert(36%) sepia(35%) saturate(836%) hue-rotate(130deg) brightness(93%) contrast(92%);
       }
     }
   }
 }
 
-// --- CARD SYSTEM ---
+// --- MOBILE SIDEBAR FIXES (Prevent Glitching) ---
+.offcanvas {
+  // GPU acceleration to prevent flickering/glitching
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  
+  // Smooth scrolling for iOS
+  -webkit-overflow-scrolling: touch;
+  
+  // Prevent visual artifacts during animation
+  &.offcanvas-start {
+    transform: translateX(-100%);
+    
+    &.show, &.showing {
+      transform: translateX(0);
+    }
+  }
+  
+  // Smooth transition
+  transition: transform 0.3s ease-in-out !important;
+}
 
-.dashboard-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border: none;
-  border-radius: 12px;
-  background-color: $white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
-
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08) !important;
+// Backdrop stability
+.offcanvas-backdrop {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  
+  &.show {
+    opacity: 0.5;
+  }
+  
+  &.fade {
+    transition: opacity 0.15s linear !important;
   }
 }
 
-// Event Card Specifics
+// --- CARDS (Minimal) ---
+.dashboard-card {
+  border: 1px solid $gray-200;
+  border-radius: 8px;
+  background-color: $white;
+  box-shadow: none;
+
+  &:hover {
+    border-color: $gray-300;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+}
+
 .event-card {
   @extend .dashboard-card;
 
   .card-img-top {
-    transition: transform 0.5s ease;
-    border-radius: 12px 12px 0 0;
-  }
-
-  &:hover .card-img-top {
-    transform: scale(1.05);
+    border-radius: 8px 8px 0 0;
   }
 }
 
-// File Card Specifics
 .file-card {
   @extend .dashboard-card;
   position: relative;
   overflow: hidden;
 
   .file-icon-wrapper {
-    background-color: rgba($primary, 0.05);
+    background-color: $gray-100;
   }
 
-  // Clickable overlay for description modal (Top 70%)
   .card-click-overlay {
     position: absolute;
     top: 0;
@@ -222,38 +253,29 @@
 }
 
 .student-card {
-  // Extends your generic dashboard card
   @extend .dashboard-card;
 
-  // Smooth hover for the entire card
   &:hover {
-    transform: translateY(-5px);
-    // Uses your standard card shadow
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 
-  // Dropdown button styling
   .dropdown-toggle::after {
     display: none;
   }
 
-  // Icon wrapper for initials
   .file-icon-wrapper {
-    background-color: rgba($primary, 0.1);
-    color: $primary;
+    background-color: $gray-100;
+    color: $gray-600;
   }
 }
 
-// Hover effects for the modal "Choice" buttons
 .hover-shadow:hover {
-  box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-  background-color: #f8f9fa;
-  border-color: rgba($primary, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  background-color: $gray-50;
+  border-color: $gray-300 !important;
 }
 
-// --- GRID OVERRIDES ---
-
-// Strict 4-Column Layout for File Cards on Desktop
+// --- GRID ---
 #file-cards-container {
   @include media-breakpoint-up(lg) {
     &.row-cols-lg-4 > * {
@@ -263,12 +285,11 @@
   }
 }
 
-// --- SPECIALIZED UI ---
-
+// --- FORM ELEMENTS ---
 .upload-drop-zone {
-  border: 2px dashed rgba($primary, 0.2);
-  transition: all 0.2s ease;
-  background-color: $light;
+  border: 1px dashed $gray-300;
+  background-color: $gray-50;
+  border-radius: 8px;
 
   &:hover {
     border-color: $primary;
@@ -277,47 +298,451 @@
 }
 
 .file-item {
-  border-left: 4px solid $primary;
-  background: white;
+  border-left: 3px solid $primary;
+  background: $white;
   margin-bottom: 0.5rem;
-  border-radius: 8px;
-  padding: 1rem;
-  transition: background-color 0.2s;
+  border-radius: 6px;
+  padding: 0.85rem;
 
   &:hover {
-    background-color: $gray-100;
+    background-color: $gray-50;
   }
 }
 
+// --- TABLES (Minimal) ---
 .table-responsive {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  background: $white;
+  border-radius: 8px;
+  border: 1px solid $gray-200;
   overflow: hidden;
 
   table {
     margin-bottom: 0;
+    
     thead th {
-      background-color: $gray-100;
+      background-color: $gray-50;
       color: $gray-600;
       font-weight: 600;
       text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 0.5px;
-      padding: 1rem;
-      border-bottom: none;
+      font-size: 0.7rem;
+      letter-spacing: 0.3px;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid $gray-200;
     }
+    
     tbody td {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
       vertical-align: middle;
       border-bottom: 1px solid $gray-100;
+      font-size: 0.875rem;
+    }
+    
+    tbody tr:last-child td {
+      border-bottom: none;
     }
   }
 }
 
-// Responsive Sidebar
+// =====================================================
+// MOBILE-FIRST RESPONSIVE ENHANCEMENTS
+// =====================================================
+
+// --- MOBILE TABLE ALTERNATIVE (Card Layout) ---
+.mobile-card-list {
+  display: none;
+  
+  @include media-breakpoint-down(md) {
+    display: block;
+  }
+}
+
+.mobile-data-card {
+  background: $white;
+  border: 1px solid $gray-200;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  .mobile-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid $gray-100;
+    
+    .mobile-card-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: $gray-800;
+      margin: 0;
+      flex: 1;
+      padding-right: 0.5rem;
+    }
+    
+    .mobile-card-badge {
+      flex-shrink: 0;
+    }
+  }
+  
+  .mobile-card-body {
+    .mobile-data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0;
+      
+      &:not(:last-child) {
+        border-bottom: 1px dashed $gray-100;
+      }
+      
+      .mobile-data-label {
+        font-size: 0.75rem;
+        color: $gray-500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        font-weight: 500;
+      }
+      
+      .mobile-data-value {
+        font-size: 0.875rem;
+        color: $gray-700;
+        font-weight: 500;
+        text-align: right;
+      }
+    }
+  }
+  
+  .mobile-card-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid $gray-100;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+}
+
+// Hide desktop table on mobile, show card list
+.desktop-table {
+  display: block;
+  
+  @include media-breakpoint-down(md) {
+    display: none !important;
+  }
+}
+
+// --- MOBILE DASHBOARD CONTENT ---
+@include media-breakpoint-down(md) {
+  #dashboard-content {
+    padding: 1rem !important;
+  }
+  
+  // Smaller headers on mobile
+  header {
+    h1, .display-6 {
+      font-size: 1.35rem !important;
+      line-height: 1.3;
+    }
+    
+    p {
+      font-size: 0.85rem !important;
+    }
+  }
+  
+  // Cards grid adjustments
+  .row-cols-md-2,
+  .row-cols-lg-3,
+  .row-cols-xl-3,
+  .row-cols-xxl-4 {
+    &.g-4 {
+      --bs-gutter-x: 0.75rem;
+      --bs-gutter-y: 0.75rem;
+    }
+  }
+  
+  // Dashboard cards
+  .dashboard-card,
+  .student-card,
+  .file-card,
+  .event-card {
+    .card-body {
+      padding: 1rem !important;
+    }
+  }
+  
+  // Form elements
+  .form-control,
+  .form-select {
+    font-size: 16px !important; // Prevents zoom on iOS
+    padding: 0.65rem 0.85rem;
+  }
+  
+  // Buttons
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  // Filter/Search header sections
+  .d-flex.flex-column.flex-sm-row,
+  .d-flex.flex-column.flex-lg-row {
+    gap: 0.75rem !important;
+    
+    .input-group,
+    .form-select {
+      max-width: 100% !important;
+      width: 100%;
+    }
+  }
+}
+
+// --- MOBILE MODALS ---
+@include media-breakpoint-down(md) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+    
+    &.modal-dialog-centered {
+      min-height: calc(100% - 1rem);
+    }
+  }
+  
+  .modal-content {
+    border-radius: 12px;
+    
+    .modal-header {
+      padding: 1rem 1rem 0.75rem;
+    }
+    
+    .modal-body {
+      padding: 1rem !important;
+    }
+    
+    .modal-footer {
+      padding: 0.75rem 1rem 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      
+      .btn {
+        flex: 1;
+        min-width: 120px;
+      }
+    }
+  }
+}
+
+// --- MOBILE EMPTY STATES ---
+@include media-breakpoint-down(md) {
+  .empty-state,
+  .empty-events-state {
+    padding: 2rem 1.5rem;
+    
+    .empty-icon-wrapper,
+    .empty-icon {
+      width: 60px;
+      height: 60px;
+      
+      img {
+        width: 28px;
+      }
+    }
+    
+    h5, h4 {
+      font-size: 1rem;
+    }
+    
+    p {
+      font-size: 0.85rem;
+    }
+  }
+}
+
+// --- MOBILE ACTION BUTTONS ---
+@include media-breakpoint-down(md) {
+  .btn-group-custom {
+    .btn {
+      padding: 0.5rem 0.65rem;
+    }
+  }
+  
+  // Floating action buttons
+  .position-fixed.bottom-0.end-0 {
+    margin: 1rem !important;
+    
+    &[style*="width: 60px"] {
+      width: 52px !important;
+      height: 52px !important;
+    }
+  }
+}
+
+// --- MOBILE BADGES ---
+@include media-breakpoint-down(md) {
+  .status-badge,
+  .badge {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.65rem;
+  }
+}
+
+// --- MOBILE DROPDOWNS ---
+@include media-breakpoint-down(md) {
+  .dropdown-menu {
+    font-size: 0.875rem;
+    
+    .dropdown-item {
+      padding: 0.65rem 1rem;
+    }
+  }
+}
+
+// --- TOUCH-FRIENDLY TARGETS ---
+@include media-breakpoint-down(md) {
+  // Ensure minimum touch target size (44px recommended)
+  .btn-sm {
+    min-height: 38px;
+    min-width: 38px;
+  }
+  
+  .nav-link {
+    padding: 0.75rem 1rem !important;
+  }
+  
+  // Card clickable areas
+  [role="button"],
+  [style*="cursor: pointer"] {
+    min-height: 44px;
+  }
+}
+
+// --- MOBILE STATS/SUMMARY CARDS ---
+@include media-breakpoint-down(md) {
+  .col-md-4,
+  .col-md-3 {
+    &:has(.card) {
+      .card-body {
+        padding: 1rem;
+        
+        .h3, h3 {
+          font-size: 1.25rem;
+        }
+        
+        .h6, h6 {
+          font-size: 0.7rem;
+        }
+      }
+    }
+  }
+}
+
+// --- SCROLL SNAP FOR HORIZONTAL CAROUSELS ---
+.mobile-scroll-container {
+  @include media-breakpoint-down(md) {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+    
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: $gray-300;
+      border-radius: 4px;
+    }
+    
+    > * {
+      scroll-snap-align: start;
+      flex-shrink: 0;
+    }
+  }
+}
+
+// --- MOBILE SIDEBAR/OFFCANVAS ---
 @include media-breakpoint-down(lg) {
   .offcanvas-start {
     width: 280px !important;
+    max-width: 85vw;
+    
+    // Ensure smooth animation without glitches
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    
+    // Stable positioning
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important; // Dynamic viewport height for mobile browsers
+    
+    // Prevent content jumping
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+  
+  // Ensure body doesn't scroll when offcanvas is open
+  body.offcanvas-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+// --- PULL-TO-REFRESH INDICATOR (visual hint) ---
+.pull-refresh-indicator {
+  text-align: center;
+  padding: 1rem;
+  color: $gray-400;
+  font-size: 0.75rem;
+  display: none;
+  
+  @include media-breakpoint-down(md) {
+    display: block;
+  }
+}
+
+// --- BOTTOM SAFE AREA (for notched devices) ---
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  @include media-breakpoint-down(md) {
+    #dashboard-content {
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+    
+    .position-fixed.bottom-0 {
+      margin-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+    }
+  }
+}
+
+// --- RESPONSIVE ---
+@include media-breakpoint-down(lg) {
+  .offcanvas-start {
+    width: 260px !important;
+    
+    // Ensure stable rendering
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  
+  // Fix z-index stacking for mobile
+  .offcanvas {
+    z-index: 1055 !important;
+  }
+  
+  .offcanvas-backdrop {
+    z-index: 1050 !important;
   }
 }

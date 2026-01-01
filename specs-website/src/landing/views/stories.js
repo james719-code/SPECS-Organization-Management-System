@@ -1,4 +1,3 @@
-import { renderHeader } from '../../shared/utils.js';
 import { fetchHighlights } from '../data/data.js';
 import personFill from 'bootstrap-icons/icons/person-fill.svg';
 import calendar3 from 'bootstrap-icons/icons/calendar3.svg';
@@ -135,7 +134,7 @@ function createEmptyStateHTML() {
     `;
 }
 
-export async function renderStoriesPage(app, page = 1) {
+export async function renderStoriesPage(container, page = 1) {
     const storiesPerPage = 9;
     const { documents: highlightsData, total } = await fetchHighlights(page, storiesPerPage);
 
@@ -145,42 +144,37 @@ export async function renderStoriesPage(app, page = 1) {
 
     const paginationHTML = createPaginationHTML(page, total, storiesPerPage);
 
-    app.innerHTML = `
-    <div class="stories-page">
-        ${renderHeader()}
-        <main>
-            <!-- Hero Section -->
-            <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
-                <div class="container pt-3 pt-md-4 pt-lg-5">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-10 col-xl-8 text-center">
-                            <h1 class="display-6 fw-bold mb-3 pt-2">Organization Highlights</h1>
-                            <p class="lead fs-6 mb-4 opacity-75 px-2">
-                                Celebrating our achievements, milestones, and collaborative successes that define the SPECS community.
-                            </p>
-                        </div>
+    container.innerHTML = `
+        <!-- Hero Section -->
+        <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
+            <div class="container pt-3 pt-md-4 pt-lg-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10 col-xl-8 text-center">
+                        <h1 class="display-6 fw-bold mb-3 pt-2">Organization Highlights</h1>
+                        <p class="lead fs-6 mb-4 opacity-75 px-2">
+                            Celebrating our achievements, milestones, and collaborative successes that define the SPECS community.
+                        </p>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- Main Content -->
-            <section class="py-5 bg-light-subtle">
-                <div class="container">
-                    <div class="row mb-5">
-                        <div class="col-12">
-                            <h2 class="fw-bold mb-2 fs-3">Latest Stories</h2>
-                            <p class="text-muted mb-0 mt-2">Discover what's happening in our community</p>
-                        </div>
+        <!-- Main Content -->
+        <section class="py-5 bg-light-subtle">
+            <div class="container">
+                <div class="row mb-5">
+                    <div class="col-12">
+                        <h2 class="fw-bold mb-2 fs-3">Latest Stories</h2>
+                        <p class="text-muted mb-0 mt-2">Discover what's happening in our community</p>
                     </div>
-
-                    <div class="row" id="highlights-container">
-                        ${contentHTML}
-                    </div>
-
-                    ${paginationHTML}
                 </div>
-            </section>
-        </main>
-    </div>
+
+                <div class="row" id="highlights-container">
+                    ${contentHTML}
+                </div>
+
+                ${paginationHTML}
+            </div>
+        </section>
     `;
 }

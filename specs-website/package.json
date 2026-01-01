@@ -13,7 +13,7 @@
   "devDependencies": {
     "sass": "^1.89.2",
     "unlighthouse": "^0.17.2",
-    "vite": "^6.3.5"
+    "vite": "7.1.11"
   },
   "dependencies": {
     "appwrite": "^18.1.1",

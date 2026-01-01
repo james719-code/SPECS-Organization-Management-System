@@ -13,42 +13,96 @@ import hourglassSplit from 'bootstrap-icons/icons/hourglass-split.svg';
 import envelopeCheckFill from 'bootstrap-icons/icons/envelope-check-fill.svg';
 
 export function renderSignupPage() {
-    const yearLevelOptions = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B']
-        .map(section => `<option value="BSCS ${section}">BSCS ${section}</option>`).join('');
+    const sectionOptions = ['A', 'B']
+        .map(section => `<option value="${section}">${section}</option>`).join('');
+    
+    const yearOptions = [1, 2, 3, 4]
+        .map(year => `<option value="${year}">${year}</option>`).join('');
 
     app.innerHTML = `
     <div class="container auth-container">
         <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-8 col-xl-7">
-                <div class="card shadow-lg">
+            <div class="col-md-10 col-lg-8 col-xl-7">
+                <div class="card shadow-lg border-0">
                     <div class="card-body p-4 p-md-5">
                         <form id="signup-form" novalidate>
-                            <h2 class="text-center fw-bold mb-4">Create Account</h2>
-                            <div id="form-error-message" class="alert alert-danger d-none" role="alert"></div>
-                            <div class="row g-3">
-                                <div class="col-md-6"><label for="name" class="form-label">Full Name</label><input id="name" name="name" type="text" class="form-control" placeholder="e.g., Juan Dela Cruz" required /></div>
-                                <div class="col-md-6"><label for="username" class="form-label">Username</label><input id="username" name="username" type="text" class="form-control" placeholder="e.g., juan23" required /></div>
-                                <div class="col-12"><label for="email" class="form-label">University Email</label><input id="email" name="email" type="email" class="form-control" placeholder="your-id@parsu.edu.ph" required pattern=".+@parsu\\.edu\\.ph$" title="Please use your @parsu.edu.ph email address."/></div>
-
-                                <div class="col-md-4"><label for="yearLevel" class="form-label">Section</label><select id="yearLevel" name="yearLevel" class="form-select" required><option value="" disabled selected>-- Select --</option>${yearLevelOptions}</select></div>
-                                <div class="col-md-4"><label for="yearNum" class="form-label">Year Level</label><select id="yearNum" name="yearNum" class="form-select" required><option value="" disabled selected>-- Select --</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
-
-                                <div class="col-md-4"><label for="role" class="form-label">Registering as</label><select id="role" name="role" class="form-select" required><option value="student" selected>Student</option></select></div>
-
-                                <div class="col-md-12"><label for="address" class="form-label">Address</label><input id="address" name="address" type="text" class="form-control" required /></div>
-                                <div class="col-md-6"><label for="studentId" class="form-label">Student ID</label><input id="studentId" name="studentId" type="number" class="form-control" required /></div>
-
-                                <div class="col-md-6"><label for="password" class="form-label">Password</label><input id="password" name="password" type="password" class="form-control" placeholder="At least 8 characters" required minlength="8" /></div>
-                                <div class="col-md-6"><label for="password2" class="form-label">Retype Password</label><input id="password2" name="password2" type="password" class="form-control" placeholder="Confirm your password" required /></div>
+                            <div class="text-center mb-4">
+                                <h2 class="fw-bold mb-2">Create Account</h2>
+                                <p class="text-muted small">Join SPECS and start your journey</p>
                             </div>
+                            <div id="form-error-message" class="alert alert-danger d-none" role="alert"></div>
+                            
+                            <div class="row g-3">
+                                <!-- Personal Information -->
+                                <div class="col-12">
+                                    <h6 class="text-muted mb-3 fw-semibold">Personal Information</h6>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="name" class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+                                    <input id="name" name="name" type="text" class="form-control" placeholder="e.g., Juan Dela Cruz" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="username" class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+                                    <input id="username" name="username" type="text" class="form-control" placeholder="e.g., juan23" required />
+                                </div>
+                                <div class="col-12">
+                                    <label for="email" class="form-label fw-semibold">University Email <span class="text-danger">*</span></label>
+                                    <input id="email" name="email" type="email" class="form-control" placeholder="your-id@parsu.edu.ph" required pattern=".+@parsu\\.edu\\.ph$" title="Please use your @parsu.edu.ph email address."/>
+                                    <div class="form-text">Use your official ParSU email address</div>
+                                </div>
+
+                                <!-- Academic Information -->
+                                <div class="col-12 mt-4">
+                                    <h6 class="text-muted mb-3 fw-semibold">Academic Information</h6>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="studentId" class="form-label fw-semibold">Student ID <span class="text-danger">*</span></label>
+                                    <input id="studentId" name="studentId" type="number" class="form-control" placeholder="e.g., 20230001" required />
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="yearNum" class="form-label fw-semibold">Year Level <span class="text-danger">*</span></label>
+                                    <select id="yearNum" name="yearNum" class="form-select" required>
+                                        <option value="" disabled selected>Select Year</option>
+                                        ${yearOptions}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="section" class="form-label fw-semibold">Section <span class="text-danger">*</span></label>
+                                    <select id="section" name="section" class="form-select" required>
+                                        <option value="" disabled selected>Select Section</option>
+                                        ${sectionOptions}
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label for="address" class="form-label fw-semibold">Address <span class="text-danger">*</span></label>
+                                    <input id="address" name="address" type="text" class="form-control" placeholder="Enter your complete address" required />
+                                </div>
+
+                                <!-- Security -->
+                                <div class="col-12 mt-4">
+                                    <h6 class="text-muted mb-3 fw-semibold">Security</h6>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="password" class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
+                                    <input id="password" name="password" type="password" class="form-control" placeholder="At least 8 characters" required minlength="8" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="password2" class="form-label fw-semibold">Confirm Password <span class="text-danger">*</span></label>
+                                    <input id="password2" name="password2" type="password" class="form-control" placeholder="Retype your password" required />
+                                </div>
+                            </div>
+                            
                             <div class="d-grid mt-4">
-                                <button type="submit" class="btn btn-primary">
-                                    <span class="button-text">Sign Up</span>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <span class="button-text">Create Account</span>
                                     <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
                                 </button>
                             </div>
-                            <p class="text-center small mt-4 mb-0">Already have an account? <a href="#login">Login here</a></p>
-                            <p class="text-center small mt-2 mb-0"><a href="#home">Back to Home</a></p>
+                            
+                            <div class="text-center mt-4">
+                                <p class="text-muted small mb-2">Already have an account? <a href="#login" class="fw-semibold">Sign in</a></p>
+                                <a href="#home" class="text-muted small text-decoration-none">← Back to Home</a>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -76,7 +130,7 @@ export function renderSignupPage() {
             name: e.target.elements['name'].value,
             username: e.target.elements['username'].value,
             email: e.target.elements['email'].value,
-            yearLevel: e.target.elements['yearLevel'].value,
+            section: e.target.elements['section'].value,
             yearNum: e.target.elements['yearNum'].value,
             address: e.target.elements['address'].value,
             studentId: e.target.elements['studentId'].value,
@@ -91,7 +145,7 @@ export function renderSignupPage() {
         if (!signupForm.checkValidity()) { showFormError("Please fill out all required fields."); return; }
 
         submitButton.disabled = true;
-        buttonText.textContent = 'Signing Up...';
+        buttonText.textContent = 'Creating account...';
         buttonSpinner.classList.remove('d-none');
 
         try {
@@ -99,7 +153,8 @@ export function renderSignupPage() {
             const user = await account.create(ID.unique(), formData.email, formData.password, formData.name);
             await account.createEmailPasswordSession(formData.email, formData.password);
 
-            // 3. Create Student Profile
+            // 3. Create Student Profile with combined section
+            const combinedSection = `BSCS ${formData.yearNum}${formData.section}`;
             const studentDoc = await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_ID_STUDENTS,
@@ -108,7 +163,7 @@ export function renderSignupPage() {
                     student_id: parseInt(formData.studentId),
                     name: formData.name,
                     email: formData.email,
-                    section: formData.yearLevel,
+                    section: combinedSection,
                     yearLevel: parseInt(formData.yearNum),
                     address: formData.address,
                     is_volunteer: false
@@ -132,7 +187,6 @@ export function renderSignupPage() {
             const verificationUrl = `${window.location.origin}/landing/#verify-email`;
             await account.createVerification(verificationUrl);
 
-            // FIX: Kill the session immediately so it doesn't duplicate later
             await account.deleteSession('current');
 
             window.location.hash = 'check-email';
@@ -142,7 +196,7 @@ export function renderSignupPage() {
         } finally {
             if (!window.location.hash.includes('check-email')) {
                 submitButton.disabled = false;
-                buttonText.textContent = 'Sign Up';
+                buttonText.textContent = 'Create Account';
                 buttonSpinner.classList.add('d-none');
             }
         }
@@ -177,8 +231,7 @@ export function renderVerifyEmailPage() {
 
             await account.updateVerification(userId, secret);
 
-            // FIX: Try to delete session ONLY if it exists (avoids error on mobile)
-            try { await account.deleteSession('current'); } catch (e) { /* ignore */ }
+            try { await account.deleteSession('current'); } catch (e) { }
 
             iconEl.innerHTML = `<img src="${checkCircleFill}" class="text-success" style="width: 5rem; height: 5rem;">`;
             statusEl.textContent = "Email Verified!";
@@ -198,7 +251,6 @@ export function renderVerifyEmailPage() {
 }
 
 export function renderCheckEmailPage() {
-    // FIX: Removed "Logout" button, added "Back to Login" link since user is already logged out
     app.innerHTML = `
         <div class="container auth-container text-center">
             <div class="row justify-content-center">

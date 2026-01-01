@@ -6,7 +6,11 @@ import '../guard/auth.js';
 // Appwrite SDK and Bootstrap components
 import { account, databases } from "../shared/appwrite.js";
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from "../shared/constants.js";
+import { cache } from "../shared/cache.js";
 import { Offcanvas, Dropdown } from 'bootstrap';
+
+// Initialize cache system
+cache.init();
 
 // --- Admin View Modules ---
 import renderAdminDashboardView from './views/dashboard.js';
@@ -22,6 +26,18 @@ import calendarEventFill from 'bootstrap-icons/icons/calendar-event-fill.svg';
 import folderFill from 'bootstrap-icons/icons/folder-fill.svg';
 import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
+
+// --- SIMPLE SIDEBAR CLOSE ---
+function closeSidebar(sidebarEl) {
+    if (!sidebarEl) return;
+    if (!sidebarEl.classList.contains('show')) return;
+    
+    // Use Bootstrap's dismiss button to trigger proper close
+    const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
+    if (closeBtn) {
+        closeBtn.click();
+    }
+}
 
 export default async function renderDashboardAdmin() {
     const app = document.getElementById("app");
@@ -39,45 +55,45 @@ export default async function renderDashboardAdmin() {
         app.innerHTML = `
       <div class="d-flex" style="min-height: 100vh;">
         <!-- Sidebar -->
-        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3 bg-dark text-white" style="width: 280px;" tabindex="-1" id="adminSidebar">
-          <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-white text-decoration-none">
-            <img src="${shieldLockFill}" alt="Admin" class="me-2" style="width: 1.5rem; height: 1.5rem; filter: invert(1);">
-            <span class="fs-4 fw-bold">Admin Panel</span>
+        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3" style="width: 260px; background-color: #fff; border-right: 1px solid #e5e7eb;" tabindex="-1" id="adminSidebar">
+          <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-decoration-none">
+            <img src="${shieldLockFill}" alt="Admin" class="me-2" style="width: 1.25rem; height: 1.25rem; filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);">
+            <span class="fs-5 fw-bold text-dark">Admin Panel</span>
           </a>
-          <hr>
+          <hr class="my-2" style="border-color: #e5e7eb;">
           <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item">
-              <a href="#" class="nav-link text-white" data-view="dashboard">
-                <img src="${grid1x2Fill}" alt="Dashboard" class="me-2" style="width: 1.2em; height: 1.2em; filter: invert(1);">Dashboard
+              <a href="#" class="nav-link" data-view="dashboard">
+                <img src="${grid1x2Fill}" alt="Dashboard" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Dashboard
               </a>
             </li>
             <li>
-              <a href="#" class="nav-link text-white" data-view="accounts">
-                <img src="${peopleFill}" alt="Accounts" class="me-2" style="width: 1.2em; height: 1.2em; filter: invert(1);">Accounts
+              <a href="#" class="nav-link" data-view="accounts">
+                <img src="${peopleFill}" alt="Accounts" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Accounts
               </a>
             </li>
             <li>
-              <a href="#" class="nav-link text-white" data-view="events">
-                <img src="${calendarEventFill}" alt="Events" class="me-2" style="width: 1.2em; height: 1.2em; filter: invert(1);">Events
+              <a href="#" class="nav-link" data-view="events">
+                <img src="${calendarEventFill}" alt="Events" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Events
               </a>
             </li>
             <li>
-              <a href="#" class="nav-link text-white" data-view="files">
-                <img src="${folderFill}" alt="Files" class="me-2" style="width: 1.2em; height: 1.2em; filter: invert(1);">Files
+              <a href="#" class="nav-link" data-view="files">
+                <img src="${folderFill}" alt="Files" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Files
               </a>
             </li>
           </ul>
           
           <!-- User Menu Dropdown -->
           <div class="dropdown mt-auto">
-            <hr>
-            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
-              <img src="${personCircle}" alt="User" class="me-2" style="width: 32px; height: 32px; filter: invert(1);">
-              <strong>${profile.username || 'Admin'}</strong>
+            <hr class="my-2" style="border-color: #e5e7eb;">
+            <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
+              <img src="${personCircle}" alt="User" class="me-2" style="width: 28px; height: 28px; opacity: 0.7;">
+              <strong class="small">${profile.username || 'Admin'}</strong>
             </a>
-            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+            <ul class="dropdown-menu text-small shadow-sm border">
               <li>
-                <a class="dropdown-item text-danger fw-bold" href="#" id="logout-btn">
+                <a class="dropdown-item text-danger fw-medium" href="#" id="logout-btn">
                   <img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 1em; height: 1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out
                 </a>
               </li>
@@ -86,11 +102,11 @@ export default async function renderDashboardAdmin() {
         </aside>
 
         <!-- Main Content Wrapper -->
-        <div class="flex-grow-1" style="overflow-y: auto; height: 100vh; background-color: #f8f9fa;">
-          <header class="navbar d-lg-none bg-dark navbar-dark">
+        <div class="flex-grow-1" style="overflow-y: auto; height: 100vh; background-color: #f9fafb;">
+          <header class="navbar d-lg-none bg-white border-bottom">
             <div class="container-fluid">
-              <a class="navbar-brand" href="#">Admin Panel</a>
-              <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar">
+              <a class="navbar-brand fw-semibold" href="#">Admin Panel</a>
+              <button class="navbar-toggler border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar">
                 <span class="navbar-toggler-icon"></span>
               </button>
             </div>
@@ -164,9 +180,9 @@ export default async function renderDashboardAdmin() {
                 e.preventDefault();
                 const view = e.currentTarget.dataset.view;
                 renderContent(view);
-                // Hide the offcanvas sidebar on mobile after a link is clicked
-                if (sidebar.classList.contains('show')) {
-                    sidebarInstance.hide();
+                // Close sidebar on mobile
+                if (window.innerWidth < 992) {
+                    closeSidebar(sidebar);
                 }
             });
         });

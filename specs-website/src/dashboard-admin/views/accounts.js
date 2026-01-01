@@ -221,10 +221,6 @@ async function attachAccountsListeners() {
     };
 
     try {
-        // Fetch accounts, filtering by type != admin would be nice but Appwrite filter syntax on enum might be specific.
-        // We'll fetch all and filter client side or use queries if possible.
-        // We MUST expand 'students' to get name/email details.
-        // NOTE: In Appwrite, you expand by the attribute name of the relationship. In 'accounts' collection, it is 'students'.
         const response = await databases.listDocuments(
             DATABASE_ID, 
             COLLECTION_ID_ACCOUNTS, 

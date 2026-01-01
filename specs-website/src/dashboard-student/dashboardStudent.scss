@@ -1,1 +1,998 @@
 @import '../shared/dashboard.scss';
+
+// =====================================================
+// STUDENT DASHBOARD - MINIMALIST THEME
+// =====================================================
+
+// --- SIDEBAR (Clean Light Theme) ---
+.sidebar-gradient {
+  background: $white !important;
+  border-right: 1px solid $gray-200 !important;
+  box-shadow: none;
+  
+  // GPU acceleration for smooth animations
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+  
+  .logo-wrapper img {
+    background: $primary;
+    padding: 4px;
+    border-radius: 6px;
+  }
+  
+  .brand-text {
+    font-size: 1.1rem;
+    letter-spacing: -0.3px;
+    color: $gray-800;
+  }
+}
+
+// --- USER SECTION ---
+.user-welcome-section {
+  background: $gray-50;
+  
+  .user-avatar-ring {
+    padding: 2px;
+    border-radius: 50%;
+    background: $gray-200;
+  }
+  
+  .user-avatar {
+    width: 42px;
+    height: 42px;
+    background: $primary;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: white;
+  }
+}
+
+.nav-section-title {
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  color: $gray-500;
+  margin-left: 0.5rem;
+}
+
+.nav-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: $gray-100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// --- SIDEBAR LINKS ---
+.sidebar-link {
+  padding: 0.55rem 0.85rem !important;
+  border-radius: 6px !important;
+  margin-bottom: 0.15rem;
+  color: $gray-600 !important;
+  
+  span {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: $gray-600;
+  }
+  
+  &:hover {
+    background: $gray-100 !important;
+    
+    span {
+      color: $gray-800;
+    }
+  }
+  
+  &.active {
+    background: rgba($primary, 0.1) !important;
+    
+    span {
+      font-weight: 600;
+      color: $primary !important;
+    }
+    
+    .nav-icon-wrapper {
+      background: rgba($primary, 0.15);
+    }
+  }
+}
+
+// --- LOGOUT ---
+.btn-logout {
+  background: $gray-100;
+  border: 1px solid $gray-200;
+  color: $gray-600;
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  font-weight: 500;
+  
+  &:hover {
+    background: $danger;
+    border-color: $danger;
+    color: white;
+    
+    img {
+      filter: brightness(0) invert(1);
+    }
+  }
+}
+
+// --- MAIN CONTENT ---
+.main-content-area {
+  background: $gray-100;
+}
+
+// --- MOBILE NAVBAR ---
+.mobile-navbar {
+  background: $white;
+  border-bottom: 1px solid $gray-200;
+  z-index: 1040; // Below offcanvas and backdrop
+  
+  // Prevent glitching during sidebar animation
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  
+  .mobile-navbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    width: 100%;
+  }
+  
+  .menu-toggle-btn {
+    width: 38px;
+    height: 38px;
+    background: $gray-100;
+    border: 1px solid $gray-200;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    img {
+      background: $primary;
+      padding: 4px;
+      border-radius: 6px;
+      filter: brightness(0) invert(1);
+    }
+    
+    .brand-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: $gray-800;
+    }
+    
+    .brand-subtitle {
+      font-size: 0.6rem;
+      color: $gray-500;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+  }
+  
+  .mobile-user-avatar {
+    width: 36px;
+    height: 36px;
+    background: $primary;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: white;
+  }
+}
+
+.user-avatar-small {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+// --- DESKTOP TOPBAR ---
+.desktop-topbar {
+  background-color: $white !important;
+  border-bottom: 1px solid $gray-200;
+  z-index: 1020;
+  
+  .user-info {
+    border: 1px solid $gray-200;
+    
+    &:hover {
+      background: $gray-50 !important;
+    }
+  }
+
+  .btn-light {
+    background: $white;
+    border: 1px solid $gray-200;
+    
+    &:hover {
+      background: $gray-50;
+    }
+  }
+}
+
+// --- VIEW CONTENT ---
+#dashboard-content {
+  header h1::after {
+    display: none;
+  }
+}
+
+// =====================================================
+// EVENT CARDS - MINIMAL
+// =====================================================
+
+.student-event-card {
+  background: $white;
+  border-radius: 8px;
+  border: 1px solid $gray-200;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  
+  &:hover {
+    border-color: $gray-300;
+  }
+  
+  &.event-ended {
+    opacity: 0.7;
+    
+    .event-image {
+      filter: grayscale(30%);
+    }
+  }
+}
+
+.event-image-wrapper {
+  position: relative;
+  height: 160px;
+  overflow: hidden;
+}
+
+.event-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.event-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.3) 100%);
+  pointer-events: none;
+}
+
+.event-date-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: $white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  text-align: center;
+  min-width: 48px;
+  
+  .date-day {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $primary;
+    line-height: 1;
+  }
+  
+  .date-month {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: $gray-500;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+}
+
+.event-status-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  
+  &.upcoming {
+    background: $success;
+    color: white;
+  }
+  
+  &.ended {
+    background: $gray-500;
+    color: white;
+  }
+}
+
+.event-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.event-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: $gray-800;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-meta {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: $gray-500;
+    font-weight: 500;
+  }
+}
+
+.event-description {
+  font-size: 0.8rem;
+  color: $gray-500;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+  flex-grow: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-footer {
+  margin-top: auto;
+}
+
+.btn-view-event {
+  width: 100%;
+  background: $primary;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  
+  &:hover {
+    background: darken($primary, 5%);
+  }
+  
+  .arrow-icon {
+    filter: invert(1);
+  }
+}
+
+// --- EVENT MODAL ---
+.event-modal-content {
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.event-modal-header {
+  position: relative;
+  height: 200px;
+  
+  .modal-event-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .modal-image-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.5) 100%);
+  }
+}
+
+.modal-date-badge {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: $gray-800;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: $gray-50;
+  border-radius: 6px;
+  text-decoration: none;
+  color: $gray-700;
+  
+  &:hover {
+    background: $gray-100;
+    color: $primary;
+  }
+}
+
+// --- EVENTS HEADER ---
+.events-header {
+  .header-icon-wrapper {
+    width: 42px;
+    height: 42px;
+    background: $primary;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.search-input-wrapper {
+  position: relative;
+  min-width: 220px;
+  
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  
+  .form-control {
+    padding: 10px 14px 10px 40px;
+    border: 1px solid $gray-200;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    
+    &:focus {
+      border-color: $primary;
+      box-shadow: 0 0 0 2px rgba($primary, 0.1);
+    }
+  }
+}
+
+.filter-btn-group {
+  .btn-filter {
+    background: $white;
+    border: 1px solid $gray-200;
+    color: $gray-500;
+    padding: 8px 14px;
+    font-weight: 500;
+    font-size: 0.8rem;
+    
+    &:first-child {
+      border-radius: 6px 0 0 6px;
+    }
+    
+    &:last-child {
+      border-radius: 0 6px 6px 0;
+    }
+    
+    &:hover {
+      background: $gray-50;
+      color: $gray-700;
+    }
+    
+    &.active {
+      background: $primary;
+      border-color: $primary;
+      color: white;
+    }
+  }
+}
+
+.empty-events-state {
+  padding: 3rem 2rem;
+  text-align: center;
+  background: $white;
+  border-radius: 8px;
+  border: 1px solid $gray-200;
+  
+  .empty-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    background: $gray-100;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.25rem;
+  }
+}
+
+// --- ANIMATIONS (Subtle) ---
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+// --- CARDS ---
+.card {
+  border: 1px solid $gray-200;
+  border-radius: 8px;
+  box-shadow: none;
+  
+  &:hover {
+    border-color: $gray-300;
+  }
+}
+
+// --- TABLES ---
+.table-responsive {
+  .table {
+    thead th {
+      background: $gray-50;
+      border-bottom: 1px solid $gray-200;
+    }
+    
+    tbody tr:hover {
+      background-color: $gray-50;
+    }
+  }
+}
+
+// --- EMPTY STATE ---
+.empty-state {
+  padding: 3rem 2rem;
+  text-align: center;
+  
+  .empty-icon {
+    width: 70px;
+    height: 70px;
+    background: $gray-100;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.25rem;
+    
+    img {
+      width: 35px;
+      opacity: 0.4;
+    }
+  }
+  
+  h5 {
+    color: $gray-600;
+    font-weight: 600;
+  }
+  
+  p {
+    color: $gray-500;
+  }
+}
+
+// =====================================================
+// RESPONSIVE
+// =====================================================
+
+@include media-breakpoint-down(lg) {
+  .sidebar-gradient {
+    z-index: 1055 !important;
+    
+    // GPU acceleration to prevent flickering
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    
+    // Smooth transitions
+    transition: transform 0.3s ease-in-out !important;
+    
+    // Prevent content jumping during animation
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+  
+  .offcanvas-backdrop {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 1050 !important;
+    
+    // Prevent flickering
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+}
+
+@include media-breakpoint-up(lg) {
+  .main-content-area {
+    margin-left: 280px;
+    width: calc(100% - 280px);
+  }
+  
+  .sidebar-gradient {
+    position: fixed;
+    height: 100vh;
+    z-index: 1000;
+  }
+}
+
+@include media-breakpoint-down(md) {
+  #dashboard-content {
+    .student-event-card {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    
+    .event-image-wrapper {
+      height: 140px;
+    }
+    
+    #events-container.row > .col {
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
+    }
+    
+    .search-input-wrapper {
+      min-width: 100%;
+    }
+    
+    .filter-btn-group {
+      width: 100%;
+      
+      .btn-filter {
+        flex: 1;
+        padding: 8px 6px;
+        font-size: 0.75rem;
+      }
+    }
+  }
+  
+  .event-modal-header {
+    height: 160px;
+  }
+}
+
+// =====================================================
+// MOBILE-SPECIFIC STUDENT DASHBOARD STYLES
+// =====================================================
+
+@include media-breakpoint-down(md) {
+  // --- MOBILE NAVBAR ENHANCEMENTS ---
+  .mobile-navbar {
+    position: sticky;
+    top: 0;
+    
+    .mobile-navbar-inner {
+      padding: 8px 12px;
+    }
+    
+    .mobile-brand {
+      .brand-name {
+        font-size: 0.9rem;
+      }
+    }
+    
+    .mobile-user-avatar {
+      width: 34px;
+      height: 34px;
+      font-size: 0.8rem;
+    }
+  }
+  
+  // --- MOBILE EVENT CARDS ---
+  .student-event-card {
+    border-radius: 10px;
+    
+    .event-image-wrapper {
+      height: 120px;
+    }
+    
+    .event-date-badge {
+      padding: 5px 8px;
+      
+      .date-day {
+        font-size: 1.1rem;
+      }
+      
+      .date-month {
+        font-size: 0.55rem;
+      }
+    }
+    
+    .event-status-indicator {
+      padding: 3px 8px;
+      font-size: 0.6rem;
+    }
+    
+    .event-content {
+      padding: 0.85rem;
+    }
+    
+    .event-title {
+      font-size: 0.9rem;
+      margin-bottom: 0.35rem;
+    }
+    
+    .event-meta {
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+      
+      .meta-item {
+        font-size: 0.7rem;
+      }
+    }
+    
+    .event-description {
+      font-size: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .btn-view-event {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+  }
+  
+  // --- MOBILE EVENTS HEADER ---
+  .events-header {
+    .header-icon-wrapper {
+      width: 36px;
+      height: 36px;
+    }
+    
+    h1 {
+      font-size: 1.25rem !important;
+    }
+    
+    p {
+      font-size: 0.8rem !important;
+    }
+  }
+  
+  // --- MOBILE FILTER CONTROLS ---
+  .filter-btn-group {
+    display: flex;
+    width: 100%;
+    
+    .btn-filter {
+      flex: 1;
+      text-align: center;
+      padding: 0.6rem 0.5rem;
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+  }
+  
+  .search-input-wrapper {
+    .form-control {
+      padding: 8px 12px 8px 36px;
+      font-size: 0.875rem;
+    }
+    
+    .search-icon {
+      left: 10px;
+      width: 16px;
+    }
+  }
+  
+  // --- MOBILE PROFILE VIEW ---
+  .info-item {
+    padding: 0.85rem !important;
+    
+    .info-label {
+      font-size: 0.7rem;
+    }
+    
+    .info-value {
+      font-size: 0.9rem;
+    }
+  }
+  
+  // --- MOBILE PAYMENT/ATTENDANCE TABLES (Card View) ---
+  .table-responsive {
+    border: none;
+    background: transparent;
+    
+    table {
+      display: none;
+    }
+  }
+  
+  // Card-based layout for mobile tables
+  .mobile-payment-card,
+  .mobile-attendance-card {
+    background: $white;
+    border: 1px solid $gray-200;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+      
+      .item-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: $gray-800;
+        flex: 1;
+        padding-right: 0.5rem;
+      }
+    }
+    
+    .card-details {
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0;
+        border-bottom: 1px dashed $gray-100;
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        .label {
+          font-size: 0.75rem;
+          color: $gray-500;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        
+        .value {
+          font-size: 0.875rem;
+          color: $gray-700;
+          font-weight: 500;
+        }
+      }
+    }
+  }
+}
+
+// --- EXTRA SMALL DEVICES (< 375px) ---
+@include media-breakpoint-down(sm) {
+  .mobile-navbar {
+    .mobile-navbar-inner {
+      padding: 6px 10px;
+    }
+    
+    .menu-toggle-btn {
+      width: 34px;
+      height: 34px;
+    }
+    
+    .mobile-brand {
+      img {
+        width: 24px !important;
+        height: 24px !important;
+      }
+      
+      .brand-name {
+        font-size: 0.85rem;
+      }
+      
+      .brand-subtitle {
+        display: none;
+      }
+    }
+  }
+  
+  #dashboard-content {
+    padding: 0.75rem !important;
+    
+    header {
+      margin-bottom: 1rem !important;
+      
+      h1, .display-6 {
+        font-size: 1.15rem !important;
+      }
+    }
+  }
+  
+  .student-event-card {
+    .event-image-wrapper {
+      height: 100px;
+    }
+    
+    .event-content {
+      padding: 0.75rem;
+    }
+    
+    .event-title {
+      font-size: 0.85rem;
+    }
+  }
+  
+  .filter-btn-group .btn-filter {
+    padding: 0.5rem 0.35rem;
+    font-size: 0.65rem;
+  }
+}
+
+// --- TOAST ---
+#toast-container {
+  .toast {
+    min-width: 260px;
+    border-radius: 8px;
+    border: 1px solid $gray-200;
+  }
+}
+
+// --- PROFILE ---
+.info-item {
+  border: 1px solid transparent;
+  
+  &:hover {
+    border-color: $gray-200;
+    background: $gray-50 !important;
+  }
+}
+
+.modal-content {
+  .form-control,
+  .form-select {
+    border: 1px solid $gray-200;
+    
+    &:focus {
+      border-color: $primary;
+      box-shadow: 0 0 0 2px rgba($primary, 0.1);
+    }
+  }
+}

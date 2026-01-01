@@ -1,36 +1,20 @@
-import { app } from '../landing.js';
-import { databases, Query, storage } from '../../shared/appwrite.js';
+import { databases, Query } from '../../shared/appwrite.js';
 import { 
     DATABASE_ID, 
     COLLECTION_ID_EVENTS, 
     BUCKET_ID_EVENT_IMAGES 
 } from '../../shared/constants.js';
+import { imageCache, dataCache, generateCacheKey } from '../../shared/cache.js';
 
 import calendar from 'bootstrap-icons/icons/calendar2-week.svg';
 import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import clock from 'bootstrap-icons/icons/clock.svg';
 import imageAlt from 'bootstrap-icons/icons/image-alt.svg';
-import { renderHeader, renderFooter } from '../../shared/utils.js';
 
-const IMAGE_CACHE_KEY = 'eventImageCache';
-
+// Use centralized image cache
 function getCachedImageUrl(fileId, width = 400, height = 250) {
-    if (!fileId) return null;
-    try {
-        const cache = JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY)) || {};
-        if (cache[fileId]?.[`${width}x${height}`]) {
-            return cache[fileId][`${width}x${height}`];
-        }
-        const newUrl = storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80);
-        if (!cache[fileId]) cache[fileId] = {};
-        cache[fileId][`${width}x${height}`] = newUrl;
-        localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
-        return newUrl;
-    } catch (error) {
-        console.warn("Could not access event image cache.", error);
-        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80);
-    }
+    return imageCache.get(BUCKET_ID_EVENT_IMAGES, fileId, width, height, 'center', 80);
 }
 
 function createEventCardSkeletonHTML() {
@@ -83,7 +67,17 @@ async function fetchUpcomingEvents() {
     container.innerHTML = Array(3).fill(createEventCardSkeletonHTML()).join('');
 
     try {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.equal('event_ended', false), Query.orderAsc('date_to_held'), Query.limit(3)]);
+        const cacheKey = generateCacheKey('events_upcoming', { limit: 3 });
+        const response = await dataCache.getOrFetch(
+            cacheKey,
+            async () => await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
+                Query.equal('event_ended', false),
+                Query.orderAsc('date_to_held'),
+                Query.limit(3)
+            ]),
+            2 * 60 * 1000 // Cache for 2 minutes
+        );
+        
         if (response.documents.length > 0) {
             container.innerHTML = response.documents.map(doc => createGuestEventCard(doc, false)).join('');
         } else {
@@ -105,7 +99,17 @@ async function fetchPastEvents() {
     container.innerHTML = Array(3).fill(createEventCardSkeletonHTML()).join('');
 
     try {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.equal('event_ended', true), Query.orderDesc('date_to_held'), Query.limit(3)]);
+        const cacheKey = generateCacheKey('events_past', { limit: 3 });
+        const response = await dataCache.getOrFetch(
+            cacheKey,
+            async () => await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
+                Query.equal('event_ended', true),
+                Query.orderDesc('date_to_held'),
+                Query.limit(3)
+            ]),
+            5 * 60 * 1000 // Cache for 5 minutes
+        );
+        
         container.innerHTML = (response.documents.length > 0)
             ? response.documents.map(doc => createGuestEventCard(doc, true)).join('')
             : `<div class="col-12 text-center text-muted py-5"><img src="${clockHistory}" alt="Past events icon" style="width: 4rem; height: 4rem; opacity: 0.5;"><h4 class="fw-light mt-3">No Past Events Yet</h4><p>Our event history will appear here once events conclude.</p></div>`;
@@ -140,25 +144,19 @@ function initializeImageLoader() {
     });
 }
 
-export function renderEventsPage() {
-    app.innerHTML = `
-    <div class="landing-page">
-        ${renderHeader()}
-        <main>
-            <section id="events" class="py-5" style="padding-top: 6rem !important;">
-                <div class="container">
-                    <h2 class="text-center fw-bold mb-3">Our Events</h2>
-                    <p class="text-center text-muted mb-5">Stay updated with our latest activities and workshops.</p>
-                    <h3 class="fw-bold mb-4">Upcoming Events</h3>
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="upcoming-events-grid-container"></div>
-                    <hr class="my-5">
-                    <h3 class="fw-bold mb-4">Past Events</h3>
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="past-events-grid-container"></div>
-                </div>
-            </section>
-        </main>
-        ${renderFooter()}
-    </div>
+export function renderEventsPage(container) {
+    container.innerHTML = `
+        <section id="events" class="py-5 pt-7">
+            <div class="container">
+                <h2 class="text-center fw-bold mb-3">Our Events</h2>
+                <p class="text-center text-muted mb-5">Stay updated with our latest activities and workshops.</p>
+                <h3 class="fw-bold mb-4">Upcoming Events</h3>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="upcoming-events-grid-container"></div>
+                <hr class="my-5">
+                <h3 class="fw-bold mb-4">Past Events</h3>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="past-events-grid-container"></div>
+            </div>
+        </section>
     `;
 
     Promise.all([fetchUpcomingEvents(), fetchPastEvents()]).then(() => {

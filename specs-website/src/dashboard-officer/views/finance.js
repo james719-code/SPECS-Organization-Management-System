@@ -110,7 +110,7 @@ function createActivityCard(activity) {
 }
 
 /**
- * UPDATED: Force Scroll on Mobile
+ * UPDATED: Force Scroll on Mobile with Card Alternative
  */
 function getDetailViewHTML(groupName, revenues, expenses) {
     const createRow = (item, type) => {
@@ -137,10 +137,48 @@ function getDetailViewHTML(groupName, revenues, expenses) {
             </td>
         </tr>`;
     };
+    
+    // Mobile card for finance items
+    const createMobileCard = (item, type) => {
+        const collectionId = type === 'revenue' ? COLLECTION_ID_REVENUE : COLLECTION_ID_EXPENSES;
+        const date = new Date(type === 'revenue' ? item.date_earned : item.date_buy).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const isRev = type === 'revenue';
+        const total = item.price * item.quantity;
+        
+        return `
+        <div class="mobile-payment-item" data-doc-id="${item.$id}" data-collection-id="${collectionId}">
+            <div class="item-header">
+                <span class="item-name">${item.name}</span>
+                <span class="item-amount ${isRev ? 'text-success' : 'text-danger'}">${isRev ? '+' : '-'}${formatCurrency(total)}</span>
+            </div>
+            <div class="item-details">
+                <div class="detail-row">
+                    <span class="label">Date</span>
+                    <span class="value">${date}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Price</span>
+                    <span class="value">${formatCurrency(item.price)}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Qty</span>
+                    <span class="value">${item.quantity}</span>
+                </div>
+            </div>
+            <div class="item-actions">
+                <button class="btn btn-outline-primary btn-sm edit-btn flex-grow-1">
+                    <img src="${pencilSquare}" width="12" class="me-1"> Edit
+                </button>
+                <button class="btn btn-outline-danger btn-sm delete-btn">
+                    <img src="${trash}" width="12">
+                </button>
+            </div>
+        </div>`;
+    };
 
     return `
         <div class="finance-detail-view animate-fade-in-up container-fluid px-0">
-            <div class="d-flex align-items-center gap-3 mb-5">
+            <div class="d-flex align-items-center gap-3 mb-4 mb-md-5">
                 <button id="backToFinanceMainBtn" class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center hover-scale" style="width: 42px; height: 42px;">
                     <img src="${arrowUp}" style="transform: rotate(-90deg); width: 1rem; opacity: 0.6;">
                 </button>
@@ -151,6 +189,7 @@ function getDetailViewHTML(groupName, revenues, expenses) {
             </div>
             
             <div class="d-flex flex-column gap-4 pb-5">
+                <!-- Revenue Section -->
                 <div class="card border-0 shadow-sm overflow-hidden">
                     <div class="card-header bg-success-subtle border-0 py-3 px-4 d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center gap-2">
@@ -159,7 +198,9 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                         </div>
                         <span class="badge bg-success text-white rounded-pill px-2 py-1" style="font-size: 0.7rem;">${revenues.length} Items</span>
                     </div>
-                    <div class="card-body p-0 table-responsive" style="overflow-x: auto;">
+                    
+                    <!-- Desktop Table -->
+                    <div class="card-body p-0 table-responsive desktop-table" style="overflow-x: auto;">
                         <table class="table table-sm table-hover mb-0 align-middle text-nowrap" style="min-width: 800px; font-size: 0.85rem;">
                             <thead class="bg-light text-secondary text-uppercase">
                                 <tr>
@@ -176,8 +217,16 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Mobile Cards -->
+                    <div class="mobile-officer-card-list p-3">
+                        ${revenues.length 
+                            ? revenues.map(r => createMobileCard(r, 'revenue')).join('') 
+                            : '<div class="text-center text-muted py-4 small">No revenue records found.</div>'}
+                    </div>
                 </div>
 
+                <!-- Expense Section -->
                 <div class="card border-0 shadow-sm overflow-hidden">
                     <div class="card-header bg-danger-subtle border-0 py-3 px-4 d-flex align-items-center justify-content-between">
                          <div class="d-flex align-items-center gap-2">
@@ -186,7 +235,9 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                         </div>
                         <span class="badge bg-danger text-white rounded-pill px-2 py-1" style="font-size: 0.7rem;">${expenses.length} Items</span>
                     </div>
-                    <div class="card-body p-0 table-responsive" style="overflow-x: auto;">
+                    
+                    <!-- Desktop Table -->
+                    <div class="card-body p-0 table-responsive desktop-table" style="overflow-x: auto;">
                          <table class="table table-sm table-hover mb-0 align-middle text-nowrap" style="min-width: 800px; font-size: 0.85rem;">
                             <thead class="bg-light text-secondary text-uppercase">
                                 <tr>
@@ -202,6 +253,13 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                                 ${expenses.length ? expenses.map(e => createRow(e, 'expense')).join('') : '<tr><td colspan="6" class="text-center text-muted py-4 small">No expense records found.</td></tr>'}
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Mobile Cards -->
+                    <div class="mobile-officer-card-list p-3">
+                        ${expenses.length 
+                            ? expenses.map(e => createMobileCard(e, 'expense')).join('') 
+                            : '<div class="text-center text-muted py-4 small">No expense records found.</div>'}
                     </div>
                 </div>
             </div>

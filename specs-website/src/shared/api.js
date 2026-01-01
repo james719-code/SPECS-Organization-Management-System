@@ -10,6 +10,7 @@ import {
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';
+import { dataCache, imageCache, generateCacheKey } from './cache.js';
 
 export const api = {
     // --- EVENTS ---
@@ -126,14 +127,127 @@ export const api = {
 
     // --- STORAGE ---
     files: {
-        getFilePreview(fileId) {
-            return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES, fileId, 600, 400); // Default preview options
+        getFilePreview(fileId, width = 600, height = 400) {
+            // Use centralized image cache
+            return imageCache.get(BUCKET_ID_EVENT_IMAGES, fileId, width, height);
         },
         async uploadEventImage(file) {
             return storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), file);
         },
         async deleteEventImage(fileId) {
+            // Clear image cache when deleting
+            imageCache.clear(fileId);
             return storage.deleteFile(BUCKET_ID_EVENT_IMAGES, fileId);
+        }
+    },
+
+    // --- CACHE UTILITIES ---
+    cache: {
+        /**
+         * Clear all cached data (useful after mutations like create/update/delete)
+         */
+        clearAll() {
+            dataCache.clear();
+        },
+        /**
+         * Clear data cache by pattern
+         * @param {string} pattern - Regex pattern to match cache keys
+         */
+        clearByPattern(pattern) {
+            dataCache.clear(pattern);
+        },
+        /**
+         * Clear specific cache key
+         * @param {string} key - Cache key to clear
+         */
+        clearKey(key) {
+            dataCache.remove(key);
+        },
+        /**
+         * Get cache statistics
+         */
+        getStats() {
+            return {
+                images: imageCache.getStats(),
+                data: dataCache.getStats()
+            };
+        }
+    }
+};
+
+/**
+ * Cache-enabled API wrapper
+ * Use these methods when you want automatic caching of API responses
+ */
+export const cachedApi = {
+    events: {
+        /**
+         * List events with caching
+         * @param {number} limit - Max number of events
+         * @param {boolean} orderDesc - Order by date descending
+         * @param {number} ttl - Cache TTL in milliseconds (default: 2 minutes)
+         */
+        async list(limit = 100, orderDesc = true, ttl = 2 * 60 * 1000) {
+            const cacheKey = generateCacheKey('events_list', { limit, orderDesc });
+            return dataCache.getOrFetch(cacheKey, () => api.events.list(limit, orderDesc), ttl);
+        },
+        /**
+         * Get single event with caching
+         * @param {string} eventId - Event ID
+         * @param {number} ttl - Cache TTL in milliseconds (default: 5 minutes)
+         */
+        async get(eventId, ttl = 5 * 60 * 1000) {
+            const cacheKey = generateCacheKey('event', { id: eventId });
+            return dataCache.getOrFetch(cacheKey, () => api.events.get(eventId), ttl);
+        }
+    },
+
+    payments: {
+        /**
+         * List payments with caching
+         * @param {number} limit - Max number of payments
+         * @param {number} ttl - Cache TTL in milliseconds (default: 1 minute)
+         */
+        async list(limit = 5000, ttl = 60 * 1000) {
+            const cacheKey = generateCacheKey('payments_list', { limit });
+            return dataCache.getOrFetch(cacheKey, () => api.payments.list(limit), ttl);
+        },
+        /**
+         * List payments for a student with caching
+         * @param {string} studentId - Student ID
+         * @param {number} ttl - Cache TTL in milliseconds (default: 1 minute)
+         */
+        async listForStudent(studentId, ttl = 60 * 1000) {
+            const cacheKey = generateCacheKey('payments_student', { studentId });
+            return dataCache.getOrFetch(cacheKey, () => api.payments.listForStudent(studentId), ttl);
+        }
+    },
+
+    users: {
+        /**
+         * Get current user with caching
+         * @param {number} ttl - Cache TTL in milliseconds (default: 5 minutes)
+         */
+        async getCurrent(ttl = 5 * 60 * 1000) {
+            const cacheKey = 'current_user';
+            return dataCache.getOrFetch(cacheKey, () => api.users.getCurrent(), ttl);
+        },
+        /**
+         * Get student profile with caching
+         * @param {string} studentId - Student ID
+         * @param {number} ttl - Cache TTL in milliseconds (default: 5 minutes)
+         */
+        async getStudentProfile(studentId, ttl = 5 * 60 * 1000) {
+            const cacheKey = generateCacheKey('student_profile', { studentId });
+            return dataCache.getOrFetch(cacheKey, () => api.users.getStudentProfile(studentId), ttl);
+        },
+        /**
+         * List students with caching
+         * @param {number} ttl - Cache TTL in milliseconds (default: 2 minutes)
+         */
+        async listStudents(ttl = 2 * 60 * 1000) {
+            const cacheKey = 'students_list';
+            return dataCache.getOrFetch(cacheKey, () => api.users.listStudents(), ttl);
         }
     }
 };

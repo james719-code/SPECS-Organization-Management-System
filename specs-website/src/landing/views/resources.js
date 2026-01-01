@@ -11,7 +11,6 @@ import shieldCheck from 'bootstrap-icons/icons/shield-check.svg';
 import cpuFill from 'bootstrap-icons/icons/cpu-fill.svg';
 import lightbulbFill from 'bootstrap-icons/icons/lightbulb-fill.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
-import { renderHeader } from '../../shared/utils.js';
 import { storage } from '../../shared/appwrite.js';
 
 const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES;
@@ -175,7 +174,7 @@ async function getFilesFromAppwrite() {
 
 // --- Main Render Function ---
 
-export async function renderResourcesPage(app) {
+export async function renderResourcesPage(container) {
     const siteData = {
         bscsFeatures: [
             {
@@ -229,35 +228,33 @@ export async function renderResourcesPage(app) {
     // Get files from Appwrite
     const files = await getFilesFromAppwrite();
 
-    app.innerHTML = `
+    container.innerHTML = `
     <div class="resources-page">
-        ${renderHeader()}
-        <main>
-            <!-- Hero Section -->
-            <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
-                <div class="container pt-3 pt-md-4 pt-lg-5">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-10 col-xl-8 text-center">
-                            <h1 class="display-6 display-md-5 fw-bold mb-3 mb-md-4 pt-2 pt-md-4">Resources & Information</h1>
-                            <p class="lead fs-6 fs-md-5 mb-0 opacity-75 px-2 px-md-3">Everything you need to know about the BSCS program, career opportunities, and SPECS organization resources.</p>
-                        </div>
+        <!-- Hero Section -->
+        <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
+            <div class="container pt-3 pt-md-4 pt-lg-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10 col-xl-8 text-center">
+                        <h1 class="display-6 display-md-5 fw-bold mb-3 mb-md-4 pt-2 pt-md-4">Resources & Information</h1>
+                        <p class="lead fs-6 fs-md-5 mb-0 opacity-75 px-2 px-md-3">Everything you need to know about the BSCS program, career opportunities, and SPECS organization resources.</p>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- BSCS Program Section -->
-            <section id="about-bscs" class="py-4 py-md-5 py-lg-6 bg-light-subtle">
-                <div class="container">
-                    <div class="text-center mb-4 mb-md-5 mb-lg-6 px-2 px-md-3">
-                        <h2 class="fw-bold mb-3 mb-md-4 position-relative d-inline-block fs-3 fs-md-2">The BSCS Program</h2>
-                        <p class="text-muted col-lg-8 mx-auto mb-4 mb-md-5 px-md-5 fs-6 fs-md-5">The Bachelor of Science in Computer Science program at Partido State University equips students with a robust foundation in computing theories, programming, and system development to solve complex problems in various scientific and industrial domains.</p>
-                    </div>
-                    
-                    <div class="row g-3 g-md-4 mb-4 mb-md-5 mb-lg-6">
-                        ${siteData.bscsFeatures.map(createFeatureCardHTML).join('')}
-                    </div>
+        <!-- BSCS Program Section -->
+        <section id="about-bscs" class="py-4 py-md-5 py-lg-6 bg-light-subtle">
+            <div class="container">
+                <div class="text-center mb-4 mb-md-5 mb-lg-6 px-2 px-md-3">
+                    <h2 class="fw-bold mb-3 mb-md-4 position-relative d-inline-block fs-3 fs-md-2">The BSCS Program</h2>
+                    <p class="text-muted col-lg-8 mx-auto mb-4 mb-md-5 px-md-5 fs-6 fs-md-5">The Bachelor of Science in Computer Science program at Partido State University equips students with a robust foundation in computing theories, programming, and system development to solve complex problems in various scientific and industrial domains.</p>
                 </div>
-            </section>
+                
+                <div class="row g-3 g-md-4 mb-4 mb-md-5 mb-lg-6">
+                    ${siteData.bscsFeatures.map(createFeatureCardHTML).join('')}
+                </div>
+            </div>
+        </section>
 
             <!-- Career Opportunities Section -->
             <section class="py-4 py-md-5 py-lg-6">
@@ -368,9 +365,6 @@ export async function renderResourcesPage(app) {
                     </div>
                 </div>
             </section>
-        </main>
     </div>
     `;
-
-    document.head.appendChild(style);
 }

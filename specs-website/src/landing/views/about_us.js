@@ -10,7 +10,6 @@ import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import cameraVideoFill from 'bootstrap-icons/icons/camera-video-fill.svg';
 import codeSlash from 'bootstrap-icons/icons/code-slash.svg';
 import logoURL from '../../../public/logo.webp';
-import { renderHeader } from "../../shared/utils.js";
 
 const BUCKET_ID_PICTURES = import.meta.env.VITE_BUCKET_ID_PICTURES;
 const PICTURE_CACHE_KEY = 'pictureImageCache';
@@ -312,18 +311,16 @@ export function renderAboutUsPage(container) {
 
     container.innerHTML = `
     <div class="about-us-page">
-        ${renderHeader()}
-        <main>
-            <!-- Hero Section -->
-            <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
-                <div class="container pt-3 pt-md-4 pt-lg-5">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-10 col-xl-8 text-center">
-                            <h1 class="display-6 display-md-5 fw-bold mb-3 mb-md-4 pt-2 pt-md-4">About SPECS</h1>
-                            <p class="lead fs-6 fs-md-5 mb-0 opacity-75 px-2 px-md-3">The premier organization for Computer Science students at Partido State University.</p>
-                        </div>
+        <!-- Hero Section -->
+        <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
+            <div class="container pt-3 pt-md-4 pt-lg-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10 col-xl-8 text-center">
+                        <h1 class="display-6 display-md-5 fw-bold mb-3 mb-md-4 pt-2 pt-md-4">About SPECS</h1>
+                        <p class="lead fs-6 fs-md-5 mb-0 opacity-75 px-2 px-md-3">The premier organization for Computer Science students at Partido State University.</p>
                     </div>
                 </div>
+            </div>
             </section>
 
             <!-- About SPECS Section -->
@@ -437,7 +434,6 @@ export function renderAboutUsPage(container) {
                     </div>
                 </div>
             </section>
-        </main>
     </div>
     `;
 

@@ -153,10 +153,57 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
     
     const studentData = student.students || {};
     const displayName = studentData.name || student.username;
+    
+    // Helper to generate mobile card for payment
+    const createMobilePaymentCard = (p, isPending = true) => {
+        const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
+        let forName = p.activity;
+        if (p.is_event && p.events) {
+            if (p.events.event_name) forName = p.events.event_name;
+            else {
+                const ev = events.find(e => e.$id === p.events || e.$id === p.events.$id);
+                forName = ev ? ev.event_name : 'Linked Event';
+            }
+        }
+        
+        return `
+            <div class="mobile-payment-item">
+                <div class="item-header">
+                    <span class="item-name">${p.item_name}</span>
+                    <span class="item-amount ${isPending ? 'text-dark' : 'text-muted'}">${formatCurrency(p.price * p.quantity)}</span>
+                </div>
+                <div class="item-details">
+                    <div class="detail-row">
+                        <span class="label">For</span>
+                        <span class="value">${forName || '-'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Status</span>
+                        <span class="value">${isPending 
+                            ? '<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-2 py-1">Pending</span>' 
+                            : '<span class="badge bg-success-subtle text-success rounded-pill px-2 py-1">Paid</span>'}</span>
+                    </div>
+                </div>
+                ${isPending ? `
+                <div class="item-actions">
+                    <button class="btn btn-success btn-sm paid-payment-btn" data-payment='${paymentData}'>
+                        <i class="bi bi-check-circle-fill me-1"></i> Mark Paid
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm edit-payment-btn" data-payment='${paymentData}'>
+                        <i class="bi bi-pencil-fill"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm delete-payment-btn" data-payment-id="${p.$id}" data-payment-name="${p.item_name}">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    };
 
     return `
         <div class="student-payment-details-page container-fluid py-4 px-md-5">
-            <div class="d-flex align-items-center gap-3 mb-5">
+            <div class="d-flex align-items-center gap-3 mb-4 mb-md-5">
                 <button id="backToPaymentsBtn" class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center hover-scale" style="width: 48px; height: 48px;">
                     <img src="${arrowLeftIcon}" width="20" style="opacity: 0.6;">
                 </button>
@@ -166,12 +213,15 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                 </div>
             </div>
 
+            <!-- Pending Payments Section -->
             <div class="card border-0 shadow-sm mb-4 overflow-hidden">
-                <div class="card-header bg-warning-subtle border-0 py-3 px-4 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold m-0 text-warning-emphasis d-flex align-items-center gap-2"><i class="bi bi-hourglass-split"></i> Pending Payments</h6>
+                <div class="card-header bg-warning-subtle border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="fw-bold m-0 text-warning-emphasis d-flex align-items-center gap-2"><i class="bi bi-hourglass-split"></i> Pending</h6>
                     <span class="badge bg-warning text-dark rounded-pill px-3">${formatCurrency(totalDue)} Due</span>
                 </div>
-                <div class="card-body p-0 table-responsive">
+                
+                <!-- Desktop Table -->
+                <div class="card-body p-0 table-responsive desktop-table">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="bg-light text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Actions</th></tr></thead>
                         <tbody>${pending.length > 0 ? pending.map(p => {
@@ -204,14 +254,24 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Mobile Cards -->
+                <div class="mobile-officer-card-list p-3">
+                    ${pending.length > 0 
+                        ? pending.map(p => createMobilePaymentCard(p, true)).join('') 
+                        : '<div class="text-center text-muted py-4 small">No pending payments.</div>'}
+                </div>
             </div>
 
+            <!-- Payment History Section -->
             <div class="card border-0 shadow-sm overflow-hidden">
-                <div class="card-header bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold m-0 text-secondary d-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> Payment History</h6>
-                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-danger border-0 clear-paid-records-btn" data-student-id="${student.$id}" data-student-name="${displayName}"><i class="bi bi-trash me-1"></i> Clear History</button>` : ''}
+                <div class="card-header bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="fw-bold m-0 text-secondary d-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> History</h6>
+                    ${(totalDue === 0 && paid.length > 0) ? `<button class="btn btn-sm btn-outline-danger border-0 clear-paid-records-btn" data-student-id="${student.$id}" data-student-name="${displayName}"><i class="bi bi-trash me-1"></i> Clear</button>` : ''}
                 </div>
-                <div class="card-body p-0 table-responsive">
+                
+                <!-- Desktop Table -->
+                <div class="card-body p-0 table-responsive desktop-table">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="bg-white text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Status</th></tr></thead>
                         <tbody>${paid.length > 0 ? paid.map(p => {
@@ -223,6 +283,13 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                             return `<tr><td class="ps-4 text-muted">${p.item_name}</td><td class="text-muted small">${forName || '-'}</td><td class="text-end text-muted">${formatCurrency(p.price * p.quantity)}</td><td class="text-end pe-4"><span class="badge bg-success-subtle text-success rounded-pill px-2">Paid</span></td></tr>`;
                         }).join('') : '<tr><td colspan="4" class="text-center text-muted py-5 small">No payment history yet.</td></tr>'}</tbody>
                     </table>
+                </div>
+                
+                <!-- Mobile Cards -->
+                <div class="mobile-officer-card-list p-3">
+                    ${paid.length > 0 
+                        ? paid.map(p => createMobilePaymentCard(p, false)).join('') 
+                        : '<div class="text-center text-muted py-4 small">No payment history yet.</div>'}
                 </div>
             </div>
         </div>

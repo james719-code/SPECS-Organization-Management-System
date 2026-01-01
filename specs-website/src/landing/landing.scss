@@ -251,11 +251,23 @@ section:not(.hero-section-gradient):not(:first-of-type) {
   justify-content: center;
   min-height: 100vh;
   padding: 2rem 1rem;
-  background-color: $gray-100;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
 
   // Add top padding for auth containers too if header is present
   @include media-breakpoint-down(sm) {
     padding-top: 6rem;
+  }
+  
+  .card {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    
+    .card-body {
+      @include media-breakpoint-down(sm) {
+        padding: 2rem 1.5rem !important;
+      }
+    }
   }
 }
 
@@ -263,12 +275,14 @@ section:not(.hero-section-gradient):not(:first-of-type) {
   color: $gray-800;
   font-weight: 500;
   margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
-.form-control {
+.form-control, .form-select {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid $gray-300;
+  transition: all 0.2s ease;
 
   &:focus {
     border-color: $primary;
@@ -277,6 +291,23 @@ section:not(.hero-section-gradient):not(:first-of-type) {
   &::placeholder {
     color: $gray-500;
     font-style: italic;
+  }
+}
+
+.form-control-lg {
+  padding: 0.875rem 1.25rem;
+  font-size: 1rem;
+}
+
+.btn-lg {
+  padding: 0.875rem 1.5rem;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba($primary, 0.3);
   }
 }
 
