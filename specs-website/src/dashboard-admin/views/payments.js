@@ -1,20 +1,13 @@
 import { api } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 
-import trashIcon from 'bootstrap-icons/icons/trash.svg';
-import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
 import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
 import arrowLeftIcon from 'bootstrap-icons/icons/arrow-left.svg';
 import threeDotsIcon from 'bootstrap-icons/icons/three-dots.svg';
-import checkCircleFillIcon from 'bootstrap-icons/icons/check-circle-fill.svg';
-import pencilFillIcon from 'bootstrap-icons/icons/pencil-fill.svg';
-import trashFillIcon from 'bootstrap-icons/icons/trash-fill.svg';
 import eraserIcon from 'bootstrap-icons/icons/eraser.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import peopleIcon from 'bootstrap-icons/icons/people.svg';
-import personXIcon from 'bootstrap-icons/icons/person-x.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
-import wallet2Icon from 'bootstrap-icons/icons/wallet2.svg';
 
 const formatCurrency = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
 
@@ -80,8 +73,8 @@ function getInitialPaymentViewHTML() {
         <div class="admin-payments-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">Student Payments</h1>
-                    <p class="text-muted mb-0">Track dues, collect payments, and manage records.</p>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Payment Management</h1>
+                    <p class="text-muted mb-0">Assign dues, collect payments, and manage student records.</p>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
@@ -96,7 +89,7 @@ function getInitialPaymentViewHTML() {
             </header>
 
             <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
-                </div>
+            </div>
         </div>
 
         <button class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4 shadow-lg hover-scale d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; z-index: 1050;" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal" title="Add Payment">
@@ -118,7 +111,6 @@ function getInitialPaymentViewHTML() {
                 </div>
 
                 <div id="activity-group" class="mb-3"><label class="form-label small fw-bold text-muted">ACTIVITY NAME</label><input type="text" id="activityName" class="form-control" placeholder="e.g. 1st Semester Collection"></div>
-                <!-- UPDATED: Select value is Event ID now -->
                 <div id="event-group" class="mb-3 d-none"><label class="form-label small fw-bold text-muted">SELECT EVENT</label><select id="eventId" class="form-select">${eventOptions}</select></div>
                 
                 <hr class="my-4 text-muted opacity-25">
@@ -148,7 +140,6 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
     const studentData = student.students || {};
     const displayName = studentData.name || student.username;
 
-    // Helper to generate mobile card for payment
     const createMobilePaymentCard = (p, isPending = true) => {
         const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
         let forName = p.activity;
@@ -392,14 +383,11 @@ async function attachEventListeners(currentUser, profile) {
     try {
         const [paymentsRes, eventsRes, accountsRes] = await Promise.all([
             api.payments.list(),
-            api.events.list(5000, false), // Check logic for order asc/desc if needed
+            api.events.list(5000, false),
             api.users.listStudents()
         ]);
         allPayments = paymentsRes.documents;
-        events = eventsRes.documents.filter(e => !e.event_ended); // Filter in code or query? Query was event_ended=false. API `list` doesn't filter by `event_ended` by default.
-        // Actually api.events.list only sorts. We should probably filter.
-        // Or we can update api.events.list to accept filters. For now, filter in memory is safer or I update api.js.
-        // Let's stick to memory filter for simplicity as we already fetched.
+        events = eventsRes.documents.filter(e => !e.event_ended);
 
         allStudents = accountsRes.documents;
 
@@ -591,7 +579,7 @@ async function attachEventListeners(currentUser, profile) {
     }
 }
 
-export default function renderPaymentView(currentUser, profile) {
+export default function renderPaymentsView(currentUser, profile) {
     return {
         html: `<div class="admin-payments-container-wrapper d-flex flex-column" style="min-height: 100vh;"></div>`,
         afterRender: () => attachEventListeners(currentUser, profile)

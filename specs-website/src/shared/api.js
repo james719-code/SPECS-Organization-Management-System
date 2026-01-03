@@ -1,5 +1,5 @@
 import { databases, storage, account } from './appwrite.js';
-import { 
+import {
     DATABASE_ID,
     COLLECTION_ID_EVENTS,
     COLLECTION_ID_PAYMENTS,
@@ -13,7 +13,6 @@ import { Query, ID } from 'appwrite';
 import { dataCache, imageCache, generateCacheKey } from './cache.js';
 
 export const api = {
-    // --- EVENTS ---
     events: {
         async list(limit = 100, orderDesc = true) {
             const queries = [Query.limit(limit)];
@@ -37,7 +36,6 @@ export const api = {
         }
     },
 
-    // --- PAYMENTS ---
     payments: {
         async list(limit = 5000) {
             return databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(limit)]);
@@ -71,14 +69,13 @@ export const api = {
                 recorder: recorderId
             });
             // Update Payment Record
-            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { 
-                is_paid: true, 
-                date_paid: new Date().toISOString() 
+            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, {
+                is_paid: true,
+                date_paid: new Date().toISOString()
             });
         }
     },
 
-    // --- ATTENDANCE ---
     attendance: {
         async listForStudent(studentId) {
             return databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
@@ -105,7 +102,6 @@ export const api = {
         }
     },
 
-    // --- USERS (Students/Accounts) ---
     users: {
         async getCurrent() {
             return account.get();
@@ -125,7 +121,6 @@ export const api = {
         }
     },
 
-    // --- STORAGE ---
     files: {
         getFilePreview(fileId, width = 600, height = 400) {
             // Use centralized image cache
@@ -141,7 +136,6 @@ export const api = {
         }
     },
 
-    // --- CACHE UTILITIES ---
     cache: {
         /**
          * Clear all cached data (useful after mutations like create/update/delete)

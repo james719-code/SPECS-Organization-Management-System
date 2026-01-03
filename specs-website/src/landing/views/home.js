@@ -1,15 +1,12 @@
-// views/home.js
 
 import logoURL from '../../../public/logo.webp';
 
-// Icons
 import calendarCheck from 'bootstrap-icons/icons/calendar-check.svg';
 import arrowRight from 'bootstrap-icons/icons/arrow-right.svg';
 import chevronRight from 'bootstrap-icons/icons/chevron-right.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import laptop from 'bootstrap-icons/icons/laptop.svg';
 
-// Icons for Resources
 import mortarboard from 'bootstrap-icons/icons/mortarboard.svg';
 import briefcase from 'bootstrap-icons/icons/briefcase.svg';
 import folder2Open from 'bootstrap-icons/icons/folder2-open.svg';
@@ -19,7 +16,6 @@ import journalCode from 'bootstrap-icons/icons/journal-code.svg';
 import { Carousel } from 'bootstrap';
 import { fetchHighlights, fetchEvents } from '../data/data.js';
 
-// --- HELPER: Build Carousel Items ---
 const buildCarouselHTML = (highlights) => {
     if (!highlights || highlights.length === 0) {
         return '<div class="text-center py-5 text-muted bg-light rounded-4 border border-dashed">No highlights available at the moment.</div>';
@@ -48,7 +44,6 @@ const buildCarouselHTML = (highlights) => {
     }).join('');
 };
 
-// --- HELPER: Build Calendar Logic ---
 const buildCalendarHTML = (events) => {
     const today = new Date();
     const currentMonth = today.getMonth();
@@ -103,7 +98,6 @@ const buildCalendarHTML = (events) => {
 };
 
 
-// --- MAIN RENDER FUNCTION ---
 export async function renderHomePage(container) {
     const { documents: allHighlights } = await fetchHighlights();
     const upcomingEvents = await fetchEvents('upcoming');
@@ -218,7 +212,7 @@ export async function renderHomePage(container) {
                                             <div class="card-body p-3 d-flex align-items-center gap-3">
                                                 <div class="bg-light rounded-3 text-center px-3 py-2 border" style="min-width: 60px;">
                                                     <div class="fw-bold text-dark h5 mb-0">${new Date(e.date).getDate()}</div>
-                                                    <div class="small text-uppercase text-secondary" style="font-size: 0.65rem;">${monthNames[today.getMonth()].substring(0,3)}</div>
+                                                    <div class="small text-uppercase text-secondary" style="font-size: 0.65rem;">${monthNames[today.getMonth()].substring(0, 3)}</div>
                                                 </div>
                                                 <div class="flex-grow-1 overflow-hidden">
                                                     <h6 class="fw-bold text-dark mb-1 text-truncate">${e.title}</h6>
@@ -334,7 +328,7 @@ export async function renderHomePage(container) {
     `;
 
     const carEl = document.getElementById('highlightsCarousel');
-    if(carEl && allHighlights.length > 0) {
+    if (carEl && allHighlights.length > 0) {
         new Carousel(carEl, { interval: 6000, touch: true });
     }
 }

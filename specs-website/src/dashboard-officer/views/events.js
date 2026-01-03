@@ -1,9 +1,7 @@
-// --- IMPORTS ---
 import { api } from '../../shared/api.js';
-import { ID } from 'appwrite'; 
+import { ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
-// --- SVG ICON IMPORTS ---
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import pencilSquare from 'bootstrap-icons/icons/pencil-square.svg';
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
@@ -197,8 +195,6 @@ function getEventsHTML() {
     </div>`;
 }
 
-// --- LOGIC FUNCTIONS ---
-
 function renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId) {
     wrapper.innerHTML = `
         <div class="mb-5">
@@ -226,7 +222,7 @@ function attachEventListeners(currentUser, userLookup) {
     const addEventModal = new Modal(document.getElementById('addEventModal'));
     const editEventModal = new Modal(document.getElementById('editEventModal'));
     const attendanceModal = new Modal(document.getElementById('attendanceModal'));
-    
+
     const eventsViewContainer = document.querySelector('.events-view-container');
     const searchInput = document.getElementById('eventSearchInput');
 
@@ -247,7 +243,7 @@ function attachEventListeners(currentUser, userLookup) {
             wrapper.innerHTML = `<div class="alert alert-danger">Failed to load events.</div>`;
         }
     };
-    
+
     // Pre-fetch students for attendance search
     api.users.listStudents().then(res => { allStudentsCache = res.documents; });
 
@@ -259,7 +255,7 @@ function attachEventListeners(currentUser, userLookup) {
         tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>`;
         try {
             const res = await api.attendance.listForEvent(eventId);
-            if(res.documents.length === 0) {
+            if (res.documents.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted small py-3">No students marked present yet.</td></tr>`;
                 return;
             }
@@ -267,7 +263,7 @@ function attachEventListeners(currentUser, userLookup) {
             // Attendance record has `students` relationship. It expands to student profile doc.
             tbody.innerHTML = res.documents.map(rec => {
                 let name = "Unknown";
-                if(rec.students) {
+                if (rec.students) {
                     name = rec.students.name || "Student";
                 }
                 return `<tr>
@@ -277,7 +273,7 @@ function attachEventListeners(currentUser, userLookup) {
                     </td>
                 </tr>`;
             }).join('');
-        } catch(e) { console.error(e); tbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger small py-3">Error loading list.</td></tr>`; }
+        } catch (e) { console.error(e); tbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger small py-3">Error loading list.</td></tr>`; }
     };
 
     // DELEGATED CLICKS
@@ -286,7 +282,7 @@ function attachEventListeners(currentUser, userLookup) {
         const markEndedBtn = e.target.closest('.mark-ended-btn');
         const deleteBtn = e.target.closest('.delete-event-btn');
         const attendanceBtn = e.target.closest('.take-attendance-btn');
-        
+
         // Collab logic
         const addCollabBtn = e.target.closest('#add-collaborator-btn, #edit-add-collaborator-btn');
         const removeCollabBtn = e.target.closest('.remove-collaborator-btn');
@@ -338,16 +334,16 @@ function attachEventListeners(currentUser, userLookup) {
     // ATTENDANCE SEARCH & ADD
     const attSearch = document.getElementById('studentAttendanceSearch');
     const attResults = document.getElementById('attendance-autocomplete');
-    
+
     attSearch.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
-        if(term.length < 2) { attResults.style.display = 'none'; return; }
-        
+        if (term.length < 2) { attResults.style.display = 'none'; return; }
+
         const matches = allStudentsCache.filter(s => {
             const name = (s.students && s.students.name) ? s.students.name : s.username;
             return name.toLowerCase().includes(term);
         }).slice(0, 5);
-        
+
         attResults.innerHTML = matches.map(s => {
             const name = (s.students && s.students.name) ? s.students.name : s.username;
             // Need Student Profile ID
@@ -356,30 +352,30 @@ function attachEventListeners(currentUser, userLookup) {
         }).join('');
         attResults.style.display = matches.length ? 'block' : 'none';
     });
-    
+
     attResults.addEventListener('click', async (e) => {
         e.preventDefault();
         const link = e.target.closest('a');
-        if(!link) return;
-        
+        if (!link) return;
+
         const sId = link.dataset.sid;
         const name = link.dataset.name;
-        
-        if(confirm(`Mark ${name} as present?`)) {
+
+        if (confirm(`Mark ${name} as present?`)) {
             try {
                 await api.attendance.create(currentAttendanceEventId, sId, currentUserId, "Present");
                 attSearch.value = '';
                 attResults.style.display = 'none';
                 refreshAttendanceList(currentAttendanceEventId);
-            } catch(err) { alert(err.message); }
+            } catch (err) { alert(err.message); }
         }
     });
 
     document.getElementById('attendanceListBody').addEventListener('click', async (e) => {
         const btn = e.target.closest('.delete-attendance-btn');
-        if(btn && confirm('Remove this attendance record?')) {
-             await api.attendance.delete(btn.dataset.id);
-             refreshAttendanceList(currentAttendanceEventId);
+        if (btn && confirm('Remove this attendance record?')) {
+            await api.attendance.delete(btn.dataset.id);
+            refreshAttendanceList(currentAttendanceEventId);
         }
     });
 

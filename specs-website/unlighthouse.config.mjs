@@ -6,7 +6,12 @@ export default {
     sitePaths: [
         '/',
         '/landing/',
-        '/dashboard-user/',
+        '/landing/#login',
+        '/landing/#signup',
+        '/landing/#events',
+        '/landing/#about',
+        '/dashboard-student/',
+        '/dashboard-officer/',
         '/dashboard-admin/',
     ],
     scanner: {
@@ -15,7 +20,6 @@ export default {
         robotsTxt: false,
     },
     // Use the explicit path to your Edge browser.
-    // This is the most reliable method.
     puppeteerOptions: {
         executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     },

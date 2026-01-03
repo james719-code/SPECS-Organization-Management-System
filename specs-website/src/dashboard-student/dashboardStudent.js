@@ -1,17 +1,29 @@
-// dashboardStudent.js
+
 import { api } from '../shared/api.js';
 import { account } from '../shared/appwrite.js';
+import { prefetchModule } from '../shared/lazyLoadHelper.js';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import { Offcanvas, Tooltip } from 'bootstrap';
 import './dashboardStudent.scss';
 
-// --- VIEW IMPORTS ---
-import renderEventsView from './views/events.js';
-import renderProfileView from './views/profile.js';
-import renderPaymentsView from './views/payments.js';
-import renderAttendanceView from './views/attendance.js';
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
-// --- ASSETS ---
+const viewModules = {
+    events: () => import('./views/events.js'),
+    profile: () => import('./views/profile.js'),
+    payments: () => import('./views/payments.js'),
+    attendance: () => import('./views/attendance.js')
+};
+
+const loadedModules = new Map();
+
+function prefetchCommonViews() {
+    prefetchModule(viewModules.profile);
+    prefetchModule(viewModules.payments);
+}
+
 import logo from '/logo.webp';
 import calendarIcon from 'bootstrap-icons/icons/calendar-event.svg';
 import personIcon from 'bootstrap-icons/icons/person.svg';
@@ -22,58 +34,64 @@ import listIcon from 'bootstrap-icons/icons/list.svg';
 import bellIcon from 'bootstrap-icons/icons/bell.svg';
 import globeIcon from 'bootstrap-icons/icons/globe.svg';
 
-// --- CONFIGURATION ---
 const MAIN_CONTENT_ID = 'dashboard-content';
 
-// --- STATE ---
-let currentUser = null;   // Appwrite Auth User
-let accountDoc = null;    // Identity Document (Collection: Accounts)
-let studentDoc = null;    // Profile Document (Collection: Students)
+let currentUser = null;
+let accountDoc = null;
+let studentDoc = null;
 
-// --- ROUTING MAP ---
-const views = {
-    '#events': { render: renderEventsView, title: 'Events', icon: calendarIcon },
-    '#profile': { render: renderProfileView, title: 'My Profile', icon: personIcon },
-    '#payments': { render: renderPaymentsView, title: 'My Payments', icon: walletIcon },
-    '#attendance': { render: renderAttendanceView, title: 'My Attendance', icon: clockIcon },
-    // Default
-    '': { render: renderEventsView, title: 'Events', icon: calendarIcon }
+const viewMeta = {
+    '#events': { moduleKey: 'events', title: 'Events', icon: calendarIcon },
+    '#profile': { moduleKey: 'profile', title: 'My Profile', icon: personIcon },
+    '#payments': { moduleKey: 'payments', title: 'My Payments', icon: walletIcon },
+    '#attendance': { moduleKey: 'attendance', title: 'My Attendance', icon: clockIcon },
+    '': { moduleKey: 'events', title: 'Events', icon: calendarIcon }
 };
 
-// --- INIT ---
 async function init() {
     try {
         // 0. Clean up any zombie backdrops from previous sessions/reloads
         cleanupBootstrapEffects();
 
-        // 1. Get Auth User
-        currentUser = await api.users.getCurrent();
+        // Use mock data in dev mode
+        if (DEV_BYPASS) {
+            const { getDevUser } = await import('../shared/mock/devUtils.js');
+            const { mockStudents } = await import('../shared/mock/mockData.js');
+            const mockUser = getDevUser('student');
+            currentUser = { $id: mockUser.$id, email: mockUser.email, name: mockUser.name };
+            accountDoc = mockUser;
+            studentDoc = mockStudents[0]; // Use first mock student
+            console.log('[DEV] Using mock student user:', mockUser.email);
+        } else {
+            // 1. Get Auth User
+            currentUser = await api.users.getCurrent();
 
-        // 2. Get Account Identity
-        accountDoc = await api.users.getAccount(currentUser.$id);
+            // 2. Get Account Identity
+            accountDoc = await api.users.getAccount(currentUser.$id);
 
-        // Security Check
-        if (accountDoc.type !== 'student' || !accountDoc.verified) {
-            window.location.replace('/landing/#pending-verification');
-            return;
+            // Security Check
+            if (accountDoc.type !== 'student' || !accountDoc.verified) {
+                window.location.replace('/landing/#pending-verification');
+                return;
+            }
+
+            // 3. Get Linked Student Profile
+            let rawStudentData = accountDoc.students;
+            if (Array.isArray(rawStudentData)) {
+                if (rawStudentData.length === 0) throw new Error("Student link is empty.");
+                rawStudentData = rawStudentData[0];
+            }
+
+            const linkedStudentId = (rawStudentData && typeof rawStudentData === 'object')
+                ? rawStudentData.$id
+                : rawStudentData;
+
+            if (!linkedStudentId) throw new Error("No linked student profile found.");
+
+            studentDoc = await api.users.getStudentProfile(linkedStudentId);
         }
 
-        // 3. Get Linked Student Profile
-        let rawStudentData = accountDoc.students;
-        if (Array.isArray(rawStudentData)) {
-            if (rawStudentData.length === 0) throw new Error("Student link is empty.");
-            rawStudentData = rawStudentData[0];
-        }
-
-        const linkedStudentId = (rawStudentData && typeof rawStudentData === 'object')
-            ? rawStudentData.$id
-            : rawStudentData;
-
-        if (!linkedStudentId) throw new Error("No linked student profile found.");
-
-        studentDoc = await api.users.getStudentProfile(linkedStudentId);
-
-        // 4. Setup Layout & UI
+        // 4. Setup Layout & UI (for both dev and production)
         setupLayout();
         setupNavigation();
         handleRoute();
@@ -84,33 +102,28 @@ async function init() {
         if (loading) loading.style.opacity = 0;
         setTimeout(() => { if (loading) loading.remove(); }, 300);
 
+        // Prefetch common views after initial render
+        prefetchCommonViews();
+
     } catch (error) {
         console.error("Dashboard Init Error:", error);
         window.location.replace('/landing/');
     }
 }
 
-// --- SIMPLE SIDEBAR CLOSE ---
 function closeSidebar() {
     const sidebarEl = document.getElementById('sidebarMenu');
     if (!sidebarEl) return;
-    
-    // Only close if actually showing
+
     if (!sidebarEl.classList.contains('show')) return;
-    
-    // Use Bootstrap's dismiss button click to trigger proper close
+
     const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-    if (closeBtn) {
-        closeBtn.click();
-    }
+    if (closeBtn) closeBtn.click();
 }
 
-// --- CLEANUP STRAY BACKDROPS ON INIT ---
 function cleanupBootstrapEffects() {
-    // Only remove extra backdrops (if more than 1 exists)
     const backdrops = document.querySelectorAll('.offcanvas-backdrop');
     if (backdrops.length > 1) {
-        // Keep only the first one
         for (let i = 1; i < backdrops.length; i++) {
             backdrops[i].remove();
         }
@@ -122,7 +135,7 @@ function setupLayout() {
     const userName = studentDoc.name || accountDoc.username || 'Student';
     const userInitial = userName.charAt(0).toUpperCase();
     const greeting = getGreeting();
-    
+
     // Construct Sidebar HTML (Minimal Light Theme)
     const sidebar = `
         <div class="offcanvas-lg offcanvas-start sidebar-gradient" tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel" style="width: 260px;">
@@ -153,7 +166,7 @@ function setupLayout() {
                         <small class="text-uppercase fw-bold nav-section-title">Navigation</small>
                     </div>
                     <nav class="nav nav-pills flex-column gap-1">
-                        ${Object.entries(views).filter(([k]) => k !== '').map(([hash, config]) => `
+                        ${Object.entries(viewMeta).filter(([k]) => k !== '').map(([hash, config]) => `
                             <a href="${hash}" class="nav-link d-flex align-items-center gap-3 sidebar-link">
                                 <div class="nav-icon-wrapper">
                                     <img src="${config.icon}" width="16" style="opacity: 0.6;">
@@ -235,7 +248,7 @@ function setupLayout() {
     `;
 
     app.innerHTML = mainHTML;
-    
+
     // Initialize tooltips
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     tooltipTriggerList.forEach(el => new Tooltip(el));
@@ -263,7 +276,7 @@ function setupNavigation() {
         e.preventDefault();
         const btn = e.currentTarget;
         const originalContent = btn.innerHTML;
-        
+
         try {
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span> Signing out...`;
@@ -284,7 +297,7 @@ async function handleRoute() {
     // No need to close here - it causes double-close issues
 
     const hash = window.location.hash || '#events';
-    const viewConfig = views[hash] || views['#events'];
+    const viewConfig = viewMeta[hash] || viewMeta['#events'];
 
     // Update page title
     const pageTitle = document.getElementById('page-title');
@@ -295,7 +308,7 @@ async function handleRoute() {
     document.querySelectorAll('.sidebar-link').forEach(link => {
         const linkHash = link.getAttribute('href');
         const icon = link.querySelector('img');
-        
+
         if (linkHash === hash) {
             link.classList.add('active');
             if (icon) {
@@ -324,7 +337,20 @@ async function handleRoute() {
     `;
 
     try {
-        const view = viewConfig.render(studentDoc, currentUser);
+        // Use cached module or load dynamically
+        let module;
+        const moduleKey = viewConfig.moduleKey;
+
+        if (loadedModules.has(moduleKey)) {
+            module = loadedModules.get(moduleKey);
+        } else {
+            const importFn = viewModules[moduleKey];
+            module = await importFn();
+            loadedModules.set(moduleKey, module);
+        }
+
+        const renderFn = module.default;
+        const view = renderFn(studentDoc, currentUser);
 
         if (view instanceof Promise) {
             const rendered = await view;

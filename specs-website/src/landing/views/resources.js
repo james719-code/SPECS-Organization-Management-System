@@ -7,7 +7,6 @@ import paletteFill from 'bootstrap-icons/icons/palette-fill.svg';
 import fileEarmarkTextFill from 'bootstrap-icons/icons/file-earmark-text-fill.svg';
 import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
 import shieldCheck from 'bootstrap-icons/icons/shield-check.svg';
-// Import the BSCS feature icons
 import cpuFill from 'bootstrap-icons/icons/cpu-fill.svg';
 import lightbulbFill from 'bootstrap-icons/icons/lightbulb-fill.svg';
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
@@ -171,8 +170,6 @@ async function getFilesFromAppwrite() {
         ];
     }
 }
-
-// --- Main Render Function ---
 
 export async function renderResourcesPage(container) {
     const siteData = {

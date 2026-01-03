@@ -3,7 +3,28 @@ import { app } from '../landing.js';
 import { account, databases } from '../../shared/appwrite.js';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../../shared/constants.js';
 
+// Check for dev mode
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
+
 export function renderLoginPage() {
+    // Dev mode quick login panel
+    const devPanel = DEV_BYPASS ? `
+        <div class="card border-warning mt-4">
+            <div class="card-header bg-warning text-dark fw-bold small">
+                Dev Quick Login (Mock Mode)
+            </div>
+            <div class="card-body p-3">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-sm btn-danger dev-login-btn" data-type="admin">Admin Dashboard</button>
+                    <button type="button" class="btn btn-sm btn-primary dev-login-btn" data-type="officer">Officer Dashboard</button>
+                    <button type="button" class="btn btn-sm btn-success dev-login-btn" data-type="student">Student Dashboard</button>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
     app.innerHTML = `
     <div class="container auth-container">
         <div class="row justify-content-center">
@@ -40,6 +61,7 @@ export function renderLoginPage() {
                                 <a href="#home" class="text-muted small text-decoration-none">← Back to Home</a>
                             </div>
                         </form>
+                        ${devPanel}
                     </div>
                 </div>
             </div>
@@ -52,6 +74,22 @@ export function renderLoginPage() {
     const buttonText = submitButton.querySelector('.button-text');
     const buttonSpinner = submitButton.querySelector('.spinner-border');
     const statusMessageDiv = document.getElementById('status-message');
+
+    // Dev mode quick login handlers
+    if (DEV_BYPASS) {
+        document.querySelectorAll('.dev-login-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const userType = e.target.dataset.type;
+                const redirectMap = {
+                    admin: '/dashboard-admin/',
+                    officer: '/dashboard-officer/',
+                    student: '/dashboard-student/'
+                };
+                console.log(`[DEV] Quick login as ${userType}`);
+                window.location.href = redirectMap[userType];
+            });
+        });
+    }
 
     loginForm.onsubmit = async (e) => {
         e.preventDefault();
@@ -81,9 +119,9 @@ export function renderLoginPage() {
             // 4. Route based on status
             if (profile.type === 'admin') {
                 window.location.href = '/dashboard-admin/';
-            }else if(profile.type === 'officer'){
+            } else if (profile.type === 'officer') {
                 window.location.href = '/dashboard-officer/';
-            }else if (profile.type === 'student' && profile.verified) {
+            } else if (profile.type === 'student' && profile.verified) {
                 window.location.href = '/dashboard-student/';
             } else {
                 window.location.hash = 'pending-verification';
@@ -158,10 +196,10 @@ export function renderForgotPasswordPage() {
         try {
             const resetUrl = `${window.location.origin}/landing/#reset-password`;
             await account.createRecovery(email, resetUrl);
-            
+
             statusMessageDiv.classList.add('text-success');
             statusMessageDiv.textContent = 'Password reset link sent! Check your email.';
-            
+
             setTimeout(() => {
                 window.location.hash = 'login';
             }, 3000);
@@ -169,7 +207,7 @@ export function renderForgotPasswordPage() {
             console.error("Password reset error:", err);
             statusMessageDiv.classList.add('text-danger');
             statusMessageDiv.textContent = err.message || "Failed to send reset link.";
-            
+
             submitButton.disabled = false;
             buttonText.textContent = 'Send Reset Link';
             buttonSpinner.classList.add('d-none');
@@ -257,10 +295,10 @@ export function renderResetPasswordPage() {
             }
 
             await account.updateRecovery(userId, secret, password);
-            
+
             statusMessageDiv.classList.add('text-success');
             statusMessageDiv.textContent = 'Password reset successful! Redirecting to login...';
-            
+
             setTimeout(() => {
                 window.location.hash = 'login';
             }, 2000);
@@ -268,7 +306,7 @@ export function renderResetPasswordPage() {
             console.error("Reset password error:", err);
             statusMessageDiv.classList.add('text-danger');
             statusMessageDiv.textContent = err.message || "Failed to reset password.";
-            
+
             submitButton.disabled = false;
             buttonText.textContent = 'Reset Password';
             buttonSpinner.classList.add('d-none');

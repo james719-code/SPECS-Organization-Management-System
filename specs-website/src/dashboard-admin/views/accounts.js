@@ -1,18 +1,16 @@
-// views/renderAdmin/accounts.js
 import { databases, storage, functions } from '../../shared/appwrite.js';
-import { 
-    DATABASE_ID, 
-    COLLECTION_ID_ACCOUNTS, 
+import {
+    DATABASE_ID,
+    COLLECTION_ID_ACCOUNTS,
     COLLECTION_ID_STUDENTS,
-    BUCKET_ID_RESUMES, 
-    BUCKET_ID_SCHEDULES, 
-    FUNCTION_PROMOTE_OFFICER, 
-    FUNCTION_ACCEPT_STUDENT 
+    BUCKET_ID_RESUMES,
+    BUCKET_ID_SCHEDULES,
+    FUNCTION_PROMOTE_OFFICER,
+    FUNCTION_ACCEPT_STUDENT
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
 import { Modal, Dropdown } from 'bootstrap';
 
-// --- SVG Icon Imports ---
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
 import trash from 'bootstrap-icons/icons/trash.svg';
 import threeDotsVertical from 'bootstrap-icons/icons/three-dots-vertical.svg';
@@ -25,12 +23,9 @@ import sortAlphaDown from 'bootstrap-icons/icons/sort-alpha-down.svg';
 import sortNumericDown from 'bootstrap-icons/icons/sort-numeric-down.svg';
 import award from 'bootstrap-icons/icons/award.svg';
 
-// --- Reusable Icon HTML strings ---
 const acceptIconHTML = `<img src="${checkCircle}" alt="Accept" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; filter: invert(42%) sepia(93%) saturate(1352%) hue-rotate(87deg) brightness(119%) contrast(119%);">Accept Student`;
 const promoteIconHTML = `<img src="${award}" alt="Promote" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; opacity: 0.6;">Promote to Officer`;
 const deleteIconHTML = `<img src="${trash}" alt="Delete" class="me-2" style="width: 1em; height: 1em; vertical-align: -0.125em; filter: invert(21%) sepia(30%) saturate(7469%) hue-rotate(348deg) brightness(98%) contrast(92%);">Delete User`;
-
-// --- HTML TEMPLATE FUNCTIONS ---
 
 function createAccountCardHTML(account) {
     const isVerified = account.verified === true;
@@ -48,14 +43,13 @@ function createAccountCardHTML(account) {
 
     const joinedDate = new Date(account.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // --- Actions ---
     let actions = '';
-    
+
     // Accept (only for unverified students)
     if (!isVerified && isStudent) {
         actions += `<li><a class="dropdown-item accept-btn fw-medium text-success" href="#" data-docid="${account.$id}">${acceptIconHTML}</a></li>`;
     }
-    
+
     // Promote (only for verified students who are not officers)
     if (isVerified && isStudent) {
         actions += `<li><a class="dropdown-item promote-btn fw-medium text-primary" href="#" data-docid="${account.$id}">${promoteIconHTML}</a></li>`;
@@ -64,9 +58,6 @@ function createAccountCardHTML(account) {
     // Delete (always available)
     actions += `<li><a class="dropdown-item delete-btn fw-medium text-danger" href="#" data-docid="${account.$id}">${deleteIconHTML}</a></li>`;
 
-    // --- Data Extraction ---
-    // account.students is the relationship. If expanded, it's an object. If not, it's an ID.
-    // We try to access fields if expanded.
     const studentData = (account.students && typeof account.students === 'object') ? account.students : {};
     const displayName = studentData.name || account.username;
     const displayEmail = studentData.email || 'No email linked';
@@ -171,12 +162,11 @@ function getAccountsHTML() {
     `;
 }
 
-// --- LOGIC AND EVENT LISTENERS ---
 async function attachAccountsListeners() {
     const cardsContainer = document.getElementById('user-cards-container');
     const searchInput = document.getElementById('userSearchInput');
     const sortOptions = document.querySelectorAll('[data-sort]');
-    
+
     const userDetailsModalEl = document.getElementById('userDetailsModal');
     const userDetailsModal = new Modal(userDetailsModalEl);
     const userDetailsModalBody = document.getElementById('userDetailsModalBody');
@@ -201,7 +191,7 @@ async function attachAccountsListeners() {
 
     const renderUserList = (accounts) => {
         const filtered = accounts.filter(acc => acc.type !== 'admin');
-        
+
         if (filtered.length === 0) {
             cardsContainer.innerHTML = `
                 <div class="col-12">
@@ -213,19 +203,19 @@ async function attachAccountsListeners() {
                 </div>`;
             return;
         }
-        
+
         const sorted = sortUsers(filtered, currentSort);
         cardsContainer.innerHTML = sorted.map(createAccountCardHTML).join('');
-        
+
         document.querySelectorAll('.dropdown-toggle').forEach(dd => new Dropdown(dd));
     };
 
     try {
         const response = await databases.listDocuments(
-            DATABASE_ID, 
-            COLLECTION_ID_ACCOUNTS, 
+            DATABASE_ID,
+            COLLECTION_ID_ACCOUNTS,
             [
-                Query.limit(100) 
+                Query.limit(100)
             ]
         );
         allAccounts = response.documents;
@@ -253,7 +243,7 @@ async function attachAccountsListeners() {
             e.preventDefault();
             sortOptions.forEach(opt => opt.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            
+
             currentSort = e.currentTarget.dataset.sort;
             // Re-render handled by reusing current list state logic if we refetch or just resort
             // Simplified: re-trigger search input event to re-filter & sort
@@ -268,7 +258,6 @@ async function attachAccountsListeners() {
         const deleteBtn = target.closest('.delete-btn');
         const card = target.closest('.account-card');
 
-        // --- ACCEPT ACTION ---
         if (acceptBtn) {
             e.preventDefault();
             const docId = acceptBtn.dataset.docid;
@@ -281,20 +270,20 @@ async function attachAccountsListeners() {
                 // However, usually we store UserID in the doc or make DocID = UserID. 
                 // Let's assume we pass the DocID and let the function figure it out or we need the owner ID.
                 // The 'accounts' collection often uses UserID as Document ID.
-                const userId = docId; 
+                const userId = docId;
 
                 const execution = await functions.createExecution(
                     FUNCTION_ACCEPT_STUDENT,
                     JSON.stringify({ userId: userId, accountDocId: docId }),
                     false
                 );
-                
+
                 if (execution.status === 'completed') {
                     // Update local state optimistic
-                     const acc = allAccounts.find(u => u.$id === docId);
-                     if(acc) acc.verified = true;
-                     renderUserList(allAccounts);
-                     alert('Student accepted successfully.');
+                    const acc = allAccounts.find(u => u.$id === docId);
+                    if (acc) acc.verified = true;
+                    renderUserList(allAccounts);
+                    alert('Student accepted successfully.');
                 } else {
                     console.error('Function execution status:', execution.status, execution.response);
                     alert('Acceptance processed. Refreshing list...');
@@ -311,11 +300,10 @@ async function attachAccountsListeners() {
             return;
         }
 
-        // --- PROMOTE ACTION ---
         if (promoteBtn) {
             e.preventDefault();
             if (!confirm("Are you sure you want to promote this student to Officer? They will gain access to the Officer Dashboard.")) return;
-            
+
             const docId = promoteBtn.dataset.docid;
             promoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Promoting...`;
 
@@ -326,13 +314,13 @@ async function attachAccountsListeners() {
                     JSON.stringify({ userId: userId, accountDocId: docId }),
                     false
                 );
-                 
+
                 // Refetch to show changes
                 setTimeout(async () => {
-                     const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS);
-                     allAccounts = res.documents;
-                     renderUserList(allAccounts);
-                     alert('User promoted to Officer.');
+                    const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS);
+                    allAccounts = res.documents;
+                    renderUserList(allAccounts);
+                    alert('User promoted to Officer.');
                 }, 1000);
 
             } catch (error) {
@@ -342,9 +330,8 @@ async function attachAccountsListeners() {
             return;
         }
 
-        // --- DELETE ACTION ---
         if (deleteBtn) {
-            e.preventDefault(); 
+            e.preventDefault();
             if (!confirm(`Are you sure you want to permanently delete this user's profile? This cannot be undone.`)) return;
             const docId = deleteBtn.dataset.docid;
             deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
@@ -363,7 +350,6 @@ async function attachAccountsListeners() {
             return;
         }
 
-        // --- VIEW DETAILS ---
         if (card) {
             const docId = card.dataset.docid;
             const account = allAccounts.find(u => u.$id === docId);
@@ -371,9 +357,9 @@ async function attachAccountsListeners() {
 
             const student = account.students || {};
             const name = student.name || account.username;
-            
+
             document.getElementById('userDetailsModalLabel').textContent = name;
-            
+
             // Build modal content
             let detailsHTML = `
                 <div class="text-center mb-4">
@@ -402,13 +388,12 @@ async function attachAccountsListeners() {
                     </div>
                 </div>
             `;
-            
+
             userDetailsModalBody.innerHTML = detailsHTML;
         }
     });
 }
 
-// --- Main export ---
 export default function renderAccountsView() {
     return {
         html: getAccountsHTML(),

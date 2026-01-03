@@ -1,9 +1,7 @@
-// --- IMPORTS ---
 import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 
-// --- SVG ICON IMPORTS ---
 import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
 import downloadIcon from 'bootstrap-icons/icons/download.svg';
 import trashIcon from 'bootstrap-icons/icons/trash.svg';
@@ -14,7 +12,6 @@ import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import infoCircle from 'bootstrap-icons/icons/info-circle.svg';
 
-// --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
 const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;

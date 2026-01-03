@@ -70,7 +70,127 @@ In building this application, specific architectural and technical choices were 
 - **UI:** Bootstrap 5 (via SCSS), Bootstrap Icons (SVG)
 - **Backend:** Appwrite Cloud (BaaS)
 - **Build Tool:** Vite
+- **Testing:** Vitest, @testing-library/dom
 - **Quality Control:** Unlighthouse (Performance & SEO Scanning)
+
+---
+
+## Performance Optimizations
+
+This project implements several performance optimizations for faster load times:
+
+### Code Splitting & Lazy Loading
+- **Dynamic Imports:** All dashboard views and landing page routes are lazily loaded using `import()` to reduce initial bundle size.
+- **Route Prefetching:** Commonly visited pages (login, signup) are prefetched after initial load.
+- **IntersectionObserver:** Utility for lazy loading below-the-fold components.
+
+### Build Optimizations
+- **Vendor Chunking:** Libraries are split into separate chunks (`vendor-appwrite`, `vendor-bootstrap`, `vendor-chart`).
+- **Console Removal:** Production builds automatically strip `console.log` statements using Terser.
+- **Tree Shaking:** Unused code is automatically removed from production bundles.
+
+### Code Quality
+- **Clean Codebase:** Unnecessary comments (file headers, section dividers, redundant inline comments) have been removed for improved readability and maintainability. The code is self-documenting through clear naming conventions.
+- **JSDoc Comments:** Preserved where they provide meaningful API documentation (e.g., `cache.js`, `cachedApi` wrapper).
+
+---
+
+## Development Mode Features
+
+### Mock Data System
+Enable mock data to develop without a backend connection:
+
+```bash
+# In your .env file
+VITE_USE_MOCK_DATA=true
+```
+
+When enabled:
+- Authentication is bypassed with auto-login
+- All API calls return realistic mock data
+- A Dev Quick Login panel appears on the landing page
+
+### Dev Quick Login
+In development mode with mock data enabled, a floating panel provides instant access to all dashboard types:
+- Admin Dashboard
+- Officer Dashboard  
+- Student Dashboard
+
+### Available Test Accounts (Mock Mode)
+| Type | Email | Description |
+|------|-------|-------------|
+| Admin | admin@specs.org | Full admin access |
+| Officer | officer@specs.org | Officer dashboard |
+| Student | john.doe@student.edu | Student dashboard |
+
+---
+
+## Testing
+
+### Running Tests
+```bash
+# Run all tests
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests once (CI mode)
+npm run test:run
+```
+
+### Test Structure
+```
+src/__tests__/
+  setup.js           # Global test setup and mocks
+  unit/
+    cache.test.js    # Cache utility tests
+    lazyLoadHelper.test.js  # Lazy loading tests
+  integration/
+    router.test.js   # Router integration tests
+```
+
+---
+
+## Multi-Provider Support
+
+The application supports multiple backend providers through an abstraction layer:
+
+### Supported Providers
+| Provider | Auth | Database | Storage |
+|----------|------|----------|---------|
+| Appwrite | Yes | Yes | Yes |
+| Firebase | Yes | Yes | No |
+| Cloudflare R2 | No | No | Yes |
+
+### Configuration
+Set providers in your `.env` file:
+
+```bash
+# Provider Selection
+VITE_AUTH_PROVIDER=appwrite     # appwrite or firebase
+VITE_DB_PROVIDER=appwrite       # appwrite or firebase
+VITE_STORAGE_PROVIDER=appwrite  # appwrite or cloudflare-r2
+```
+
+### Provider-Specific Configuration
+
+**Firebase (optional):**
+```bash
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+```
+
+**Cloudflare R2 (optional):**
+```bash
+VITE_R2_ENDPOINT=
+VITE_R2_BUCKET_NAME=
+VITE_R2_PUBLIC_URL=
+```
 
 ---
 

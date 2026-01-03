@@ -1,22 +1,17 @@
-// views/renderAdmin/events.js
 import { databases } from '../../shared/appwrite.js';
 import { Query } from 'appwrite';
 import { imageCache, dataCache, generateCacheKey } from '../../shared/cache.js';
 
-// --- SVG Icon Imports ---
 import calendarEvent from 'bootstrap-icons/icons/calendar-event.svg';
 import trash from 'bootstrap-icons/icons/trash.svg';
 import clock from 'bootstrap-icons/icons/clock.svg';
 import person from 'bootstrap-icons/icons/person.svg';
 import calendarX from 'bootstrap-icons/icons/calendar-x.svg';
 
-// --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
-
-// --- HTML TEMPLATE FUNCTIONS ---
 
 function createTimelineItemHTML(eventDoc, userLookup) {
     const creatorName = userLookup[eventDoc.added_by] || 'Unknown';
@@ -91,7 +86,6 @@ function getEventsHTML() {
     `;
 }
 
-// --- LOGIC AND EVENT LISTENERS ---
 async function attachEventsListeners() {
     const timelineContainer = document.getElementById('events-timeline-container');
 
@@ -138,7 +132,7 @@ async function attachEventsListeners() {
         try {
             await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, docId);
             await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, fileId);
-            
+
             // Animate removal
             const item = deleteBtn.closest('.timeline-item');
             item.style.transition = 'all 0.3s ease';
@@ -156,7 +150,6 @@ async function attachEventsListeners() {
     });
 }
 
-// --- Main export ---
 export default function renderEventsTimelineView() {
     return {
         html: getEventsHTML(),

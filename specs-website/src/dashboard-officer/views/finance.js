@@ -1,10 +1,8 @@
-// --- IMPORTS ---
 import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import Chart from 'chart.js/auto';
 
-// --- SVG ICON IMPORTS ---
 import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import inbox from 'bootstrap-icons/icons/inbox.svg';
 import calendarRange from 'bootstrap-icons/icons/calendar-range.svg';
@@ -19,22 +17,19 @@ import wallet2 from 'bootstrap-icons/icons/wallet2.svg';
 import graphUpArrow from 'bootstrap-icons/icons/graph-up-arrow.svg';
 import graphDownArrow from 'bootstrap-icons/icons/graph-down-arrow.svg';
 
-// --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
 const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const STORAGE_KEY_DATE_RANGE = 'finance_date_range_v2';
 
-// --- STATE MANAGEMENT ---
 let financeChart = null;
 
-// --- HELPERS ---
 const formatCurrency = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
 
 function getStoredDateRange() {
     const stored = localStorage.getItem(STORAGE_KEY_DATE_RANGE);
-    if (stored) { try { return JSON.parse(stored); } catch (e) {} }
+    if (stored) { try { return JSON.parse(stored); } catch (e) { } }
     const end = new Date();
     const start = new Date();
     start.setMonth(start.getMonth() - 11); // Default last 12 months
@@ -44,8 +39,6 @@ function getStoredDateRange() {
 function setStoredDateRange(sY, sM, eY, eM) {
     localStorage.setItem(STORAGE_KEY_DATE_RANGE, JSON.stringify({ startYear: sY, startMonth: sM, endYear: eY, endMonth: eM }));
 }
-
-// --- TEMPLATES ---
 
 function createSummaryCard(title, value, type) {
     let icon, colorClass, bgClass;
@@ -137,14 +130,14 @@ function getDetailViewHTML(groupName, revenues, expenses) {
             </td>
         </tr>`;
     };
-    
+
     // Mobile card for finance items
     const createMobileCard = (item, type) => {
         const collectionId = type === 'revenue' ? COLLECTION_ID_REVENUE : COLLECTION_ID_EXPENSES;
         const date = new Date(type === 'revenue' ? item.date_earned : item.date_buy).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
         const isRev = type === 'revenue';
         const total = item.price * item.quantity;
-        
+
         return `
         <div class="mobile-payment-item" data-doc-id="${item.$id}" data-collection-id="${collectionId}">
             <div class="item-header">
@@ -220,9 +213,9 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                     
                     <!-- Mobile Cards -->
                     <div class="mobile-officer-card-list p-3">
-                        ${revenues.length 
-                            ? revenues.map(r => createMobileCard(r, 'revenue')).join('') 
-                            : '<div class="text-center text-muted py-4 small">No revenue records found.</div>'}
+                        ${revenues.length
+            ? revenues.map(r => createMobileCard(r, 'revenue')).join('')
+            : '<div class="text-center text-muted py-4 small">No revenue records found.</div>'}
                     </div>
                 </div>
 
@@ -257,27 +250,25 @@ function getDetailViewHTML(groupName, revenues, expenses) {
                     
                     <!-- Mobile Cards -->
                     <div class="mobile-officer-card-list p-3">
-                        ${expenses.length 
-                            ? expenses.map(e => createMobileCard(e, 'expense')).join('') 
-                            : '<div class="text-center text-muted py-4 small">No expense records found.</div>'}
+                        ${expenses.length
+            ? expenses.map(e => createMobileCard(e, 'expense')).join('')
+            : '<div class="text-center text-muted py-4 small">No expense records found.</div>'}
                     </div>
                 </div>
             </div>
         </div>`;
 }
 
-// --- LOGIC ---
-
 function processDataForChart(revenues, expenses, start, end) {
     const data = {};
     let cursor = new Date(start);
     while (cursor <= end) {
-        data[`${cursor.getFullYear()}-${String(cursor.getMonth()).padStart(2,'0')}`] = 0;
+        data[`${cursor.getFullYear()}-${String(cursor.getMonth()).padStart(2, '0')}`] = 0;
         cursor.setMonth(cursor.getMonth() + 1);
     }
     const add = (items, mult) => items.forEach(i => {
         const d = new Date(i.date_earned || i.date_buy);
-        const k = `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`;
+        const k = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
         if (data[k] !== undefined) data[k] += (i.price * i.quantity) * mult;
     });
     add(revenues, 1); add(expenses, -1);
@@ -318,7 +309,7 @@ function renderChart(chartData) {
                 }
             },
             scales: {
-                y: { beginAtZero: true, grid: { borderDash: [4, 4], color: '#f3f4f6' }, ticks: { font: { family: "'Poppins', sans-serif", size: 10 }, color: '#9ca3af', callback: v => v >= 1000 ? v/1000 + 'k' : v } },
+                y: { beginAtZero: true, grid: { borderDash: [4, 4], color: '#f3f4f6' }, ticks: { font: { family: "'Poppins', sans-serif", size: 10 }, color: '#9ca3af', callback: v => v >= 1000 ? v / 1000 + 'k' : v } },
                 x: { grid: { display: false }, ticks: { font: { family: "'Poppins', sans-serif", size: 10 }, color: '#9ca3af' } }
             }
         }
@@ -340,8 +331,6 @@ function groupTransactions(revs, exps, eventMap) {
     proc(revs, 'rev'); proc(exps, 'exp');
     return Object.values(acts).sort((a, b) => b.lastDate - a.lastDate);
 }
-
-// --- EVENT LISTENERS ---
 
 function attachDetailViewListeners(user, userLookup) {
     const view = document.querySelector('.finance-detail-view');
@@ -376,8 +365,8 @@ function attachDetailViewListeners(user, userLookup) {
             row.querySelectorAll('td[data-field]').forEach(td => {
                 const val = td.dataset.originalValue;
                 const field = td.dataset.field;
-                if(field === 'date') td.innerHTML = new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-                else if(field === 'price') td.innerHTML = formatCurrency(val);
+                if (field === 'date') td.innerHTML = new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                else if (field === 'price') td.innerHTML = formatCurrency(val);
                 else td.textContent = val;
             });
             row.querySelector('.action-buttons').style.display = 'block';
@@ -395,7 +384,7 @@ function attachDetailViewListeners(user, userLookup) {
                 Object.entries(updates).forEach(([k, v]) => {
                     const f = k === 'date_earned' || k === 'date_buy' ? 'date' : k;
                     const cell = row.querySelector(`td[data-field="${f}"]`);
-                    if(cell) cell.dataset.originalValue = v;
+                    if (cell) cell.dataset.originalValue = v;
                 });
                 row.querySelector('.cancel-btn').click();
             } catch (err) { alert('Update failed.'); } finally { btn.disabled = false; }
@@ -408,8 +397,8 @@ function attachMainListeners(currentUser, userLookup, data) {
     const modalContainer = document.getElementById('finance-modal-fab-container');
 
     // 1. Render Modal & FAB
-    const years = Array.from({length: 6}, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}">${y}</option>`).join('');
-    const months = Array.from({length: 12}, (_, i) => `<option value="${i}">${new Date(0, i).toLocaleString('default', {month:'long'})}</option>`).join('');
+    const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => `<option value="${y}">${y}</option>`).join('');
+    const months = Array.from({ length: 12 }, (_, i) => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('');
     const eventOptions = data.events.map(e => `<option value="${e.$id}">${e.event_name}</option>`).join('');
 
     modalContainer.innerHTML = `
@@ -540,8 +529,6 @@ function attachMainListeners(currentUser, userLookup, data) {
     });
 }
 
-// --- MAIN EXPORT ---
-
 export default async function renderFinanceView(userLookup, currentUser) {
     const main = document.getElementById("dashboard-content");
     main.innerHTML = `<div id="finance-view-container" class="container-fluid py-4 px-md-5"></div><div id="finance-modal-fab-container"></div>`;
@@ -560,7 +547,7 @@ export default async function renderFinanceView(userLookup, currentUser) {
             databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(500)])
         ]);
 
-        const eventLookup = evRes.documents.reduce((a, e) => ({...a, [e.$id]: e.event_name}), {});
+        const eventLookup = evRes.documents.reduce((a, e) => ({ ...a, [e.$id]: e.event_name }), {});
         const acts = groupTransactions(rRes.documents, eRes.documents, eventLookup);
 
         // Calculate Totals
@@ -570,7 +557,7 @@ export default async function renderFinanceView(userLookup, currentUser) {
         container.innerHTML = `
             <div class="finance-overview animate-fade-in-up">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 gap-3">
-                    <div><h1 class="display-6 fw-bold text-dark mb-1">Financial Overview</h1><p class="text-muted m-0">Performance summary from ${start.toLocaleDateString(undefined, {month:'short', year:'numeric'})} to ${end.toLocaleDateString(undefined, {month:'short', year:'numeric'})}</p></div>
+                    <div><h1 class="display-6 fw-bold text-dark mb-1">Financial Overview</h1><p class="text-muted m-0">Performance summary from ${start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} to ${end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p></div>
                     <div class="d-flex gap-2">
                         <div class="input-group shadow-sm bg-white rounded-3 border-0" style="width: 250px;">
                             <span class="input-group-text bg-white border-0 ps-3"><img src="${searchIcon}" width="16" class="opacity-50"></span>

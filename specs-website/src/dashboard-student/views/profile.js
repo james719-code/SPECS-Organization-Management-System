@@ -5,7 +5,6 @@ import {
     COLLECTION_ID_STUDENTS
 } from '../../shared/constants.js';
 
-// Icons
 import personBadge from 'bootstrap-icons/icons/person-badge.svg';
 import envelope from 'bootstrap-icons/icons/envelope.svg';
 import geoAlt from 'bootstrap-icons/icons/geo-alt.svg';
@@ -201,11 +200,10 @@ function getProfileHTML() {
 
 async function attachProfileListeners(currentUser) {
     console.log("🔹 [Profile] Attempting to find Student Document with ID:", currentUser.$id);
-    
+
     let studentData = null;
 
     try {
-        // --- DIRECT FETCH: Look for Student Document using Auth ID ---
         studentData = await databases.getDocument(
             DATABASE_ID,
             COLLECTION_ID_STUDENTS,
@@ -214,13 +212,11 @@ async function attachProfileListeners(currentUser) {
 
         console.log("✅ [Profile] Student Document Found:", studentData);
 
-        // --- Update UI ---
-        // Prefer name from database, fallback to auth name
         const name = studentData.name || currentUser.name || "User";
 
         document.getElementById('profile-name').textContent = name;
         document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
-        
+
         const emailDisplay = document.getElementById('profile-email-display');
         if (emailDisplay) {
             emailDisplay.querySelector('span').textContent = studentData.email || currentUser.email;
@@ -248,7 +244,7 @@ async function attachProfileListeners(currentUser) {
             document.getElementById('profile-name').innerHTML = "<span class='text-danger'>Profile Not Found</span>";
             document.getElementById('profile-student-id').innerHTML =
                 "<span class='text-danger small'>No student document matches your Login ID.</span>";
-            
+
             const statusEl = document.getElementById('profile-status');
             if (statusEl) {
                 statusEl.className = 'badge bg-danger-subtle text-danger rounded-pill px-3 py-2 border border-danger-subtle';
@@ -261,12 +257,11 @@ async function attachProfileListeners(currentUser) {
             document.getElementById('profile-name').textContent = "Error loading data";
         }
     }
-    
-    // --- EDIT PROFILE FUNCTIONALITY ---
+
     const editBtn = document.getElementById('edit-profile-btn');
     const editModal = new Modal(document.getElementById('editProfileModal'));
     const editForm = document.getElementById('edit-profile-form');
-    
+
     editBtn?.addEventListener('click', () => {
         if (studentData) {
             // Pre-fill form with current data
@@ -277,23 +272,23 @@ async function attachProfileListeners(currentUser) {
         }
         editModal.show();
     });
-    
+
     editForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const saveBtn = document.getElementById('save-profile-btn');
         const originalText = saveBtn.innerHTML;
-        
+
         try {
             saveBtn.disabled = true;
             saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving...`;
-            
+
             const updatedData = {
                 name: document.getElementById('edit-name').value.trim(),
                 section: document.getElementById('edit-section').value.trim(),
                 yearLevel: document.getElementById('edit-year').value,
                 address: document.getElementById('edit-address').value.trim()
             };
-            
+
             // Update database
             await databases.updateDocument(
                 DATABASE_ID,
@@ -301,22 +296,22 @@ async function attachProfileListeners(currentUser) {
                 currentUser.$id,
                 updatedData
             );
-            
+
             // Update UI immediately
             document.getElementById('profile-name').textContent = updatedData.name;
             document.getElementById('profile-avatar').textContent = updatedData.name.charAt(0).toUpperCase();
             document.getElementById('profile-section').textContent = updatedData.section || 'N/A';
             document.getElementById('profile-year').textContent = updatedData.yearLevel || 'N/A';
             document.getElementById('profile-address').textContent = updatedData.address || 'N/A';
-            
+
             // Update local studentData
             studentData = { ...studentData, ...updatedData };
-            
+
             editModal.hide();
-            
+
             // Show success toast/feedback
             showToast('Profile updated successfully!', 'success');
-            
+
         } catch (error) {
             console.error('Error updating profile:', error);
             showToast('Failed to update profile. Please try again.', 'error');
@@ -325,30 +320,29 @@ async function attachProfileListeners(currentUser) {
             saveBtn.innerHTML = originalText;
         }
     });
-    
-    // --- DELETE ACCOUNT FUNCTIONALITY ---
+
     const deleteBtn = document.getElementById('delete-account-btn');
     const deleteModal = new Modal(document.getElementById('deleteAccountModal'));
     const deleteConfirmInput = document.getElementById('delete-confirm');
     const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-    
+
     deleteBtn?.addEventListener('click', () => {
         deleteConfirmInput.value = '';
         confirmDeleteBtn.disabled = true;
         deleteModal.show();
     });
-    
+
     deleteConfirmInput?.addEventListener('input', (e) => {
         confirmDeleteBtn.disabled = e.target.value !== 'DELETE';
     });
-    
+
     confirmDeleteBtn?.addEventListener('click', async () => {
         const originalText = confirmDeleteBtn.innerHTML;
-        
+
         try {
             confirmDeleteBtn.disabled = true;
             confirmDeleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
-            
+
             // Delete student document first
             if (studentData) {
                 await databases.deleteDocument(
@@ -357,23 +351,23 @@ async function attachProfileListeners(currentUser) {
                     currentUser.$id
                 );
             }
-            
+
             // Delete the user's identity (this will log them out)
             await account.deleteIdentity(currentUser.$id);
-            
+
             // Redirect to landing page
             window.location.href = '/landing/';
-            
+
         } catch (error) {
             console.error('Error deleting account:', error);
-            
+
             // If identity deletion fails, still try to sign out and redirect
             try {
                 await account.deleteSession('current');
             } catch (e) {
                 // Ignore session deletion errors
             }
-            
+
             showToast('Account deletion encountered an issue. Please contact support.', 'error');
             confirmDeleteBtn.disabled = false;
             confirmDeleteBtn.innerHTML = originalText;
@@ -393,9 +387,9 @@ function showToast(message, type = 'info') {
         const appDiv = document.getElementById('app');
         (appDiv || document.body).appendChild(toastContainer);
     }
-    
+
     const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-primary';
-    
+
     const toastHTML = `
         <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert">
             <div class="d-flex">
@@ -404,18 +398,18 @@ function showToast(message, type = 'info') {
             </div>
         </div>
     `;
-    
+
     const toastWrapper = document.createElement('div');
     toastWrapper.innerHTML = toastHTML;
     const toastEl = toastWrapper.firstElementChild;
     toastContainer.appendChild(toastEl);
-    
+
     // Auto remove after 4 seconds
     setTimeout(() => {
         toastEl.classList.remove('show');
         setTimeout(() => toastEl.remove(), 300);
     }, 4000);
-    
+
     // Handle manual close
     toastEl.querySelector('.btn-close')?.addEventListener('click', () => {
         toastEl.classList.remove('show');

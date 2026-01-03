@@ -1,4 +1,3 @@
-// dashboard.js
 
 import './dashboardOfficer.scss';
 import '../guard/auth.js';
@@ -6,18 +5,31 @@ import '../guard/auth.js';
 import { account, databases } from "../shared/appwrite.js";
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_EVENTS, COLLECTION_ID_FILES } from "../shared/constants.js";
 import { cache } from "../shared/cache.js";
+import { prefetchModule } from "../shared/lazyLoadHelper.js";
 import { Query } from "appwrite";
 import { Offcanvas, Dropdown } from 'bootstrap';
 
-// Initialize cache system
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
+
 cache.init();
 
-import renderFinanceView from "./views/finance.js";
-import renderFilesView from "./views/files.js";
-import renderEventsView from "./views/events.js";
-import renderSettingsView from "./views/settings.js";
-import renderStudentView from "./views/students.js";
-import renderPaymentView from "./views/payments.js";
+const viewModules = {
+  finance: () => import("./views/finance.js"),
+  files: () => import("./views/files.js"),
+  events: () => import("./views/events.js"),
+  settings: () => import("./views/settings.js"),
+  students: () => import("./views/students.js"),
+  payments: () => import("./views/payments.js")
+};
+
+const loadedModules = new Map();
+
+function prefetchCommonViews() {
+  prefetchModule(viewModules.files);
+  prefetchModule(viewModules.events);
+}
 
 import wallet from 'bootstrap-icons/icons/wallet.svg';
 import folder from 'bootstrap-icons/icons/folder.svg';
@@ -31,42 +43,55 @@ import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 
 const FILES_PAGE_LIMIT = 10;
 
-// --- SIMPLE SIDEBAR CLOSE ---
 function closeSidebar(sidebarEl) {
-    if (!sidebarEl) return;
-    if (!sidebarEl.classList.contains('show')) return;
-    
-    // Use Bootstrap's dismiss button to trigger proper close
-    const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-    if (closeBtn) {
-        closeBtn.click();
-    }
+  if (!sidebarEl) return;
+  if (!sidebarEl.classList.contains('show')) return;
+
+  const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
+  if (closeBtn) closeBtn.click();
 }
 
 export default async function renderDashboard() {
-    const app = document.getElementById("app");
+  const app = document.getElementById("app");
 
-    try {
-        // --- DATA FETCHING ---
-        const user = await account.get();
-        // Use ACCOUNTS collection
-        const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+  try {
+    let user, profile, initialFilesData, initialEventsData, userLookup;
 
-        const [filesResponse, eventsResponse, accountsResponse] = await Promise.all([
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.orderDesc('date_to_held')]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)])
-        ]);
+    // Use mock data in dev mode
+    if (DEV_BYPASS) {
+      const { getDevUser } = await import('../shared/mock/devUtils.js');
+      const { mockEvents, mockFiles, mockUsers } = await import('../shared/mock/mockData.js');
+      const mockUser = getDevUser('officer');
+      user = { $id: mockUser.$id, email: mockUser.email, name: mockUser.name };
+      profile = mockUser;
+      initialFilesData = { files: mockFiles, total: mockFiles.length };
+      initialEventsData = mockEvents;
+      userLookup = mockUsers.reduce((map, u) => {
+        map[u.$id] = u.name || u.username;
+        return map;
+      }, {});
+      console.log('[DEV] Using mock officer user:', mockUser.email);
+    } else {
+      user = await account.get();
+      // Use ACCOUNTS collection
+      profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
-        const initialFilesData = { files: filesResponse.documents, total: filesResponse.total };
-        const initialEventsData = eventsResponse.documents;
-        const userLookup = accountsResponse.documents.reduce((map, acc) => {
-            const name = (acc.students && acc.students.name) ? acc.students.name : acc.username;
-            map[acc.$id] = name;
-            return map;
-        }, {});
-        
-        app.innerHTML = `
+      const [filesResponse, eventsResponse, accountsResponse] = await Promise.all([
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.orderDesc('date_to_held')]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)])
+      ]);
+
+      initialFilesData = { files: filesResponse.documents, total: filesResponse.total };
+      initialEventsData = eventsResponse.documents;
+      userLookup = accountsResponse.documents.reduce((map, acc) => {
+        const name = (acc.students && acc.students.name) ? acc.students.name : acc.username;
+        map[acc.$id] = name;
+        return map;
+      }, {});
+    }
+
+    app.innerHTML = `
       <div class="d-flex" style="min-height: 100vh;">
         <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3" style="width: 260px; background-color: #fff; border-right: 1px solid #e5e7eb;" tabindex="-1" id="sidebar">
           <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-decoration-none">
@@ -111,79 +136,105 @@ export default async function renderDashboard() {
       </div>
     `;
 
-        const contentEl = document.getElementById("dashboard-content");
-        const viewLinks = document.querySelectorAll('#sidebar [data-view]');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarInstance = Offcanvas.getOrCreateInstance(sidebar);
+    const contentEl = document.getElementById("dashboard-content");
+    const viewLinks = document.querySelectorAll('#sidebar [data-view]');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarInstance = Offcanvas.getOrCreateInstance(sidebar);
 
-        const userDropdown = new Dropdown(document.querySelector('.dropdown-toggle'));
+    const userDropdown = new Dropdown(document.querySelector('.dropdown-toggle'));
 
-        const renderContent = async (viewName) => {
-            contentEl.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
+    const renderContent = async (viewName) => {
+      contentEl.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
 
-            viewLinks.forEach((link) => {
-                link.classList.remove("active");
-            });
+      viewLinks.forEach((link) => {
+        link.classList.remove("active");
+      });
 
-            const activeLink = document.querySelector(`#sidebar [data-view="${viewName}"]`);
-            if (activeLink) {
-                activeLink.classList.add("active");
-            }
+      const activeLink = document.querySelector(`#sidebar [data-view="${viewName}"]`);
+      if (activeLink) {
+        activeLink.classList.add("active");
+      }
 
-            try {
-                switch (viewName) {
-                    case "finance": await renderFinanceView(userLookup, user); break;
-                    case "files":
-                        const filesView = renderFilesView(initialFilesData, userLookup, user);
-                        contentEl.innerHTML = filesView.html; filesView.afterRender(); break;
-                    case "events":
-                        const eventsView = renderEventsView(initialEventsData, user, userLookup);
-                        contentEl.innerHTML = eventsView.html; eventsView.afterRender(); break;
-                    case "students":
-                        const studentView = renderStudentView(user, profile);
-                        contentEl.innerHTML = studentView.html;
-                        await studentView.afterRender();
-                        break;
-                    case "payments":
-                        const paymentView = renderPaymentView(user, profile);
-                        contentEl.innerHTML = paymentView.html;
-                        await paymentView.afterRender();
-                        break;
-                    case "settings":
-                        const settingsView = renderSettingsView(user, profile);
-                        contentEl.innerHTML = settingsView.html; settingsView.afterRender(); break;
-                    default: await renderFinanceView(userLookup, user);
-                }
-            } catch (error) {
-                console.error(`Error rendering ${viewName} view:`, error);
-                contentEl.innerHTML = `<div class="alert alert-danger mx-4"><h4>Error</h4><p>Could not load the ${viewName} page.</p></div>`;
-            }
-        };
+      try {
+        // Use cached module or load dynamically
+        let module;
+        if (loadedModules.has(viewName)) {
+          module = loadedModules.get(viewName);
+        } else {
+          const importFn = viewModules[viewName] || viewModules.finance;
+          module = await importFn();
+          loadedModules.set(viewName, module);
+        }
 
-        viewLinks.forEach((link) => {
-            link.addEventListener("click", (e) => {
-                e.preventDefault();
-                const view = e.currentTarget.dataset.view;
-                renderContent(view);
-                // Close sidebar on mobile
-                if (window.innerWidth < 992) {
-                    closeSidebar(sidebar);
-                }
-            });
-        });
+        const renderFn = module.default;
+        let view;
 
-        document.getElementById("logout-btn").addEventListener("click", async (e) => {
-            e.preventDefault();
-            await account.deleteSession("current");
-            window.location.href = "/landing/#login";
-        });
-        await renderContent("finance");
+        switch (viewName) {
+          case "finance":
+            await renderFn(userLookup, user);
+            break;
+          case "files":
+            view = renderFn(initialFilesData, userLookup, user);
+            contentEl.innerHTML = view.html;
+            view.afterRender();
+            break;
+          case "events":
+            view = renderFn(initialEventsData, user, userLookup);
+            contentEl.innerHTML = view.html;
+            view.afterRender();
+            break;
+          case "students":
+            view = renderFn(user, profile);
+            contentEl.innerHTML = view.html;
+            await view.afterRender();
+            break;
+          case "payments":
+            view = renderFn(user, profile);
+            contentEl.innerHTML = view.html;
+            await view.afterRender();
+            break;
+          case "settings":
+            view = renderFn(user, profile);
+            contentEl.innerHTML = view.html;
+            view.afterRender();
+            break;
+          default:
+            await renderFn(userLookup, user);
+        }
+      } catch (error) {
+        console.error(`Error rendering ${viewName} view:`, error);
+        contentEl.innerHTML = `<div class="alert alert-danger mx-4"><h4>Error</h4><p>Could not load the ${viewName} page.</p></div>`;
+      }
+    };
 
-    } catch (err) {
-        console.error("Failed to render dashboard:", err);
-        await account.deleteSession("current").catch(() => { });
-        window.location.href = "/landing/#login";
-    }
+    viewLinks.forEach((link) => {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        const view = e.currentTarget.dataset.view;
+        renderContent(view);
+        // Close sidebar on mobile
+        if (window.innerWidth < 992) {
+          closeSidebar(sidebar);
+        }
+      });
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", async (e) => {
+      e.preventDefault();
+      await account.deleteSession("current");
+      window.location.href = "/landing/#login";
+    });
+
+    await renderContent("finance");
+
+    // Prefetch common views after initial render
+    prefetchCommonViews();
+
+  } catch (err) {
+    console.error("Failed to render dashboard:", err);
+    await account.deleteSession("current").catch(() => { });
+    window.location.href = "/landing/#login";
+  }
 }
 
 renderDashboard();

@@ -1,36 +1,31 @@
-// --- IMPORTS ---
 import { databases, functions } from '../../shared/appwrite.js';
-import { 
-    DATABASE_ID, 
-    COLLECTION_ID_ACCOUNTS, 
-    FUNCTION_ACCEPT_STUDENT 
+import {
+    DATABASE_ID,
+    COLLECTION_ID_ACCOUNTS,
+    FUNCTION_ACCEPT_STUDENT
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
 
-// --- SVG ICON IMPORTS ---
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import envelopeIcon from 'bootstrap-icons/icons/envelope.svg';
 import mortarboardIcon from 'bootstrap-icons/icons/mortarboard.svg';
 
-// --- HELPERS ---
-// (Optional if needed for filters later)
 
-// --- HTML TEMPLATE FUNCTIONS ---
 
 function createStudentCardHTML(account) {
     const isVerified = account.verified === true;
-    const studentData = account.students || {}; 
+    const studentData = account.students || {};
     // Fallback if 'students' is just an ID string (not expanded)
     const isExpanded = typeof studentData === 'object' && studentData !== null;
-    
+
     const name = isExpanded ? (studentData.name || account.username) : account.username;
     const email = isExpanded ? (studentData.email || 'No email') : 'No email';
     const section = isExpanded ? (studentData.section || 'No Section') : 'No Section';
     const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-    const acceptBtn = !isVerified 
+    const acceptBtn = !isVerified
         ? `<button class="btn btn-sm btn-outline-success w-100 mt-3 accept-btn" data-docid="${account.$id}">
              <img src="${checkCircle}" width="14" class="me-1"> Accept Student
            </button>`
@@ -99,7 +94,6 @@ function getStudentHTML() {
     `;
 }
 
-// --- LOGIC ---
 async function attachEventListeners(currentUser, profile) {
     const cardsContainer = document.getElementById('student-cards-container');
     const filterSelect = document.getElementById('filterSelect');
@@ -155,8 +149,8 @@ async function attachEventListeners(currentUser, profile) {
     const loadData = async () => {
         try {
             const res = await databases.listDocuments(
-                DATABASE_ID, 
-                COLLECTION_ID_ACCOUNTS, 
+                DATABASE_ID,
+                COLLECTION_ID_ACCOUNTS,
                 [Query.limit(100), Query.orderDesc('$createdAt')]
             );
             allAccounts = res.documents;
@@ -180,18 +174,18 @@ async function attachEventListeners(currentUser, profile) {
             const docId = acceptBtn.dataset.docid;
             acceptBtn.disabled = true;
             acceptBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            
+
             try {
-                 const execution = await functions.createExecution(
+                const execution = await functions.createExecution(
                     FUNCTION_ACCEPT_STUDENT,
                     JSON.stringify({ userId: docId, accountDocId: docId }),
                     false
                 );
-                
+
                 if (execution.status === 'completed' || execution.status === 'processing') {
                     // Optimistic update
                     const acc = allAccounts.find(a => a.$id === docId);
-                    if(acc) acc.verified = true;
+                    if (acc) acc.verified = true;
                     applyFilters();
                     alert("Student accepted!");
                 } else {

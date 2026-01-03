@@ -1,7 +1,6 @@
 import { databases, storage, account } from "../../shared/appwrite.js";
 import { ID } from "appwrite";
 
-// --- SVG ICON IMPORTS ---
 import uploadIcon from 'bootstrap-icons/icons/upload.svg';
 import exclamationOctagonIcon from 'bootstrap-icons/icons/exclamation-octagon.svg';
 import personGear from 'bootstrap-icons/icons/person-gear.svg';
@@ -9,7 +8,6 @@ import lock from 'bootstrap-icons/icons/lock.svg';
 import shieldExclamation from 'bootstrap-icons/icons/shield-exclamation.svg';
 import calendarWeek from 'bootstrap-icons/icons/calendar-week.svg';
 
-// --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
@@ -48,7 +46,7 @@ function getSettingsHTML(user, profile) {
                                 <a href="${storage.getFileView(BUCKET_ID_SCHEDULES, profile.scheduleId)}" target="_blank" class="small text-success text-decoration-underline">View Current PDF</a>
                             </div>
                         </div>`
-        : `
+            : `
                         <div class="alert alert-light border text-muted d-flex align-items-center mb-0">
                             <i class="bi bi-info-circle me-2"></i>
                             <span class="small">Please upload your latest COE/Schedule (PDF) for verification.</span>
@@ -188,7 +186,6 @@ function getSettingsHTML(user, profile) {
 
 function attachEventListeners(user, profile) {
 
-    // --- GENERIC FORM HANDLER ---
     const setupForm = (formId, onSubmit) => {
         const form = document.getElementById(formId);
         if (!form) return;
@@ -254,7 +251,7 @@ function attachEventListeners(user, profile) {
         if (!file || file.size === 0) throw new Error("Please select a valid PDF.");
 
         if (profile.haveSchedule && profile.scheduleId) {
-            try { await storage.deleteFile(BUCKET_ID_SCHEDULES, profile.scheduleId); } catch(e) { console.warn("Old file delete failed", e); }
+            try { await storage.deleteFile(BUCKET_ID_SCHEDULES, profile.scheduleId); } catch (e) { console.warn("Old file delete failed", e); }
         }
 
         const uploaded = await storage.createFile(BUCKET_ID_SCHEDULES, ID.unique(), file);

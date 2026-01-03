@@ -1,11 +1,16 @@
 import { account, databases } from '../shared/appwrite.js';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants.js';
 
+// Check for dev mode bypass
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS_AUTH = IS_DEV && USE_MOCK_DATA;
+
 // Centralized Route Configuration
 const ROUTES = {
     ADMIN_DASHBOARD: '/dashboard-admin/',
-    OFFICER_DASHBOARD: '/dashboard-officer/',   // Assuming you have this
-    STUDENT_DASHBOARD: '/dashboard-user/',      // Your student dashboard path
+    OFFICER_DASHBOARD: '/dashboard-officer/',
+    STUDENT_DASHBOARD: '/dashboard-student/',
     LANDING_PAGE: '/landing/',
     LOGIN_PAGE: '/landing/#login',
     PENDING_PAGE: '/landing/#pending-verification'
@@ -14,48 +19,64 @@ const ROUTES = {
 (async () => {
     const currentPath = window.location.pathname;
 
-    // 1. Identify if we are on a "Public" page (Landing, Login, Signup)
-    // We generally don't want to kick people off these pages unless they are already logged in
+    // DEV MODE: Skip auth checks if using mock data
+    if (DEV_BYPASS_AUTH) {
+        console.log('[DEV] Auth bypass enabled - skipping authentication checks');
+
+        // Import dev utilities dynamically
+        const { devAutoLogin, initDevLoginPanel } = await import('../shared/mock/devUtils.js');
+
+        // Auto-login based on current dashboard
+        if (currentPath.includes('/dashboard-admin/')) {
+            await devAutoLogin('admin');
+        } else if (currentPath.includes('/dashboard-officer/')) {
+            await devAutoLogin('officer');
+        } else if (currentPath.includes('/dashboard-student/')) {
+            await devAutoLogin('student');
+        }
+
+        // Show dev panel on landing page
+        if (currentPath.includes('/landing') || currentPath === '/') {
+            setTimeout(() => initDevLoginPanel(), 500);
+        }
+
+        return; // Skip normal auth flow
+    }
+
+    // PRODUCTION MODE: Normal authentication flow
     const isPublicPage = currentPath.includes('/landing') || currentPath === '/';
 
     try {
-        // 2. Check Session
+        // Check Session
         const user = await account.get();
 
-        // 3. Fetch User Role & Status
+        // Fetch User Role & Status
         const profile = await databases.getDocument(
             DATABASE_ID,
             COLLECTION_ID_ACCOUNTS,
             user.$id
         );
 
-        const type = profile.type; // 'admin', 'officer', 'student'
+        const type = profile.type;
         const isVerified = profile.verified;
 
-        // --- RULE 1: Unverified Users ---
-        // If account exists but is not verified, strict quarantine.
-        // They are ONLY allowed on the pending page or to logout.
+        // RULE 1: Unverified Users
         if (!isVerified && type !== 'admin') {
-            // If they are inside ANY dashboard, kick them out to pending
             if (currentPath.includes('dashboard')) {
                 window.location.replace(ROUTES.PENDING_PAGE);
                 return;
             }
-            // If they are on the landing page but NOT on pending, suggest pending
-            // (Optional: usually we just let them be on landing, but ensure they can't go further)
             return;
         }
 
-        // --- RULE 2: Role-Based Routing (The Traffic Cop) ---
+        // RULE 2: Role-Based Routing
 
         // If user is ADMIN
         if (type === 'admin') {
-            // If trying to access Officer or Student dashboards -> Go to Admin
             if (currentPath.includes(ROUTES.OFFICER_DASHBOARD) || currentPath.includes(ROUTES.STUDENT_DASHBOARD)) {
                 window.location.replace(ROUTES.ADMIN_DASHBOARD);
                 return;
             }
-            // If on Public page (Landing) -> Auto-redirect to Dashboard (Convenience)
             if (isPublicPage) {
                 window.location.replace(ROUTES.ADMIN_DASHBOARD);
                 return;
@@ -64,12 +85,10 @@ const ROUTES = {
 
         // If user is OFFICER
         else if (type === 'officer') {
-            // If trying to access Admin or Student dashboards -> Go to Officer
             if (currentPath.includes(ROUTES.ADMIN_DASHBOARD) || currentPath.includes(ROUTES.STUDENT_DASHBOARD)) {
                 window.location.replace(ROUTES.OFFICER_DASHBOARD);
                 return;
             }
-            // If on Public page -> Auto-redirect
             if (isPublicPage) {
                 window.location.replace(ROUTES.OFFICER_DASHBOARD);
                 return;
@@ -78,12 +97,10 @@ const ROUTES = {
 
         // If user is STUDENT
         else if (type === 'student') {
-            // If trying to access Admin or Officer dashboards -> Go to Student
             if (currentPath.includes(ROUTES.ADMIN_DASHBOARD) || currentPath.includes(ROUTES.OFFICER_DASHBOARD)) {
                 window.location.replace(ROUTES.STUDENT_DASHBOARD);
                 return;
             }
-            // If on Public page -> Auto-redirect
             if (isPublicPage) {
                 window.location.replace(ROUTES.STUDENT_DASHBOARD);
                 return;
@@ -91,15 +108,10 @@ const ROUTES = {
         }
 
     } catch (error) {
-        // --- RULE 3: Not Logged In ---
-
-        // If check session failed (user is guest)
-        // AND they are trying to access a restricted page (Dashboards)
+        // RULE 3: Not Logged In
         if (currentPath.includes('dashboard')) {
             console.warn("Unauthorized access attempt. Redirecting to login.");
             window.location.replace(ROUTES.LOGIN_PAGE);
         }
-
-        // If they are on public pages, do nothing (let them view the landing page)
     }
 })();

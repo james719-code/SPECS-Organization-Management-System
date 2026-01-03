@@ -1,27 +1,25 @@
-// views/renderAdmin/dashboard.js
 import { databases, storage } from '../../shared/appwrite.js';
 import { Query } from 'appwrite';
 import Chart from 'chart.js/auto';
 
-// --- SVG Icon Imports ---
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import personExclamation from 'bootstrap-icons/icons/person-exclamation.svg';
 import calendarEventFill from 'bootstrap-icons/icons/calendar-event-fill.svg';
 import fileEarmarkArrowUpFill from 'bootstrap-icons/icons/file-earmark-arrow-up-fill.svg';
 import arrowUpShort from 'bootstrap-icons/icons/arrow-up-short.svg';
 
-
-// --- CONFIGURATION ---
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
 
-// To hold the chart instances
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
+
 let accountChart = null;
 let userTypeChart = null;
 
-// --- HTML TEMPLATE ---
 function getDashboardHTML() {
     return `
         <div class="admin-dashboard-container animate-fade-in-up">
@@ -36,7 +34,6 @@ function getDashboardHTML() {
             </div>
 
             <div class="row g-4 mb-4">
-                <!-- Stat Card 1 -->
                 <div class="col-sm-6 col-xl-3">
                     <div class="card h-100 border-0 shadow-sm hover-lift">
                         <div class="card-body">
@@ -52,7 +49,6 @@ function getDashboardHTML() {
                     </div>
                 </div>
 
-                <!-- Stat Card 2 -->
                 <div class="col-sm-6 col-xl-3">
                     <div class="card h-100 border-0 shadow-sm hover-lift">
                          <div class="card-body">
@@ -68,7 +64,6 @@ function getDashboardHTML() {
                     </div>
                 </div>
 
-                <!-- Stat Card 3 -->
                 <div class="col-sm-6 col-xl-3">
                     <div class="card h-100 border-0 shadow-sm hover-lift">
                          <div class="card-body">
@@ -84,7 +79,6 @@ function getDashboardHTML() {
                     </div>
                 </div>
 
-                <!-- Stat Card 4 -->
                 <div class="col-sm-6 col-xl-3">
                     <div class="card h-100 border-0 shadow-sm hover-lift">
                          <div class="card-body">
@@ -101,7 +95,6 @@ function getDashboardHTML() {
                 </div>
             </div>
 
-            <!-- Charts Row -->
             <div class="row g-4">
                 <div class="col-lg-8">
                      <div class="card border-0 shadow-sm">
@@ -134,44 +127,54 @@ function getDashboardHTML() {
     `;
 }
 
-// --- LOGIC AND EVENT LISTENERS ---
 async function attachDashboardListeners() {
     const totalAccountsEl = document.getElementById('total-accounts-stat');
     const pendingVerificationsEl = document.getElementById('pending-verifications-stat');
     const upcomingEventsEl = document.getElementById('upcoming-events-stat');
     const totalFilesEl = document.getElementById('total-files-stat');
     const growthStatEl = document.getElementById('growth-stat');
-    
+
     const growthChartCanvas = document.getElementById('accountGrowthChart');
     const typeChartCanvas = document.getElementById('userTypeChart');
 
     try {
-        const [usersResponse, eventsResponse, filesResponse] = await Promise.all([
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', new Date().toISOString())]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)]) // Just need count
-        ]);
+        let allAccounts, upcomingEventsCount, filesCount;
 
-        const allAccounts = usersResponse.documents;
+        if (DEV_BYPASS) {
+            const { mockUsers, mockEvents, mockFiles, getMockDashboardStats } = await import('../../shared/mock/mockData.js');
+            const stats = getMockDashboardStats();
+            allAccounts = mockUsers;
+            upcomingEventsCount = stats.upcomingEvents;
+            filesCount = stats.totalFiles;
+            console.log('[DEV] Using mock dashboard data');
+        } else {
+            const [usersResponse, eventsResponse, filesResponse] = await Promise.all([
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', new Date().toISOString())]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)])
+            ]);
+            allAccounts = usersResponse.documents;
+            upcomingEventsCount = eventsResponse.total;
+            filesCount = filesResponse.total;
+        }
+
         const studentAccounts = allAccounts.filter(u => u.type !== 'admin');
         const pendingVerifications = studentAccounts.filter(u => !u.verified).length;
 
-        // Calculate generic growth (this month vs last month simple approx)
         const now = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(now.getDate() - 30);
-        
+
         const newUsersLast30Days = allAccounts.filter(u => new Date(u.$createdAt) > thirtyDaysAgo).length;
         const totalUsers = allAccounts.length;
-        // Avoid division by zero
         const previousTotal = totalUsers - newUsersLast30Days;
         const growthPercentage = previousTotal > 0 ? ((newUsersLast30Days / previousTotal) * 100).toFixed(1) : 100;
 
         totalAccountsEl.textContent = totalUsers;
         growthStatEl.textContent = growthPercentage;
         pendingVerificationsEl.textContent = pendingVerifications;
-        upcomingEventsEl.textContent = eventsResponse.total;
-        totalFilesEl.textContent = filesResponse.total;
+        upcomingEventsEl.textContent = upcomingEventsCount;
+        totalFilesEl.textContent = filesCount;
 
         if (accountChart) accountChart.destroy();
         if (userTypeChart) userTypeChart.destroy();
@@ -194,17 +197,16 @@ async function attachDashboardListeners() {
             chartData.push(signupsByDate[dateString] || 0);
         }
 
-        // --- Chart Styling Config ---
         Chart.defaults.font.family = "'Poppins', 'Segoe UI', sans-serif";
         Chart.defaults.color = '#64748b';
 
         accountChart = new Chart(growthChartCanvas, {
-            type: 'line', 
-            data: { 
-                labels: chartLabels, 
+            type: 'line',
+            data: {
+                labels: chartLabels,
                 datasets: [{
-                    label: 'New Accounts', 
-                    data: chartData, 
+                    label: 'New Accounts',
+                    data: chartData,
                     fill: true,
                     backgroundColor: (context) => {
                         const ctx = context.chart.ctx;
@@ -215,7 +217,7 @@ async function attachDashboardListeners() {
                     },
                     borderColor: '#0d6b66',
                     borderWidth: 2,
-                    tension: 0.4, 
+                    tension: 0.4,
                     pointBackgroundColor: '#ffffff',
                     pointBorderColor: '#0d6b66',
                     pointBorderWidth: 2,
@@ -223,20 +225,20 @@ async function attachDashboardListeners() {
                     pointHoverRadius: 5
                 }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                scales: { 
-                    y: { 
-                        beginAtZero: true, 
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
                         grid: { borderDash: [5, 5], color: '#f1f5f9' },
                         ticks: { stepSize: 1 }
                     },
                     x: {
                         grid: { display: false }
                     }
-                }, 
-                plugins: { 
+                },
+                plugins: {
                     legend: { display: false },
                     tooltip: {
                         backgroundColor: '#1e293b',
@@ -262,10 +264,10 @@ async function attachDashboardListeners() {
                     borderWidth: 0
                 }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                plugins: { 
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
                 },
                 cutout: '70%'
@@ -283,7 +285,6 @@ async function attachDashboardListeners() {
     }
 }
 
-// --- Main export ---
 export default function renderAdminDashboardView() {
     return {
         html: getDashboardHTML(),
