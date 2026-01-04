@@ -127,10 +127,15 @@ function getProfileHTML() {
                             </h5>
                         </div>
                         <div class="card-body p-4">
-                            <div class="row align-items-center">
+                            <div class="row align-items-start">
                                 <div class="col-md-8">
-                                    <h6 class="fw-bold mb-2">Become a Volunteer</h6>
-                                    <p class="text-muted small mb-3">Volunteers can create and share posts with the SPECS community. Join our volunteer program to contribute to the organization!</p>
+                                    <h6 class="fw-bold mb-2">Join the SPECS Volunteer Team</h6>
+                                    <p class="text-muted small mb-3">Contribute to the SPECS community by sharing your experiences, achievements, and insights with fellow students.</p>
+                                    <div class="mb-3">
+                                        <span class="badge bg-primary-subtle text-primary me-2 mb-1">Create Posts</span>
+                                        <span class="badge bg-success-subtle text-success me-2 mb-1">Share Stories</span>
+                                        <span class="badge bg-info-subtle text-info mb-1">Build Portfolio</span>
+                                    </div>
                                     <div id="volunteer-status-container">
                                         <!-- Status will be dynamically inserted here -->
                                     </div>

@@ -63,8 +63,10 @@ async function init() {
             const mockUser = getDevUser('student');
             currentUser = { $id: mockUser.$id, email: mockUser.email, name: mockUser.name };
             accountDoc = mockUser;
-            studentDoc = mockStudents[0]; // Use first mock student
-            console.log('[DEV] Using mock student user:', mockUser.email);
+            // Find the matching student document based on the user's linked student ID
+            const linkedStudentId = mockUser.students?.$id;
+            studentDoc = mockStudents.find(s => s.$id === linkedStudentId) || mockStudents[0];
+            console.log('[DEV] Using mock student user:', mockUser.email, '-> studentDoc:', studentDoc?.name);
         } else {
             // 1. Get Auth User
             currentUser = await api.users.getCurrent();

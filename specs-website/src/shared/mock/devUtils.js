@@ -62,12 +62,17 @@ export async function devAutoLogin(userType = 'admin') {
 }
 
 /**
- * Get mock user by type
- * @param {string} userType - 'admin', 'officer', or 'student'
+ * Get mock user - returns currently logged in user from session, or falls back to type lookup
+ * @param {string} userType - 'admin', 'officer', or 'student' (fallback if no session)
  * @returns {Object|null} - User object or null
  */
 export function getDevUser(userType) {
     if (!IS_DEV) return null;
+    // First check if user is logged in via mock API (has active session)
+    if (mockApi.currentUser) {
+        return mockApi.currentUser;
+    }
+    // Fallback to type-based lookup for backwards compatibility
     return mockUsers.find(u => u.type === userType) || null;
 }
 

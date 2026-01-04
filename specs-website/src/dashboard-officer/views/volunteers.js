@@ -124,32 +124,40 @@ function getVolunteersHTML() {
             
             <!-- Stats Row -->
             <div class="row g-4 mb-5">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm">
+                <div class="col-6 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-warning mb-1" id="stat-pending">-</div>
-                            <div class="text-muted small">Pending</div>
+                            <div class="text-muted small">Pending Requests</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm">
+                <div class="col-6 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center py-4">
+                            <div class="display-6 fw-bold text-info mb-1" id="stat-backout">-</div>
+                            <div class="text-muted small">Backout Requests</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-success mb-1" id="stat-approved">-</div>
-                            <div class="text-muted small">Volunteers</div>
+                            <div class="text-muted small">Active Volunteers</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm">
+                <div class="col-6 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-danger mb-1" id="stat-rejected">-</div>
                             <div class="text-muted small">Rejected</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm">
+                <div class="col-12 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-primary mb-1" id="stat-total">-</div>
                             <div class="text-muted small">Total Students</div>
@@ -178,7 +186,8 @@ async function attachEventListeners(currentUser, profile) {
         const approved = allStudents.filter(s => s.is_volunteer === true).length;
         const rejected = allStudents.filter(s => s.volunteer_request_status === 'rejected').length;
 
-        document.getElementById('stat-pending').textContent = pending + backoutPending;
+        document.getElementById('stat-pending').textContent = pending;
+        document.getElementById('stat-backout').textContent = backoutPending;
         document.getElementById('stat-approved').textContent = approved;
         document.getElementById('stat-rejected').textContent = rejected;
         document.getElementById('stat-total').textContent = allStudents.length;

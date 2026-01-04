@@ -1,20 +1,25 @@
 // Mock data aligned with DATABASE.md schema
 
 // Mock credentials for dev login (email -> password)
+// These map directly to account emails for authentication
 export const mockCredentials = {
     'admin@specs.org': 'admin123',
     'maria.santos@student.edu': 'officer123',
     'john.doe@student.edu': 'student123',      // Student who IS a volunteer
-    'mike.johnson@student.edu': 'student456'   // Student who is NOT a volunteer
+    'jane.smith@student.edu': 'student789',    // Student with pending volunteer request
+    'mike.johnson@student.edu': 'student456',  // Student who is NOT a volunteer
+    'alex.rivera@student.edu': 'student321'    // Student with backout_pending status
 };
 
 
 // Collection: accounts (6858feff002fb157e032)
+// Each account has an email field that links to mockCredentials for authentication
 export const mockAccounts = [
     {
         $id: 'account-admin-1',
         $createdAt: '2025-09-01T00:00:00.000Z',
         $updatedAt: '2025-12-15T00:00:00.000Z',
+        email: 'admin@specs.org',
         username: 'admin',
         type: 'admin',
         verified: true,
@@ -26,6 +31,7 @@ export const mockAccounts = [
         $id: 'account-officer-1',
         $createdAt: '2025-09-01T00:00:00.000Z',
         $updatedAt: '2025-12-15T00:00:00.000Z',
+        email: 'maria.santos@student.edu',
         username: 'msantos',
         type: 'officer',
         verified: true,
@@ -37,6 +43,7 @@ export const mockAccounts = [
         $id: 'account-student-1',
         $createdAt: '2025-10-01T00:00:00.000Z',
         $updatedAt: '2025-12-20T00:00:00.000Z',
+        email: 'john.doe@student.edu',
         username: 'johndoe',
         type: 'student',
         verified: true,
@@ -48,6 +55,7 @@ export const mockAccounts = [
         $id: 'account-student-2',
         $createdAt: '2025-10-05T00:00:00.000Z',
         $updatedAt: '2025-12-18T00:00:00.000Z',
+        email: 'jane.smith@student.edu',
         username: 'janesmith',
         type: 'student',
         verified: true,
@@ -59,10 +67,23 @@ export const mockAccounts = [
         $id: 'account-student-3',
         $createdAt: '2025-10-10T00:00:00.000Z',
         $updatedAt: '2025-12-22T00:00:00.000Z',
+        email: 'mike.johnson@student.edu',
         username: 'mikej',
         type: 'student',
-        verified: false,
+        verified: true,
         students: { $id: 'student-3' },
+        admins: null,
+        officers: null
+    },
+    {
+        $id: 'account-student-4',
+        $createdAt: '2025-09-15T00:00:00.000Z',
+        $updatedAt: '2026-01-03T00:00:00.000Z',
+        email: 'alex.rivera@student.edu',
+        username: 'alexr',
+        type: 'student',
+        verified: true,
+        students: { $id: 'student-4' },
         admins: null,
         officers: null
     }
@@ -125,6 +146,20 @@ export const mockStudents = [
         is_volunteer: false,
         volunteer_request_status: 'none',
         payments: ['payment-3']
+    },
+    {
+        $id: 'student-4',
+        $createdAt: '2025-09-15T00:00:00.000Z',
+        $updatedAt: '2026-01-03T00:00:00.000Z',
+        name: 'Alex Rivera',
+        email: 'alex.rivera@student.edu',
+        section: 'BSCS-3B',
+        address: '321 Elm St, City',
+        yearLevel: 3,
+        student_id: 20240004,
+        is_volunteer: true,
+        volunteer_request_status: 'backout_pending',
+        payments: []
     }
 ];
 
@@ -434,6 +469,7 @@ export const mockVolunteerRequests = [
 ];
 
 // Backward compatibility: Export mockUsers that maps to mockAccounts with user-friendly data
+// The email field from the account is authoritative for login authentication
 export const mockUsers = mockAccounts.map(acc => {
     const student = mockStudents.find(s => acc.students?.$id === s.$id);
     const admin = mockAdmins.find(a => acc.admins?.$id === a.$id);
@@ -442,7 +478,8 @@ export const mockUsers = mockAccounts.map(acc => {
         $id: acc.$id,
         $createdAt: acc.$createdAt,
         $updatedAt: acc.$updatedAt,
-        email: student?.email || admin?.email || `${acc.username}@specs.org`,
+        // Use account email first (authoritative for login), then fall back to linked document
+        email: acc.email || student?.email || admin?.email || `${acc.username}@specs.org`,
         name: student?.name || admin?.fullName || acc.username,
         username: acc.username,
         fullname: student?.name || admin?.fullName || acc.username,
@@ -450,6 +487,8 @@ export const mockUsers = mockAccounts.map(acc => {
         verified: acc.verified,
         emailVerification: acc.verified,
         students: acc.students,
+        admins: acc.admins,
+        officers: acc.officers,
         yearLevel: student ? `${student.yearLevel}${getOrdinalSuffix(student.yearLevel)} Year` : 'Staff',
         is_volunteer: student?.is_volunteer || false,
         volunteer_request_status: student?.volunteer_request_status || 'none'

@@ -27,6 +27,45 @@ class MockApiService {
     constructor() {
         this.currentUser = null;
         this.currentSession = null;
+        // Restore session from storage if it exists (survives page navigation)
+        this._restoreSession();
+    }
+
+    _restoreSession() {
+        try {
+            const storedEmail = sessionStorage.getItem('mock_user_email');
+            if (storedEmail) {
+                const user = mockUsers.find(u => u.email === storedEmail);
+                if (user) {
+                    this.currentUser = user;
+                    this.currentSession = {
+                        $id: `session-restored-${Date.now()}`,
+                        userId: user.$id,
+                        expire: new Date(Date.now() + 86400000).toISOString()
+                    };
+                    console.log('[Mock] Session restored for:', storedEmail);
+                }
+            }
+        } catch (e) {
+            // sessionStorage may be blocked
+            console.warn('[Mock] Could not restore session:', e.message);
+        }
+    }
+
+    _saveSession(email) {
+        try {
+            sessionStorage.setItem('mock_user_email', email);
+        } catch (e) {
+            console.warn('[Mock] Could not save session:', e.message);
+        }
+    }
+
+    _clearSession() {
+        try {
+            sessionStorage.removeItem('mock_user_email');
+        } catch (e) {
+            console.warn('[Mock] Could not clear session:', e.message);
+        }
     }
 
     async getCurrentUser() {
@@ -57,6 +96,8 @@ class MockApiService {
             userId: user.$id,
             expire: new Date(Date.now() + 86400000).toISOString()
         };
+        // Persist session for page navigation
+        this._saveSession(email);
         return this.currentSession;
     }
 
@@ -64,6 +105,7 @@ class MockApiService {
         await delay(MOCK_DELAY);
         this.currentUser = null;
         this.currentSession = null;
+        this._clearSession();
         return true;
     }
 

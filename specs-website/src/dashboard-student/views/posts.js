@@ -159,18 +159,29 @@ function getPostsHTML(isVolunteer) {
                             
                             <div class="mb-4">
                                 <label for="postTitleInput" class="form-label fw-medium">Title <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="postTitleInput" placeholder="Enter a compelling title" required maxlength="200">
+                                <input type="text" class="form-control" id="postTitleInput" placeholder="Enter a compelling title for your post" required maxlength="200">
+                                <div class="form-text d-flex justify-content-between">
+                                    <span>Create a clear, descriptive title</span>
+                                    <span id="titleCharCount" class="fw-medium">0/200</span>
+                                </div>
                             </div>
                             
                             <div class="mb-4">
                                 <label for="postDescriptionInput" class="form-label fw-medium">Short Description <span class="text-danger">*</span></label>
-                                <textarea class="form-control" id="postDescriptionInput" rows="2" placeholder="Brief summary that appears in previews" required maxlength="500"></textarea>
-                                <div class="form-text">Max 500 characters</div>
+                                <textarea class="form-control" id="postDescriptionInput" rows="2" placeholder="Write a brief summary that appears in previews and search results" required maxlength="500"></textarea>
+                                <div class="form-text d-flex justify-content-between">
+                                    <span>This summary appears in post previews</span>
+                                    <span id="descCharCount" class="fw-medium">0/500</span>
+                                </div>
                             </div>
                             
                             <div class="mb-4">
                                 <label for="postContentInput" class="form-label fw-medium">Full Content <span class="text-danger">*</span></label>
-                                <textarea class="form-control" id="postContentInput" rows="8" placeholder="Write your full post content here..." required></textarea>
+                                <textarea class="form-control" id="postContentInput" rows="8" placeholder="Share your story, experience, or information with the SPECS community. Be detailed and engaging!" required></textarea>
+                                <div class="form-text d-flex justify-content-between">
+                                    <span>Write the full post content here</span>
+                                    <span id="contentCharCount" class="fw-medium">0 characters</span>
+                                </div>
                             </div>
                             
                             <div class="mb-3">
@@ -273,6 +284,7 @@ async function attachEventListeners(studentDoc, currentUser) {
         document.getElementById('postSubmitBtn').textContent = 'Create Post';
         document.getElementById('postId').value = '';
         postForm.reset();
+        updateCharCounters();
 
         modalInstance = new Modal(postModal);
         modalInstance.show();
@@ -286,10 +298,39 @@ async function attachEventListeners(studentDoc, currentUser) {
         document.getElementById('postDescriptionInput').value = story.post_description || '';
         document.getElementById('postContentInput').value = story.post_details || '';
         document.getElementById('postLinksInput').value = (story.related_links || []).join(', ');
+        updateCharCounters();
 
         modalInstance = new Modal(postModal);
         modalInstance.show();
     };
+
+    // Character counter helper
+    const updateCharCounters = () => {
+        const titleInput = document.getElementById('postTitleInput');
+        const descInput = document.getElementById('postDescriptionInput');
+        const contentInput = document.getElementById('postContentInput');
+
+        const titleCount = document.getElementById('titleCharCount');
+        const descCount = document.getElementById('descCharCount');
+        const contentCount = document.getElementById('contentCharCount');
+
+        if (titleCount && titleInput) {
+            titleCount.textContent = `${titleInput.value.length}/200`;
+            titleCount.className = titleInput.value.length > 180 ? 'fw-medium text-warning' : 'fw-medium';
+        }
+        if (descCount && descInput) {
+            descCount.textContent = `${descInput.value.length}/500`;
+            descCount.className = descInput.value.length > 450 ? 'fw-medium text-warning' : 'fw-medium';
+        }
+        if (contentCount && contentInput) {
+            contentCount.textContent = `${contentInput.value.length} characters`;
+        }
+    };
+
+    // Attach character counter event listeners
+    document.getElementById('postTitleInput')?.addEventListener('input', updateCharCounters);
+    document.getElementById('postDescriptionInput')?.addEventListener('input', updateCharCounters);
+    document.getElementById('postContentInput')?.addEventListener('input', updateCharCounters);
 
     await loadData();
 
