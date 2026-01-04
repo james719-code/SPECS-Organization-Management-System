@@ -1,4 +1,5 @@
 import { Client, Account, Databases, Storage, Query, ID, Functions } from "appwrite";
+import { mockApi } from './mock/mockApiService.js';
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -10,32 +11,46 @@ const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID || 'dummy_project';
 let client, account, databases, storage, functions;
 
 if (DEV_BYPASS) {
-    console.log('[DEV] Skipping Appwrite SDK initialization (mock mode)');
+    console.log('[DEV] Using mock Appwrite SDK');
     client = null;
+
+    // Mock account object that delegates to mockApi
     account = {
-        get: async () => { throw new Error('Use mock data'); },
-        createEmailPasswordSession: async () => { throw new Error('Use mock data'); },
-        deleteSession: async () => { throw new Error('Use mock data'); },
-        createRecovery: async () => { throw new Error('Use mock data'); },
-        updateRecovery: async () => { throw new Error('Use mock data'); }
+        get: () => mockApi.getCurrentUser(),
+        createEmailPasswordSession: (email, password) => mockApi.login(email, password),
+        deleteSession: () => mockApi.logout(),
+        createRecovery: (email, url) => mockApi.sendPasswordResetEmail(email),
+        updateRecovery: (userId, secret, password) => Promise.resolve({ success: true }),
+        create: (userId, email, password, name) => mockApi.register(email, password, name),
+        createVerification: (url) => mockApi.sendVerificationEmail()
     };
+
+    // Mock databases object that delegates to mockApi
     databases = {
-        listDocuments: async () => { throw new Error('Use mock data'); },
-        getDocument: async () => { throw new Error('Use mock data'); },
-        createDocument: async () => { throw new Error('Use mock data'); },
-        updateDocument: async () => { throw new Error('Use mock data'); },
-        deleteDocument: async () => { throw new Error('Use mock data'); }
+        listDocuments: (dbId, collectionId, queries) => mockApi.listDocuments(dbId, collectionId, queries),
+        getDocument: (dbId, collectionId, docId) => mockApi.getDocument(dbId, collectionId, docId),
+        createDocument: (dbId, collectionId, docId, data, permissions) => mockApi.createDocument(dbId, collectionId, docId, data),
+        updateDocument: (dbId, collectionId, docId, data) => mockApi.updateDocument(dbId, collectionId, docId, data),
+        deleteDocument: (dbId, collectionId, docId) => mockApi.deleteDocument(dbId, collectionId, docId)
     };
+
+    // Mock storage object that delegates to mockApi
     storage = {
-        listFiles: async () => { throw new Error('Use mock data'); },
-        getFile: async () => { throw new Error('Use mock data'); },
-        createFile: async () => { throw new Error('Use mock data'); },
-        deleteFile: async () => { throw new Error('Use mock data'); },
-        getFileView: () => '#',
-        getFileDownload: () => '#'
+        listFiles: (bucketId, queries) => mockApi.listFiles(bucketId, queries),
+        getFile: (bucketId, fileId) => mockApi.getDocument('files', 'files', fileId),
+        createFile: (bucketId, fileId, file, permissions) => mockApi.createFile(bucketId, fileId, file),
+        deleteFile: (bucketId, fileId) => mockApi.deleteFile(bucketId, fileId),
+        getFileView: (bucketId, fileId) => mockApi.getFileView(bucketId, fileId),
+        getFileDownload: (bucketId, fileId) => mockApi.getFileDownload(bucketId, fileId)
     };
+
+    // Mock functions object
     functions = {
-        createExecution: async () => { throw new Error('Use mock data'); }
+        createExecution: (functionId, body, async) => Promise.resolve({
+            $id: `execution-${Date.now()}`,
+            status: 'completed',
+            responseBody: JSON.stringify({ success: true })
+        })
     };
 } else {
     client = new Client()

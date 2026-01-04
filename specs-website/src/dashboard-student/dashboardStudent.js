@@ -14,7 +14,8 @@ const viewModules = {
     events: () => import('./views/events.js'),
     profile: () => import('./views/profile.js'),
     payments: () => import('./views/payments.js'),
-    attendance: () => import('./views/attendance.js')
+    attendance: () => import('./views/attendance.js'),
+    posts: () => import('./views/posts.js')
 };
 
 const loadedModules = new Map();
@@ -33,6 +34,7 @@ import boxArrowRightIcon from 'bootstrap-icons/icons/box-arrow-right.svg';
 import listIcon from 'bootstrap-icons/icons/list.svg';
 import bellIcon from 'bootstrap-icons/icons/bell.svg';
 import globeIcon from 'bootstrap-icons/icons/globe.svg';
+import fileTextIcon from 'bootstrap-icons/icons/file-text.svg';
 
 const MAIN_CONTENT_ID = 'dashboard-content';
 
@@ -45,6 +47,7 @@ const viewMeta = {
     '#profile': { moduleKey: 'profile', title: 'My Profile', icon: personIcon },
     '#payments': { moduleKey: 'payments', title: 'My Payments', icon: walletIcon },
     '#attendance': { moduleKey: 'attendance', title: 'My Attendance', icon: clockIcon },
+    '#posts': { moduleKey: 'posts', title: 'My Posts', icon: fileTextIcon },
     '': { moduleKey: 'events', title: 'Events', icon: calendarIcon }
 };
 

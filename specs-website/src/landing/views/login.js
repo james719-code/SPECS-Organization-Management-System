@@ -9,18 +9,49 @@ const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
 export function renderLoginPage() {
-    // Dev mode quick login panel
+    // Dev mode test accounts panel
     const devPanel = DEV_BYPASS ? `
         <div class="card border-warning mt-4">
             <div class="card-header bg-warning text-dark fw-bold small">
-                Dev Quick Login (Mock Mode)
+                Dev Test Accounts (Mock Mode)
             </div>
             <div class="card-body p-3">
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-sm btn-danger dev-login-btn" data-type="admin">Admin Dashboard</button>
-                    <button type="button" class="btn btn-sm btn-primary dev-login-btn" data-type="officer">Officer Dashboard</button>
-                    <button type="button" class="btn btn-sm btn-success dev-login-btn" data-type="student">Student Dashboard</button>
-                </div>
+                <table class="table table-sm table-borderless mb-0 small">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Email</th>
+                            <th>Password</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-danger">Admin</span></td>
+                            <td>admin@specs.org</td>
+                            <td>admin123</td>
+                            <td><button type="button" class="btn btn-xs btn-outline-secondary dev-fill-btn" data-email="admin@specs.org" data-password="admin123">Fill</button></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-primary">Officer</span></td>
+                            <td>maria.santos@student.edu</td>
+                            <td>officer123</td>
+                            <td><button type="button" class="btn btn-xs btn-outline-secondary dev-fill-btn" data-email="maria.santos@student.edu" data-password="officer123">Fill</button></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-success">Student (Volunteer)</span></td>
+                            <td>john.doe@student.edu</td>
+                            <td>student123</td>
+                            <td><button type="button" class="btn btn-xs btn-outline-secondary dev-fill-btn" data-email="john.doe@student.edu" data-password="student123">Fill</button></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-secondary">Student (Non-Volunteer)</span></td>
+                            <td>mike.johnson@student.edu</td>
+                            <td>student456</td>
+                            <td><button type="button" class="btn btn-xs btn-outline-secondary dev-fill-btn" data-email="mike.johnson@student.edu" data-password="student456">Fill</button></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     ` : '';
@@ -75,18 +106,15 @@ export function renderLoginPage() {
     const buttonSpinner = submitButton.querySelector('.spinner-border');
     const statusMessageDiv = document.getElementById('status-message');
 
-    // Dev mode quick login handlers
+    // Dev mode fill credentials handlers
     if (DEV_BYPASS) {
-        document.querySelectorAll('.dev-login-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const userType = e.target.dataset.type;
-                const redirectMap = {
-                    admin: '/dashboard-admin/',
-                    officer: '/dashboard-officer/',
-                    student: '/dashboard-student/'
-                };
-                console.log(`[DEV] Quick login as ${userType}`);
-                window.location.href = redirectMap[userType];
+        document.querySelectorAll('.dev-fill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const email = e.target.dataset.email;
+                const password = e.target.dataset.password;
+                document.getElementById('email').value = email;
+                document.getElementById('password').value = password;
+                console.log(`[DEV] Filled credentials for ${email}`);
             });
         });
     }
@@ -102,26 +130,25 @@ export function renderLoginPage() {
         statusMessageDiv.textContent = '';
 
         try {
-            // 1. Create Session
+            // 1. Create Session (uses mock or real Appwrite based on DEV_BYPASS)
             await account.createEmailPasswordSession(email, password);
             const user = await account.get();
 
-            // 2. Check Email Verification
-            if (!user.emailVerification) {
-                // If email isn't verified, we MUST logout immediately
+            // 2. Check Email Verification (skip in dev mode - mock users are pre-verified)
+            if (!DEV_BYPASS && !user.emailVerification) {
                 await account.deleteSession('current');
                 throw new Error("Your email has not been verified. Please check your inbox.");
             }
 
-            // 3. Get User Profile Role
-            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+            // 3. Get user type from the user object (mock API returns full user with type)
+            const userType = user.type;
 
-            // 4. Route based on status
-            if (profile.type === 'admin') {
+            // 4. Route based on user type
+            if (userType === 'admin') {
                 window.location.href = '/dashboard-admin/';
-            } else if (profile.type === 'officer') {
+            } else if (userType === 'officer') {
                 window.location.href = '/dashboard-officer/';
-            } else if (profile.type === 'student' && profile.verified) {
+            } else if (userType === 'student') {
                 window.location.href = '/dashboard-student/';
             } else {
                 window.location.hash = 'pending-verification';
@@ -130,12 +157,9 @@ export function renderLoginPage() {
             console.error("Login Error:", err);
             statusMessageDiv.textContent = err.message || "Login failed.";
 
-            // Only reset button if we aren't redirecting
-            if (!window.location.hash.includes('pending-verification') && !window.location.href.includes('dashboard')) {
-                submitButton.disabled = false;
-                buttonText.textContent = 'Sign In';
-                buttonSpinner.classList.add('d-none');
-            }
+            submitButton.disabled = false;
+            buttonText.textContent = 'Sign In';
+            buttonSpinner.classList.add('d-none');
         }
     };
 }

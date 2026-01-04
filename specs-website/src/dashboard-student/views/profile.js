@@ -14,6 +14,14 @@ import calendar from 'bootstrap-icons/icons/calendar.svg';
 import pencilSquare from 'bootstrap-icons/icons/pencil-square.svg';
 import trash from 'bootstrap-icons/icons/trash.svg';
 import exclamationTriangle from 'bootstrap-icons/icons/exclamation-triangle.svg';
+import personHearts from 'bootstrap-icons/icons/person-hearts.svg';
+import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
+import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
+import xCircle from 'bootstrap-icons/icons/x-circle.svg';
+
+const IS_DEV = import.meta.env.DEV;
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
 function getProfileHTML() {
     return `
@@ -102,6 +110,34 @@ function getProfileHTML() {
                                             <label class="small text-muted fw-bold text-uppercase">Address</label>
                                         </div>
                                         <p id="profile-address" class="fs-5 text-dark fw-medium mb-0">--</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Volunteer Program Card -->
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
+                            <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                                <img src="${personHearts}" width="20" class="icon-primary-filter">
+                                Volunteer Program
+                            </h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h6 class="fw-bold mb-2">Become a Volunteer</h6>
+                                    <p class="text-muted small mb-3">Volunteers can create and share posts with the SPECS community. Join our volunteer program to contribute to the organization!</p>
+                                    <div id="volunteer-status-container">
+                                        <!-- Status will be dynamically inserted here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                    <div id="volunteer-action-container">
+                                        <!-- Action button will be dynamically inserted here -->
                                     </div>
                                 </div>
                             </div>
@@ -198,17 +234,23 @@ function getProfileHTML() {
     `;
 }
 
-async function attachProfileListeners(currentUser) {
-    console.log("🔹 [Profile] Attempting to find Student Document with ID:", currentUser.$id);
+async function attachProfileListeners(studentDoc, currentUser) {
+    console.log("[Profile] Loading student data", studentDoc?.$id);
 
     let studentData = null;
 
     try {
-        studentData = await databases.getDocument(
-            DATABASE_ID,
-            COLLECTION_ID_STUDENTS,
-            currentUser.$id  // <--- USING AUTH ID DIRECTLY
-        );
+        // Use passed studentDoc for DEV_BYPASS mode, otherwise fetch from DB
+        if (DEV_BYPASS && studentDoc) {
+            studentData = studentDoc;
+            console.log("[DEV] Using passed student document");
+        } else {
+            studentData = await databases.getDocument(
+                DATABASE_ID,
+                COLLECTION_ID_STUDENTS,
+                currentUser.$id
+            );
+        }
 
         console.log("✅ [Profile] Student Document Found:", studentData);
 
@@ -236,6 +278,9 @@ async function attachProfileListeners(currentUser) {
         document.getElementById('profile-section').textContent = studentData.section || 'N/A';
         document.getElementById('profile-year').textContent = studentData.yearLevel || 'N/A';
         document.getElementById('profile-address').textContent = studentData.address || 'N/A';
+
+        // Update Volunteer Status Section
+        updateVolunteerStatus(studentData);
 
     } catch (error) {
         console.error("❌ [Profile] Error:", error);
@@ -375,6 +420,167 @@ async function attachProfileListeners(currentUser) {
     });
 }
 
+// Update volunteer status section based on student data
+function updateVolunteerStatus(studentData) {
+    const statusContainer = document.getElementById('volunteer-status-container');
+    const actionContainer = document.getElementById('volunteer-action-container');
+
+    if (!statusContainer || !actionContainer) return;
+
+    const isVolunteer = studentData.is_volunteer === true;
+    const requestStatus = studentData.volunteer_request_status || 'none';
+
+    let statusHTML = '';
+    let actionHTML = '';
+
+    if (isVolunteer && requestStatus === 'backout_pending') {
+        // Volunteer with backout request pending
+        statusHTML = `
+            <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2 border border-warning-subtle">
+                <img src="${clockHistory}" width="14" class="me-1" style="opacity: 0.8;">
+                Backout Request Pending
+            </span>
+            <p class="text-muted small mt-2 mb-0">Your request to leave the volunteer program is being reviewed.</p>
+        `;
+        actionHTML = `
+            <button class="btn btn-secondary btn-sm rounded-pill px-4" disabled>
+                Awaiting Review
+            </button>
+        `;
+    } else if (isVolunteer) {
+        // Active volunteer
+        statusHTML = `
+            <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2 border border-success-subtle">
+                <img src="${checkCircle}" width="14" class="me-1" style="opacity: 0.8;">
+                Active Volunteer
+            </span>
+        `;
+        actionHTML = `
+            <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+                <a href="#posts" class="btn btn-outline-primary btn-sm rounded-pill px-4">
+                    View My Posts
+                </a>
+                <button id="request-backout-btn" class="btn btn-outline-danger btn-sm rounded-pill px-4">
+                    Leave Program
+                </button>
+            </div>
+        `;
+    } else if (requestStatus === 'pending') {
+        // Request pending
+        statusHTML = `
+            <span class="badge bg-warning-subtle text-warning rounded-pill px-3 py-2 border border-warning-subtle">
+                <img src="${clockHistory}" width="14" class="me-1" style="opacity: 0.8;">
+                Request Pending
+            </span>
+            <p class="text-muted small mt-2 mb-0">Your request is being reviewed by an officer.</p>
+        `;
+        actionHTML = `
+            <button class="btn btn-secondary btn-sm rounded-pill px-4" disabled>
+                Awaiting Review
+            </button>
+        `;
+    } else if (requestStatus === 'rejected') {
+        // Request was rejected
+        statusHTML = `
+            <span class="badge bg-danger-subtle text-danger rounded-pill px-3 py-2 border border-danger-subtle">
+                <img src="${xCircle}" width="14" class="me-1" style="opacity: 0.8;">
+                Request Denied
+            </span>
+            <p class="text-muted small mt-2 mb-0">Your previous request was not approved. You may request again.</p>
+        `;
+        actionHTML = `
+            <button id="request-volunteer-btn" class="btn btn-primary btn-sm rounded-pill px-4">
+                Request Again
+            </button>
+        `;
+    } else {
+        // Not a volunteer, no pending request
+        statusHTML = `
+            <span class="badge bg-light text-secondary rounded-pill px-3 py-2 border">
+                Not a Volunteer
+            </span>
+        `;
+        actionHTML = `
+            <button id="request-volunteer-btn" class="btn btn-primary btn-sm rounded-pill px-4">
+                Request to Join
+            </button>
+        `;
+    }
+
+    statusContainer.innerHTML = statusHTML;
+    actionContainer.innerHTML = actionHTML;
+
+    // Attach event listener to join request button
+    const requestBtn = document.getElementById('request-volunteer-btn');
+    if (requestBtn) {
+        requestBtn.addEventListener('click', async () => {
+            requestBtn.disabled = true;
+            requestBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+
+            try {
+                if (DEV_BYPASS) {
+                    const { mockApi } = await import('../../shared/mock/mockApiService.js');
+                    await mockApi.requestVolunteerStatus(studentData.$id);
+                } else {
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID_STUDENTS,
+                        studentData.$id,
+                        { volunteer_request_status: 'pending' }
+                    );
+                }
+
+                // Update local state and UI
+                studentData.volunteer_request_status = 'pending';
+                updateVolunteerStatus(studentData);
+                showToast('Volunteer request submitted! An officer will review your request.', 'success');
+            } catch (error) {
+                console.error('Error requesting volunteer status:', error);
+                showToast('Failed to submit request. Please try again.', 'error');
+                requestBtn.disabled = false;
+                requestBtn.innerHTML = 'Request to Join';
+            }
+        });
+    }
+
+    // Attach event listener to backout request button
+    const backoutBtn = document.getElementById('request-backout-btn');
+    if (backoutBtn) {
+        backoutBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to leave the volunteer program? Your pending posts may be removed.')) {
+                return;
+            }
+
+            backoutBtn.disabled = true;
+            backoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+
+            try {
+                if (DEV_BYPASS) {
+                    const { mockApi } = await import('../../shared/mock/mockApiService.js');
+                    await mockApi.requestVolunteerBackout(studentData.$id);
+                } else {
+                    await databases.updateDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID_STUDENTS,
+                        studentData.$id,
+                        { volunteer_request_status: 'backout_pending' }
+                    );
+                }
+
+                // Update local state and UI
+                studentData.volunteer_request_status = 'backout_pending';
+                updateVolunteerStatus(studentData);
+                showToast('Backout request submitted. An officer will review your request.', 'success');
+            } catch (error) {
+                console.error('Error requesting volunteer backout:', error);
+                showToast('Failed to submit request. Please try again.', 'error');
+                backoutBtn.disabled = false;
+                backoutBtn.innerHTML = 'Leave Program';
+            }
+        });
+    }
+}
+
 // Helper function to show toast notifications
 function showToast(message, type = 'info') {
     // Create toast container if it doesn't exist - place inside #app
@@ -417,9 +623,9 @@ function showToast(message, type = 'info') {
     });
 }
 
-export default function renderProfileView(currentUser) {
+export default function renderProfileView(studentDoc, currentUser) {
     return {
         html: getProfileHTML(),
-        afterRender: () => attachProfileListeners(currentUser)
+        afterRender: () => attachProfileListeners(studentDoc, currentUser)
     };
 }

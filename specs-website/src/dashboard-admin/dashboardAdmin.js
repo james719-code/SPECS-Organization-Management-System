@@ -18,7 +18,9 @@ const viewModules = {
   events: () => import('./views/events.js'),
   files: () => import('./views/files.js'),
   payments: () => import('./views/payments.js'),
-  students: () => import('./views/students.js')
+  students: () => import('./views/students.js'),
+  volunteers: () => import('../dashboard-officer/views/volunteers.js'),
+  stories: () => import('../dashboard-officer/views/stories.js')
 };
 
 const loadedModules = new Map();
@@ -37,6 +39,8 @@ import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
 import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
 import personBadgeFill from 'bootstrap-icons/icons/person-badge-fill.svg';
+import personHeartsFill from 'bootstrap-icons/icons/person-hearts.svg';
+import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
 
 function closeSidebar(sidebarEl) {
   if (!sidebarEl) return;
@@ -108,6 +112,16 @@ export default async function renderDashboardAdmin() {
             <li>
               <a href="#" class="nav-link" data-view="files">
                 <img src="${folderFill}" alt="Files" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Files
+              </a>
+            </li>
+            <li>
+              <a href="#" class="nav-link" data-view="volunteers">
+                <img src="${personHeartsFill}" alt="Volunteers" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Volunteers
+              </a>
+            </li>
+            <li>
+              <a href="#" class="nav-link" data-view="stories">
+                <img src="${fileTextFill}" alt="Stories" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Stories
               </a>
             </li>
           </ul>
@@ -184,6 +198,10 @@ export default async function renderDashboardAdmin() {
         let view;
         switch (viewName) {
           case "payments":
+            view = renderFn(user, profile);
+            break;
+          case "volunteers":
+          case "stories":
             view = renderFn(user, profile);
             break;
           default:

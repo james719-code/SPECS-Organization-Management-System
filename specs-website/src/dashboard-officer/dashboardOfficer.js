@@ -21,7 +21,9 @@ const viewModules = {
   events: () => import("./views/events.js"),
   settings: () => import("./views/settings.js"),
   students: () => import("./views/students.js"),
-  payments: () => import("./views/payments.js")
+  payments: () => import("./views/payments.js"),
+  volunteers: () => import("./views/volunteers.js"),
+  stories: () => import("./views/stories.js")
 };
 
 const loadedModules = new Map();
@@ -40,6 +42,8 @@ import gear from 'bootstrap-icons/icons/gear.svg';
 import personCircle from 'bootstrap-icons/icons/person-circle.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
+import personHearts from 'bootstrap-icons/icons/person-hearts.svg';
+import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
 
 const FILES_PAGE_LIMIT = 10;
 
@@ -104,6 +108,8 @@ export default async function renderDashboard() {
             <li><a href="#" class="nav-link" data-view="events"><img src="${calendarEvent}" alt="Events" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Events</a></li>
             <li><a href="#" class="nav-link" data-view="students"><img src="${personBadgeFill}" alt="Students" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Students</a></li>
             <li><a href="#" class="nav-link" data-view="payments"><img src="${creditCardFill}" alt="Payments" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Payments</a></li>
+            <li><a href="#" class="nav-link" data-view="volunteers"><img src="${personHearts}" alt="Volunteers" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Volunteers</a></li>
+            <li><a href="#" class="nav-link" data-view="stories"><img src="${fileTextFill}" alt="Stories" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Stories</a></li>
             <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Settings</a></li>
           </ul>
           
@@ -198,6 +204,16 @@ export default async function renderDashboard() {
             contentEl.innerHTML = view.html;
             view.afterRender();
             break;
+          case "volunteers":
+            view = renderFn(user, profile);
+            contentEl.innerHTML = view.html;
+            await view.afterRender();
+            break;
+          case "stories":
+            view = renderFn(user, profile);
+            contentEl.innerHTML = view.html;
+            await view.afterRender();
+            break;
           default:
             await renderFn(userLookup, user);
         }
@@ -221,8 +237,15 @@ export default async function renderDashboard() {
 
     document.getElementById("logout-btn").addEventListener("click", async (e) => {
       e.preventDefault();
-      await account.deleteSession("current");
-      window.location.href = "/landing/#login";
+      try {
+        if (!DEV_BYPASS) {
+          await account.deleteSession("current");
+        }
+        window.location.href = "/landing/#login";
+      } catch (err) {
+        console.error("Failed to log out:", err);
+        window.location.href = "/landing/#login";
+      }
     });
 
     await renderContent("finance");

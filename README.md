@@ -44,20 +44,31 @@ In building this application, specific architectural and technical choices were 
 
 ### General
 - **User Authentication:** Secure login/signup for organization officers and members with university email validation and verification.
-- **Role-Based Access:** Separated dashboards and permissions for `students` and `admins` within the `officers` collection.
+- **Role-Based Access:** Separated dashboards and permissions for `students`, `officers`, and `admins`.
 - **Public Landing Page:** Displays upcoming events, past events, FAQ, and contact info.
+- **Volunteer System:** Students can request to become volunteers, officers approve requests, volunteers can create posts.
 
 ### Student Dashboard
-- **Finance Overview:** Track revenue and expenses.
-- **File Sharing:** Browse and download shared documents.
 - **Event Calendar:** View upcoming events.
-- **Student Directory:** Filterable list of general (`non-officer`) students.
 - **Payment Tracking:** See pending and past payments.
-- **Profile Settings:** Update personal info and upload documents (e.g., resume, schedule).
+- **Attendance History:** View event attendance records.
+- **Profile Settings:** Update personal info and request volunteer status.
+- **Volunteer Posts:** Create and manage posts (for approved volunteers only).
+
+### Officer Dashboard
+- **Finance Overview:** Track revenue and expenses.
+- **File Sharing:** Browse and manage shared documents.
+- **Event Calendar:** View and manage upcoming events.
+- **Student Directory:** Filterable list of students with verification controls.
+- **Payment Management:** View and manage student payments.
+- **Volunteer Management:** Approve or reject student volunteer requests.
+- **Story Approval:** Review and approve volunteer posts before publication.
+- **Settings:** Manage officer profile and preferences.
 
 ### Admin Panel
 - **Dashboard Stats:** At-a-glance overview of accounts, events, files, and visual stats with charts.
 - **Account Management:** A modern interface to approve, verify, and delete officer/student accounts.
+- **Officer Assignment:** Assign students to officer roles or remove officer privileges.
 - **Event Management:** A timeline view to add, edit, and delete events.
 - **Payment Management:** Assign and manage payments (individually or by bulk).
 - **File Management:** A view for all uploaded files.
