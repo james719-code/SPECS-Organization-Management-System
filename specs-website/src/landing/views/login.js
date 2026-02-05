@@ -140,8 +140,24 @@ export function renderLoginPage() {
                 throw new Error("Your email has not been verified. Please check your inbox.");
             }
 
-            // 3. Get user type from the user object (mock API returns full user with type)
-            const userType = user.type;
+            // 3. Get user type from the database (mock API returns it directly on user object)
+            let userType = user.type;
+            
+            // In production, fetch the user type from the accounts collection
+            if (!DEV_BYPASS && !userType) {
+                try {
+                    const accountDoc = await databases.getDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID_ACCOUNTS,
+                        user.$id
+                    );
+                    userType = accountDoc.type;
+                } catch (dbErr) {
+                    console.error("Failed to fetch account type:", dbErr);
+                    // User exists but no account record - pending approval
+                    userType = null;
+                }
+            }
 
             // 4. Route based on user type
             if (userType === 'admin') {

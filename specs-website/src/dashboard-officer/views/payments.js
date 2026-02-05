@@ -1,5 +1,7 @@
 import { api } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
+import { formatCurrency } from '../../shared/formatters.js';
+import { createStudentPaymentCardHTML } from '../../shared/components/paymentCard.js';
 
 import trashIcon from 'bootstrap-icons/icons/trash.svg';
 import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
@@ -16,62 +18,11 @@ import personXIcon from 'bootstrap-icons/icons/person-x.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import wallet2Icon from 'bootstrap-icons/icons/wallet2.svg';
 
-const formatCurrency = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value);
-
 let allStudents = [];
 let allPayments = [];
 let events = [];
 let currentStudent = null;
 let addPaymentModalInstance, editPaymentModalInstance;
-
-function createStudentPaymentCardHTML(student, paymentsForStudent) {
-    const pendingPayments = paymentsForStudent.filter(p => !p.is_paid);
-    const hasPaidRecords = paymentsForStudent.some(p => p.is_paid);
-    const totalDue = pendingPayments.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-    const hasDues = totalDue > 0;
-
-    const statusBadge = hasDues
-        ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-2">Due: ${formatCurrency(totalDue)}</span>`
-        : `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2"><i class="bi bi-check-circle-fill me-1"></i> Paid</span>`;
-
-    const studentData = student.students || {};
-    const displayName = studentData.name || student.username;
-    const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    const displayMeta = studentData.yearLevel ? `Year ${studentData.yearLevel}` : 'Student';
-
-    return `
-        <div class="col">
-            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-payment-card" role="button" data-student-id="${student.$id}">
-                <div class="card-body p-4 position-relative">
-                    ${!hasDues && hasPaidRecords ? `
-                        <button class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-3 clear-student-records-btn" 
-                                title="Clear History" 
-                                data-student-id="${student.$id}" 
-                                data-student-name="${displayName}"
-                                style="width: 32px; height: 32px;">
-                            <img src="${eraserIcon}" style="width: 14px; opacity: 0.6;">
-                        </button>
-                    ` : ''}
-                    
-                    <div class="d-flex align-items-center mb-4">
-                        <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold fs-5" style="width: 50px; height: 50px;">
-                            ${initials}
-                        </div>
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 140px;" title="${displayName}">${displayName}</h6>
-                            <small class="text-muted">${displayMeta}</small>
-                        </div>
-                    </div>
-                    
-                    <div class="pt-3 border-top border-light d-flex justify-content-between align-items-center">
-                        <span class="small fw-bold text-muted text-uppercase" style="letter-spacing: 0.5px;">Status</span>
-                        ${statusBadge}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
 
 function getInitialPaymentViewHTML() {
     const eventOptions = events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('');
@@ -323,7 +274,7 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
 
         cardsContainer.innerHTML = studentsToRender.map(student => {
             const studentDocId = (student.students && student.students.$id) ? student.students.$id : student.students;
-            return createStudentPaymentCardHTML(student, paymentsByStudent[studentDocId] || []);
+            return createStudentPaymentCardHTML(student, paymentsByStudent[studentDocId] || [], { eraserIcon });
         }).join('');
     } else {
         cardsContainer.className = 'row flex-grow-1 align-items-center justify-content-center';

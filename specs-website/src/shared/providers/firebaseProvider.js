@@ -149,6 +149,146 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         return this.db;
     }
 
+    /**
+     * Parse an Appwrite Query string into its components
+     * @param {string} queryStr - Query string from Appwrite SDK
+     * @returns {Object|null} Parsed query object
+     */
+    _parseAppwriteQuery(queryStr) {
+        const str = typeof queryStr === 'string' ? queryStr : String(queryStr);
+        const match = str.match(/^(\w+)\((.+)\)$/);
+        if (!match) return null;
+
+        const method = match[1];
+        const argsStr = match[2];
+
+        // Parse arguments
+        const args = [];
+        let current = '';
+        let inString = false;
+        let inArray = false;
+        let stringChar = '';
+
+        for (let i = 0; i < argsStr.length; i++) {
+            const char = argsStr[i];
+            if (!inString && !inArray && (char === '"' || char === "'")) {
+                inString = true;
+                stringChar = char;
+            } else if (inString && char === stringChar && argsStr[i - 1] !== '\\') {
+                inString = false;
+            } else if (!inString && char === '[') {
+                inArray = true;
+                current += char;
+            } else if (!inString && char === ']') {
+                inArray = false;
+                current += char;
+            } else if (!inString && !inArray && char === ',') {
+                args.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        if (current.trim()) args.push(current.trim());
+
+        const parsedArgs = args.map(arg => {
+            arg = arg.trim();
+            if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+                return arg.slice(1, -1);
+            }
+            if (arg.startsWith('[') && arg.endsWith(']')) {
+                try { return JSON.parse(arg); } catch { return arg; }
+            }
+            if (!isNaN(arg)) return Number(arg);
+            if (arg === 'true') return true;
+            if (arg === 'false') return false;
+            return arg;
+        });
+
+        return { method, args: parsedArgs };
+    }
+
+    /**
+     * Convert Appwrite queries to Firestore query constraints
+     * @param {Array} queries - Array of Appwrite query strings
+     * @returns {Object} Object with constraints array, limit, and orderBy info
+     */
+    async _convertQueries(queries) {
+        const { where, orderBy, limit: firestoreLimit, startAfter } = await import('firebase/firestore');
+        
+        const constraints = [];
+        let limitValue = null;
+        let offsetValue = 0;
+
+        for (const query of queries) {
+            const parsed = this._parseAppwriteQuery(query);
+            if (!parsed) continue;
+
+            const { method, args } = parsed;
+
+            switch (method) {
+                case 'equal':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '==', args[1]));
+                    }
+                    break;
+                case 'notEqual':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '!=', args[1]));
+                    }
+                    break;
+                case 'greaterThan':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '>', args[1]));
+                    }
+                    break;
+                case 'greaterThanEqual':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '>=', args[1]));
+                    }
+                    break;
+                case 'lessThan':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '<', args[1]));
+                    }
+                    break;
+                case 'lessThanEqual':
+                    if (args.length >= 2) {
+                        constraints.push(where(args[0], '<=', args[1]));
+                    }
+                    break;
+                case 'orderDesc':
+                    if (args.length >= 1) {
+                        constraints.push(orderBy(args[0], 'desc'));
+                    }
+                    break;
+                case 'orderAsc':
+                    if (args.length >= 1) {
+                        constraints.push(orderBy(args[0], 'asc'));
+                    }
+                    break;
+                case 'limit':
+                    if (args.length >= 1) {
+                        limitValue = Number(args[0]);
+                    }
+                    break;
+                case 'offset':
+                    // Firestore doesn't support offset directly
+                    // Would need cursor-based pagination
+                    offsetValue = Number(args[0]);
+                    console.warn('[FirebaseProvider] offset() is not efficiently supported in Firestore. Consider cursor-based pagination.');
+                    break;
+            }
+        }
+
+        // Add limit constraint at the end
+        if (limitValue !== null) {
+            constraints.push(firestoreLimit(limitValue));
+        }
+
+        return { constraints, limitValue, offsetValue };
+    }
+
     async listDocuments(databaseId, collectionId, queries = []) {
         const db = await this._ensureDb();
         const { collection, getDocs, query } = await import('firebase/firestore');
@@ -156,14 +296,20 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         // Note: databaseId is ignored in Firestore (uses default database)
         const collectionRef = collection(db, collectionId);
 
-        // TODO: Convert Appwrite-style queries to Firestore queries
-        const q = query(collectionRef);
+        // Convert Appwrite queries to Firestore constraints
+        const { constraints, offsetValue } = await this._convertQueries(queries);
+        const q = query(collectionRef, ...constraints);
         const snapshot = await getDocs(q);
 
-        const documents = snapshot.docs.map(doc => ({
+        let documents = snapshot.docs.map(doc => ({
             $id: doc.id,
             ...doc.data()
         }));
+
+        // Handle offset manually (inefficient but functional)
+        if (offsetValue > 0) {
+            documents = documents.slice(offsetValue);
+        }
 
         return {
             documents,

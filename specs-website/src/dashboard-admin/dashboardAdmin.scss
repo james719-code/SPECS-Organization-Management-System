@@ -9,10 +9,18 @@
 @import "bootstrap/scss/alert";
 @import "bootstrap/scss/forms";
 @import "bootstrap/scss/tables";
+@import "bootstrap/scss/pagination";
 
 // =====================================================
 // ADMIN DASHBOARD - MINIMALIST THEME
 // =====================================================
+
+// --- GLOBAL TRANSITIONS ---
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
 
 // --- SIDEBAR (Minimal Light) ---
 #adminSidebar {
@@ -27,20 +35,23 @@
 
   .nav-link {
     color: $gray-600;
-    border-radius: 6px;
+    border-radius: 8px;
     margin-bottom: 0.15rem;
     padding: 0.65rem 0.85rem;
     font-weight: 500;
     font-size: 0.875rem;
+    transition: all 0.2s ease;
 
     &:hover {
       background-color: $gray-100;
       color: $gray-800;
+      transform: translateX(4px);
     }
 
     &.active {
       background-color: $primary;
       color: $white;
+      box-shadow: 0 4px 12px rgba($primary, 0.3);
       
       img {
         filter: brightness(0) invert(1);
@@ -51,6 +62,7 @@
       position: relative;
       top: -1px;
       opacity: 0.7;
+      transition: opacity 0.2s ease;
     }
     
     &:hover img {
@@ -75,11 +87,13 @@
 .admin-dashboard-container {
   .card {
     border: 1px solid $gray-200;
-    border-radius: 8px;
-    box-shadow: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     
     &:hover {
       border-color: $gray-300;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
     }
   }
   
@@ -87,6 +101,28 @@
   .bg-warning-subtle { background-color: rgba($warning, 0.08) !important; color: darken($warning, 20%) !important; }
   .bg-info-subtle { background-color: rgba($info, 0.08) !important; color: darken($info, 20%) !important; }
   .bg-secondary-subtle { background-color: $gray-100 !important; color: $gray-700 !important; }
+  
+  .icon-shape {
+    border-radius: 10px;
+    transition: transform 0.3s ease;
+  }
+  
+  .stat-card:hover .icon-shape {
+    transform: scale(1.1);
+  }
+}
+
+// --- SKELETON LOADERS ---
+.skeleton-loader {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite ease-in-out;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 // --- TIMELINE (Simplified) ---
@@ -131,11 +167,17 @@
   color: $primary;
   border: 1px solid $gray-200;
   border-radius: 50%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timeline-item:hover .timeline-icon {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba($primary, 0.2);
 }
 
 // --- TABLES ---
 .table-responsive {
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid $gray-200;
   background-color: $white;
@@ -161,6 +203,14 @@
       font-size: 0.875rem;
     }
     
+    tbody tr {
+      transition: background-color 0.15s ease;
+      
+      &:hover {
+        background-color: rgba($primary, 0.02);
+      }
+    }
+    
     tbody tr:last-child td {
       border-bottom: none;
     }
@@ -171,6 +221,93 @@
 .admin-accounts-container {
   .card {
     height: 100%;
+  }
+  
+  .account-card {
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .avatar-placeholder {
+      transition: transform 0.3s ease;
+    }
+    
+    &:hover .avatar-placeholder {
+      transform: scale(1.05);
+    }
+  }
+}
+
+// --- PAGINATION ---
+.pagination {
+  .page-link {
+    border: none;
+    color: $gray-600;
+    padding: 0.5rem 0.85rem;
+    margin: 0 0.15rem;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: $gray-100;
+      color: $primary;
+    }
+  }
+  
+  .page-item.active .page-link {
+    background-color: $primary;
+    color: $white;
+    box-shadow: 0 4px 12px rgba($primary, 0.3);
+  }
+  
+  .page-item.disabled .page-link {
+    background-color: transparent;
+    color: $gray-400;
+  }
+}
+
+// --- ANIMATIONS ---
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+@keyframes scaleIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// Stagger children animations
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeInUp 0.4s ease-out forwards;
+  
+  @for $i from 1 through 12 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.05}s;
+    }
   }
 }
 

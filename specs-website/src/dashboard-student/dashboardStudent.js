@@ -14,7 +14,6 @@ const viewModules = {
     events: () => import('./views/events.js'),
     profile: () => import('./views/profile.js'),
     payments: () => import('./views/payments.js'),
-    attendance: () => import('./views/attendance.js'),
     posts: () => import('./views/posts.js')
 };
 
@@ -29,7 +28,6 @@ import logo from '/logo.webp';
 import calendarIcon from 'bootstrap-icons/icons/calendar-event.svg';
 import personIcon from 'bootstrap-icons/icons/person.svg';
 import walletIcon from 'bootstrap-icons/icons/wallet2.svg';
-import clockIcon from 'bootstrap-icons/icons/clock-history.svg';
 import boxArrowRightIcon from 'bootstrap-icons/icons/box-arrow-right.svg';
 import listIcon from 'bootstrap-icons/icons/list.svg';
 import bellIcon from 'bootstrap-icons/icons/bell.svg';
@@ -46,7 +44,6 @@ const viewMeta = {
     '#events': { moduleKey: 'events', title: 'Events', icon: calendarIcon },
     '#profile': { moduleKey: 'profile', title: 'My Profile', icon: personIcon },
     '#payments': { moduleKey: 'payments', title: 'My Payments', icon: walletIcon },
-    '#attendance': { moduleKey: 'attendance', title: 'My Attendance', icon: clockIcon },
     '#posts': { moduleKey: 'posts', title: 'My Posts', icon: fileTextIcon },
     '': { moduleKey: 'events', title: 'Events', icon: calendarIcon }
 };

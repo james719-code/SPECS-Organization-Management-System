@@ -1,5 +1,5 @@
 import { databases, storage, account } from './appwrite.js';
-import {
+import { 
     DATABASE_ID,
     COLLECTION_ID_EVENTS,
     COLLECTION_ID_PAYMENTS,
@@ -11,131 +11,298 @@ import {
 } from './constants.js';
 import { Query, ID } from 'appwrite';
 import { dataCache, imageCache, generateCacheKey } from './cache.js';
+import { createApiError, ErrorCodes, ApiError } from './errors.js';
+
+// Re-export error utilities for consumers
+export { ApiError, ErrorCodes };
+
+/**
+ * Default page size for paginated queries
+ */
+const DEFAULT_PAGE_SIZE = 100;
+
+/**
+ * Maximum allowed page size
+ */
+const MAX_PAGE_SIZE = 500;
+
+/**
+ * Helper to create paginated response
+ * @param {Object} result - Appwrite list result with documents and total
+ * @param {number} limit - Page size used
+ * @param {number} offset - Offset used
+ * @returns {Object} Paginated response with hasMore flag
+ */
+function createPaginatedResponse(result, limit, offset) {
+    return {
+        documents: result.documents,
+        total: result.total,
+        limit,
+        offset,
+        hasMore: offset + result.documents.length < result.total
+    };
+}
 
 export const api = {
+    // --- EVENTS ---
     events: {
-        async list(limit = 100, orderDesc = true) {
-            const queries = [Query.limit(limit)];
-            if (orderDesc) queries.push(Query.orderDesc('date_to_held'));
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, queries);
+        /**
+         * List events with pagination
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100, max: 500)
+         * @param {number} options.offset - Offset for pagination (default: 0)
+         * @param {boolean} options.orderDesc - Order by date descending (default: true)
+         * @returns {Promise<Object>} Paginated response with documents, total, hasMore
+         */
+        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true } = {}) {
+            try {
+                const pageSize = Math.min(limit, MAX_PAGE_SIZE);
+                const queries = [Query.limit(pageSize), Query.offset(offset)];
+                if (orderDesc) queries.push(Query.orderDesc('date_to_held'));
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, queries);
+                return createPaginatedResponse(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list events');
+            }
         },
         async get(eventId) {
-            return databases.getDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId);
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId);
+            } catch (error) {
+                throw createApiError(error, `Failed to get event ${eventId}`);
+            }
         },
         async create(data) {
-            return databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), data);
+            try {
+                return await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), data);
+            } catch (error) {
+                throw createApiError(error, 'Failed to create event');
+            }
         },
         async update(eventId, data) {
-            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, data);
+            try {
+                return await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, data);
+            } catch (error) {
+                throw createApiError(error, `Failed to update event ${eventId}`);
+            }
         },
         async delete(eventId) {
-            return databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId);
+            try {
+                return await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId);
+            } catch (error) {
+                throw createApiError(error, `Failed to delete event ${eventId}`);
+            }
         },
         async markEnded(eventId) {
-            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, { event_ended: true });
+            try {
+                return await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, { event_ended: true });
+            } catch (error) {
+                throw createApiError(error, `Failed to mark event ${eventId} as ended`);
+            }
         }
     },
 
+    // --- PAYMENTS ---
     payments: {
-        async list(limit = 5000) {
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(limit)]);
+        /**
+         * List all payments with pagination
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100, max: 500)
+         * @param {number} options.offset - Offset for pagination (default: 0)
+         * @returns {Promise<Object>} Paginated response
+         */
+        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0 } = {}) {
+            try {
+                const pageSize = Math.min(limit, MAX_PAGE_SIZE);
+                const queries = [Query.limit(pageSize), Query.offset(offset)];
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, queries);
+                return createPaginatedResponse(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list payments');
+            }
         },
         async listForStudent(studentId) {
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
-                Query.equal('students', studentId),
-                Query.orderDesc('date_paid'),
-                Query.limit(100)
-            ]);
+            try {
+                return await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
+                    Query.equal('students', studentId),
+                    Query.orderDesc('date_paid'),
+                    Query.limit(100)
+                ]);
+            } catch (error) {
+                throw createApiError(error, `Failed to list payments for student ${studentId}`);
+            }
         },
         async create(data) {
-            return databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), data);
+            try {
+                return await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), data);
+            } catch (error) {
+                throw createApiError(error, 'Failed to create payment');
+            }
         },
         async update(paymentId, data) {
-            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId, data);
+            try {
+                return await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId, data);
+            } catch (error) {
+                throw createApiError(error, `Failed to update payment ${paymentId}`);
+            }
         },
         async delete(paymentId) {
-            return databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId);
+            try {
+                return await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId);
+            } catch (error) {
+                throw createApiError(error, `Failed to delete payment ${paymentId}`);
+            }
         },
         async markPaid(payment, recorderId, studentName) {
-            // Create Revenue Record
-            await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
-                name: `${payment.item_name} (Paid by ${studentName})`,
-                isEvent: payment.is_event,
-                event: (payment.is_event && payment.events) ? ((payment.events.$id) ? payment.events.$id : payment.events) : null,
-                activity: payment.is_event ? null : payment.activity,
-                quantity: payment.quantity,
-                price: payment.price,
-                date_earned: new Date().toISOString(),
-                recorder: recorderId
-            });
-            // Update Payment Record
-            return databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, {
-                is_paid: true,
-                date_paid: new Date().toISOString()
-            });
+            try {
+                // Create Revenue Record
+                await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
+                    name: `${payment.item_name} (Paid by ${studentName})`,
+                    isEvent: payment.is_event,
+                    event: (payment.is_event && payment.events) ? ((payment.events.$id) ? payment.events.$id : payment.events) : null,
+                    activity: payment.is_event ? null : payment.activity,
+                    quantity: payment.quantity,
+                    price: payment.price,
+                    date_earned: new Date().toISOString(),
+                    recorder: recorderId
+                });
+                // Update Payment Record
+                return await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { 
+                    is_paid: true, 
+                    date_paid: new Date().toISOString() 
+                });
+            } catch (error) {
+                throw createApiError(error, `Failed to mark payment ${payment.$id} as paid`);
+            }
         }
     },
 
+    // --- ATTENDANCE ---
     attendance: {
         async listForStudent(studentId) {
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
-                Query.equal('students', studentId),
-                Query.orderDesc('$createdAt')
-            ]);
+            try {
+                return await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                    Query.equal('students', studentId),
+                    Query.orderDesc('$createdAt')
+                ]);
+            } catch (error) {
+                throw createApiError(error, `Failed to list attendance for student ${studentId}`);
+            }
         },
-        async listForEvent(eventId) {
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
-                Query.equal('events', eventId),
-                Query.limit(5000)
-            ]);
+        /**
+         * List attendance for an event with pagination
+         * @param {string} eventId - Event ID
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100, max: 500)
+         * @param {number} options.offset - Offset for pagination (default: 0)
+         * @returns {Promise<Object>} Paginated response
+         */
+        async listForEvent(eventId, { limit = DEFAULT_PAGE_SIZE, offset = 0 } = {}) {
+            try {
+                const pageSize = Math.min(limit, MAX_PAGE_SIZE);
+                const queries = [
+                    Query.equal('events', eventId),
+                    Query.limit(pageSize),
+                    Query.offset(offset)
+                ];
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, queries);
+                return createPaginatedResponse(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, `Failed to list attendance for event ${eventId}`);
+            }
         },
         async create(eventId, studentId, officerId, attendanceName) {
-            return databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), {
-                events: eventId,
-                students: studentId,
-                officers: officerId,
-                name_attendance: attendanceName
-            });
+            try {
+                return await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), {
+                    events: eventId,
+                    students: studentId,
+                    officers: officerId,
+                    name_attendance: attendanceName
+                });
+            } catch (error) {
+                throw createApiError(error, 'Failed to create attendance record');
+            }
         },
         async delete(attendanceId) {
-            return databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, attendanceId);
+            try {
+                return await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, attendanceId);
+            } catch (error) {
+                throw createApiError(error, `Failed to delete attendance ${attendanceId}`);
+            }
         }
     },
 
+    // --- USERS (Students/Accounts) ---
     users: {
         async getCurrent() {
-            return account.get();
+            try {
+                return await account.get();
+            } catch (error) {
+                throw createApiError(error, 'Failed to get current user');
+            }
         },
         async getAccount(accountId) {
-            return databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
+            } catch (error) {
+                throw createApiError(error, `Failed to get account ${accountId}`);
+            }
         },
         async getStudentProfile(studentId) {
-            return databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId);
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId);
+            } catch (error) {
+                throw createApiError(error, `Failed to get student profile ${studentId}`);
+            }
         },
-        async listStudents() {
-            // Often we list accounts that are type 'student'
-            return databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
-                Query.equal('type', 'student'),
-                Query.limit(5000)
-            ]);
+        /**
+         * List students with pagination
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100, max: 500)
+         * @param {number} options.offset - Offset for pagination (default: 0)
+         * @returns {Promise<Object>} Paginated response
+         */
+        async listStudents({ limit = DEFAULT_PAGE_SIZE, offset = 0 } = {}) {
+            try {
+                const pageSize = Math.min(limit, MAX_PAGE_SIZE);
+                const queries = [
+                    Query.equal('type', 'student'),
+                    Query.limit(pageSize),
+                    Query.offset(offset)
+                ];
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, queries);
+                return createPaginatedResponse(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list students');
+            }
         }
     },
 
+    // --- STORAGE ---
     files: {
         getFilePreview(fileId, width = 600, height = 400) {
             // Use centralized image cache
             return imageCache.get(BUCKET_ID_EVENT_IMAGES, fileId, width, height);
         },
         async uploadEventImage(file) {
-            return storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), file);
+            try {
+                return await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), file);
+            } catch (error) {
+                throw createApiError(error, 'Failed to upload event image');
+            }
         },
         async deleteEventImage(fileId) {
-            // Clear image cache when deleting
-            imageCache.clear(fileId);
-            return storage.deleteFile(BUCKET_ID_EVENT_IMAGES, fileId);
+            try {
+                // Clear image cache when deleting
+                imageCache.clear(fileId);
+                return await storage.deleteFile(BUCKET_ID_EVENT_IMAGES, fileId);
+            } catch (error) {
+                throw createApiError(error, `Failed to delete event image ${fileId}`);
+            }
         }
     },
 
+    // --- CACHE UTILITIES ---
     cache: {
         /**
          * Clear all cached data (useful after mutations like create/update/delete)
@@ -177,13 +344,15 @@ export const cachedApi = {
     events: {
         /**
          * List events with caching
-         * @param {number} limit - Max number of events
-         * @param {boolean} orderDesc - Order by date descending
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100)
+         * @param {number} options.offset - Offset for pagination (default: 0)
+         * @param {boolean} options.orderDesc - Order by date descending (default: true)
          * @param {number} ttl - Cache TTL in milliseconds (default: 2 minutes)
          */
-        async list(limit = 100, orderDesc = true, ttl = 2 * 60 * 1000) {
-            const cacheKey = generateCacheKey('events_list', { limit, orderDesc });
-            return dataCache.getOrFetch(cacheKey, () => api.events.list(limit, orderDesc), ttl);
+        async list({ limit = 100, offset = 0, orderDesc = true } = {}, ttl = 2 * 60 * 1000) {
+            const cacheKey = generateCacheKey('events_list', { limit, offset, orderDesc });
+            return dataCache.getOrFetch(cacheKey, () => api.events.list({ limit, offset, orderDesc }), ttl);
         },
         /**
          * Get single event with caching
@@ -199,12 +368,14 @@ export const cachedApi = {
     payments: {
         /**
          * List payments with caching
-         * @param {number} limit - Max number of payments
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100)
+         * @param {number} options.offset - Offset for pagination (default: 0)
          * @param {number} ttl - Cache TTL in milliseconds (default: 1 minute)
          */
-        async list(limit = 5000, ttl = 60 * 1000) {
-            const cacheKey = generateCacheKey('payments_list', { limit });
-            return dataCache.getOrFetch(cacheKey, () => api.payments.list(limit), ttl);
+        async list({ limit = 100, offset = 0 } = {}, ttl = 60 * 1000) {
+            const cacheKey = generateCacheKey('payments_list', { limit, offset });
+            return dataCache.getOrFetch(cacheKey, () => api.payments.list({ limit, offset }), ttl);
         },
         /**
          * List payments for a student with caching
@@ -237,10 +408,14 @@ export const cachedApi = {
         },
         /**
          * List students with caching
+         * @param {Object} options - Query options
+         * @param {number} options.limit - Page size (default: 100)
+         * @param {number} options.offset - Offset for pagination (default: 0)
          * @param {number} ttl - Cache TTL in milliseconds (default: 2 minutes)
          */
-        async listStudents(ttl = 2 * 60 * 1000) {
-            const cacheKey = 'students_list';
+        async listStudents({ limit = 100, offset = 0 } = {}, ttl = 2 * 60 * 1000) {
+            const cacheKey = generateCacheKey('students_list', { limit, offset });
+            return dataCache.getOrFetch(cacheKey, () => api.users.listStudents({ limit, offset }), ttl);
             return dataCache.getOrFetch(cacheKey, () => api.users.listStudents(), ttl);
         }
     }

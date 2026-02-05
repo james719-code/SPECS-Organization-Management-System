@@ -1,7 +1,8 @@
 import { databases } from '../../shared/appwrite.js';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS } from '../../shared/constants.js';
 import { Query } from 'appwrite';
-import { Modal } from 'bootstrap';
+import { Modal, Dropdown } from 'bootstrap';
+import toast from '../../shared/toast.js';
 
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
@@ -10,6 +11,30 @@ import mortarboardIcon from 'bootstrap-icons/icons/mortarboard.svg';
 import geoAltIcon from 'bootstrap-icons/icons/geo-alt.svg';
 import sortAlphaDown from 'bootstrap-icons/icons/sort-alpha-down.svg';
 import sortNumericDown from 'bootstrap-icons/icons/sort-numeric-down.svg';
+import arrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg';
+
+/**
+ * Generate skeleton loading cards for students
+ */
+function getSkeletonCards(count = 8) {
+    const skeletonCard = `
+        <div class="col">
+            <div class="skeleton-card" style="background: #fff; border-radius: 12px; padding: 1.5rem; border: 1px solid #e5e7eb;">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="skeleton-loader rounded-circle me-3" style="width: 56px; height: 56px;"></div>
+                    <div class="flex-grow-1">
+                        <div class="skeleton-loader mb-2" style="width: 70%; height: 16px;"></div>
+                        <div class="skeleton-loader" style="width: 40%; height: 12px;"></div>
+                    </div>
+                </div>
+                <div class="skeleton-loader mb-2" style="width: 80%; height: 14px;"></div>
+                <div class="skeleton-loader mb-2" style="width: 50%; height: 14px;"></div>
+                <div class="skeleton-loader" style="width: 65%; height: 14px;"></div>
+            </div>
+        </div>
+    `;
+    return Array(count).fill(skeletonCard).join('');
+}
 
 function createStudentCardHTML(student) {
     const name = student.name || 'Unknown';
@@ -56,12 +81,15 @@ function getStudentHTML() {
     return `
         <div class="student-directory-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
-                <div class="col-12 col-lg-5">
+                <div class="col-12 col-lg-4">
                     <h1 class="display-6 fw-bold text-dark mb-1">Student Directory</h1>
                     <p class="text-muted mb-0">Browse and manage general student records.</p>
                 </div>
-                <div class="col-12 col-lg-7">
-                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
+                <div class="col-12 col-lg-8">
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end flex-wrap">
+                        <button id="refreshStudentsBtn" class="btn btn-light btn-sm d-flex align-items-center gap-2 rounded-pill shadow-sm px-3" title="Refresh students">
+                            <img src="${arrowRepeat}" alt="Refresh" style="width: 1rem; opacity: 0.6;">
+                        </button>
                         <select id="yearFilterSelect" class="form-select border-0 shadow-sm bg-white py-2 ps-3" style="max-width: 160px; cursor: pointer;">
                             <option value="all">All Years</option>
                             <option value="1">Year 1</option>
@@ -90,8 +118,10 @@ function getStudentHTML() {
                 </div>
             </header>
             
+            <div class="mb-3 text-muted small" id="studentResultsCount"></div>
+            
             <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
-                 <div class="col-12 text-center p-5"><div class="spinner-border text-primary" role="status"></div></div>
+                ${getSkeletonCards(8)}
             </div>
         </div>
 
@@ -109,6 +139,23 @@ function getStudentHTML() {
                 </div>
             </div>
         </div>
+        
+        <style>
+            .skeleton-loader {
+                background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+                background-size: 200% 100%;
+                animation: skeleton-loading 1.5s infinite ease-in-out;
+                border-radius: 6px;
+            }
+            @keyframes skeleton-loading {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+            #refreshStudentsBtn.refreshing img { animation: spin 1s linear infinite; }
+            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            .student-card { transition: all 0.3s ease; }
+            .student-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.1) !important; }
+        </style>
     `;
 }
 
@@ -117,6 +164,8 @@ async function attachEventListeners() {
     const yearFilterSelect = document.getElementById('yearFilterSelect');
     const searchInput = document.getElementById('studentSearchInput');
     const sortOptions = document.querySelectorAll('[data-sort]');
+    const refreshBtn = document.getElementById('refreshStudentsBtn');
+    const resultsCountEl = document.getElementById('studentResultsCount');
 
     const studentDetailsModalEl = document.getElementById('studentDetailsModal');
     const studentDetailsModal = new Modal(studentDetailsModalEl);
@@ -124,6 +173,7 @@ async function attachEventListeners() {
 
     let allStudents = [];
     let currentSort = 'name_asc';
+    let searchTimeout;
 
     const sortStudents = (students, criteria) => {
         const sorted = [...students];
@@ -138,6 +188,13 @@ async function attachEventListeners() {
     };
 
     const updateGridState = (data) => {
+        // Update results count
+        if (resultsCountEl) {
+            resultsCountEl.textContent = data.length > 0 
+                ? `Showing ${data.length} student${data.length !== 1 ? 's' : ''}` 
+                : '';
+        }
+
         if (data.length === 0) {
             cardsContainer.className = "d-flex flex-column align-items-center justify-content-center py-5 text-center";
             cardsContainer.innerHTML = `
@@ -180,7 +237,16 @@ async function attachEventListeners() {
         updateGridState(filtered);
     };
 
-    const loadData = async () => {
+    const loadData = async (isRefresh = false) => {
+        if (isRefresh && refreshBtn) {
+            refreshBtn.classList.add('refreshing');
+            refreshBtn.disabled = true;
+        }
+
+        if (!isRefresh) {
+            cardsContainer.innerHTML = getSkeletonCards(8);
+        }
+
         try {
             const res = await databases.listDocuments(
                 DATABASE_ID,
@@ -189,17 +255,41 @@ async function attachEventListeners() {
             );
             allStudents = res.documents;
             applyFilters();
+            
+            if (isRefresh) {
+                toast.success('Students refreshed successfully');
+            }
         } catch (err) {
             console.error(err);
-            cardsContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load students.</div></div>`;
+            cardsContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger d-flex align-items-center justify-content-between">
+                        <span>Failed to load students.</span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Retry</button>
+                    </div>
+                </div>`;
+            toast.error('Failed to load students');
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.classList.remove('refreshing');
+                refreshBtn.disabled = false;
+            }
         }
     };
 
     await loadData();
 
-    // Listeners
+    // Refresh button handler
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadData(true));
+    }
+
+    // Listeners (debounced search)
     yearFilterSelect.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', applyFilters);
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFilters, 300);
+    });
 
     // Sort Listener
     sortOptions.forEach(option => {

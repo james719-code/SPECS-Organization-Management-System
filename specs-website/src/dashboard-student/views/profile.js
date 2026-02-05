@@ -2,7 +2,8 @@ import { databases, account } from '../../shared/appwrite.js';
 import { Modal } from 'bootstrap';
 import {
     DATABASE_ID,
-    COLLECTION_ID_STUDENTS
+    COLLECTION_ID_STUDENTS,
+    COLLECTION_ID_ACCOUNTS
 } from '../../shared/constants.js';
 
 import personBadge from 'bootstrap-icons/icons/person-badge.svg';
@@ -217,7 +218,6 @@ function getProfileHTML() {
                         <ul class="text-muted small mb-4">
                             <li>Your profile information</li>
                             <li>Payment history</li>
-                            <li>Attendance records</li>
                             <li>Access to the student portal</li>
                         </ul>
                         <div class="mb-3">
@@ -250,11 +250,32 @@ async function attachProfileListeners(studentDoc, currentUser) {
             studentData = studentDoc;
             console.log("[DEV] Using passed student document");
         } else {
-            studentData = await databases.getDocument(
+            // First fetch the account document to get the students relationship
+            const accountDoc = await databases.getDocument(
                 DATABASE_ID,
-                COLLECTION_ID_STUDENTS,
+                COLLECTION_ID_ACCOUNTS,
                 currentUser.$id
             );
+            
+            // Get the student document from the relationship
+            if (accountDoc.students) {
+                // If it's already expanded (an object), use it directly
+                if (typeof accountDoc.students === 'object' && accountDoc.students.$id) {
+                    studentData = accountDoc.students;
+                } else {
+                    // Otherwise fetch it using the ID
+                    const studentId = typeof accountDoc.students === 'string' 
+                        ? accountDoc.students 
+                        : accountDoc.students.$id;
+                    studentData = await databases.getDocument(
+                        DATABASE_ID,
+                        COLLECTION_ID_STUDENTS,
+                        studentId
+                    );
+                }
+            } else {
+                throw { code: 404, message: 'No student record linked to this account' };
+            }
         }
 
         console.log("✅ [Profile] Student Document Found:", studentData);
@@ -343,7 +364,7 @@ async function attachProfileListeners(studentDoc, currentUser) {
             await databases.updateDocument(
                 DATABASE_ID,
                 COLLECTION_ID_STUDENTS,
-                currentUser.$id,
+                studentData.$id,
                 updatedData
             );
 
@@ -398,7 +419,7 @@ async function attachProfileListeners(studentDoc, currentUser) {
                 await databases.deleteDocument(
                     DATABASE_ID,
                     COLLECTION_ID_STUDENTS,
-                    currentUser.$id
+                    studentData.$id
                 );
             }
 

@@ -16,6 +16,44 @@ const ROUTES = {
     PENDING_PAGE: '/landing/#pending-verification'
 };
 
+/**
+ * Check if an error indicates an expired or invalid session
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if session is expired/invalid
+ */
+function isSessionExpiredError(error) {
+    // Appwrite returns 401 for unauthorized/expired sessions
+    if (error?.code === 401) return true;
+    if (error?.type === 'user_unauthorized') return true;
+    if (error?.type === 'general_unauthorized_scope') return true;
+    
+    // Check error message as fallback
+    const message = error?.message?.toLowerCase() || '';
+    return message.includes('unauthorized') || 
+           message.includes('session') || 
+           message.includes('expired') ||
+           message.includes('not authenticated');
+}
+
+/**
+ * Clear any local session data and redirect to login
+ * @param {string} reason - Reason for logout (for logging)
+ */
+function handleSessionExpiry(reason = 'session_expired') {
+    console.warn(`[Auth] Session invalid: ${reason}. Redirecting to login.`);
+    
+    // Clear any cached session data
+    try {
+        sessionStorage.removeItem('mock_user_email');
+        // Clear any other session-related storage
+        localStorage.removeItem('appwrite_session');
+    } catch (e) {
+        // Storage might be blocked
+    }
+    
+    window.location.replace(ROUTES.LOGIN_PAGE);
+}
+
 (async () => {
     const currentPath = window.location.pathname;
 
@@ -47,15 +85,48 @@ const ROUTES = {
     const isPublicPage = currentPath.includes('/landing') || currentPath === '/';
 
     try {
-        // Check Session
-        const user = await account.get();
+        // Check Session - this will throw if session is expired/invalid
+        let user;
+        try {
+            user = await account.get();
+        } catch (sessionError) {
+            // Specific handling for session errors
+            if (isSessionExpiredError(sessionError)) {
+                if (currentPath.includes('dashboard')) {
+                    handleSessionExpiry('get_user_failed');
+                }
+                // Allow public pages even without session
+                return;
+            }
+            throw sessionError; // Re-throw non-session errors
+        }
 
         // Fetch User Role & Status
-        const profile = await databases.getDocument(
-            DATABASE_ID,
-            COLLECTION_ID_ACCOUNTS,
-            user.$id
-        );
+        let profile;
+        try {
+            profile = await databases.getDocument(
+                DATABASE_ID,
+                COLLECTION_ID_ACCOUNTS,
+                user.$id
+            );
+        } catch (profileError) {
+            console.error('[Auth] Failed to fetch user profile:', profileError);
+            
+            // If profile fetch fails due to auth, treat as session expired
+            if (isSessionExpiredError(profileError)) {
+                if (currentPath.includes('dashboard')) {
+                    handleSessionExpiry('profile_fetch_unauthorized');
+                }
+                return;
+            }
+            
+            // For other errors (e.g., profile not found), redirect to login
+            if (currentPath.includes('dashboard')) {
+                console.warn('[Auth] Profile not found or error. Redirecting.');
+                window.location.replace(ROUTES.LOGIN_PAGE);
+            }
+            return;
+        }
 
         const type = profile.type;
         const isVerified = profile.verified;
@@ -108,10 +179,28 @@ const ROUTES = {
         }
 
     } catch (error) {
-        // RULE 3: Not Logged In
+        // RULE 3: Handle unexpected errors
+        console.error('[Auth] Unexpected error during authentication:', error);
+        
         if (currentPath.includes('dashboard')) {
-            console.warn("Unauthorized access attempt. Redirecting to login.");
-            window.location.replace(ROUTES.LOGIN_PAGE);
+            // Check if it's a session-related error
+            if (isSessionExpiredError(error)) {
+                handleSessionExpiry('unexpected_session_error');
+            } else {
+                // For other errors, still redirect to login as a safety measure
+                console.warn('[Auth] Unauthorized access attempt. Redirecting to login.');
+                window.location.replace(ROUTES.LOGIN_PAGE);
+            }
         }
     }
 })();
+
+/**
+ * SECURITY NOTE:
+ * This client-side authentication guard is for UX convenience only.
+ * All sensitive operations MUST be protected by Appwrite's server-side
+ * collection permissions and document-level security rules.
+ * 
+ * Client-side routing can be bypassed by disabling JavaScript.
+ * Never rely solely on this guard for security.
+ */

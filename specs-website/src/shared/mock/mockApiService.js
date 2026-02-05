@@ -160,20 +160,250 @@ class MockApiService {
         return true;
     }
 
+    /**
+     * Parse an Appwrite Query string into its components
+     * Query format: "method(\"field\", value)" or "method(value)"
+     * @param {string} queryStr - Query string from Appwrite SDK
+     * @returns {Object|null} Parsed query object or null
+     */
+    _parseQuery(queryStr) {
+        const str = typeof queryStr === 'string' ? queryStr : String(queryStr);
+        
+        // Match: method("field", value) or method("field", [values]) or method(value)
+        const match = str.match(/^(\w+)\((.+)\)$/);
+        if (!match) return null;
+
+        const method = match[1];
+        const argsStr = match[2];
+
+        // Parse arguments - could be "field", value or just value
+        const args = [];
+        let current = '';
+        let inString = false;
+        let inArray = false;
+        let stringChar = '';
+        
+        for (let i = 0; i < argsStr.length; i++) {
+            const char = argsStr[i];
+            
+            if (!inString && !inArray && (char === '"' || char === "'")) {
+                inString = true;
+                stringChar = char;
+            } else if (inString && char === stringChar && argsStr[i - 1] !== '\\') {
+                inString = false;
+                stringChar = '';
+            } else if (!inString && char === '[') {
+                inArray = true;
+                current += char;
+            } else if (!inString && char === ']') {
+                inArray = false;
+                current += char;
+            } else if (!inString && !inArray && char === ',') {
+                args.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        if (current.trim()) {
+            args.push(current.trim());
+        }
+
+        // Parse individual values
+        const parsedArgs = args.map(arg => {
+            arg = arg.trim();
+            // String
+            if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+                return arg.slice(1, -1);
+            }
+            // Array
+            if (arg.startsWith('[') && arg.endsWith(']')) {
+                try {
+                    return JSON.parse(arg);
+                } catch {
+                    return arg;
+                }
+            }
+            // Number
+            if (!isNaN(arg)) {
+                return Number(arg);
+            }
+            // Boolean
+            if (arg === 'true') return true;
+            if (arg === 'false') return false;
+            return arg;
+        });
+
+        return { method, args: parsedArgs };
+    }
+
+    /**
+     * Apply parsed queries to filter/sort/limit data
+     * @param {Array} data - Array of documents
+     * @param {Array} queries - Array of query strings or objects
+     * @returns {Object} Result with filtered documents, total count, and pagination info
+     */
+    _applyQueries(data, queries) {
+        let result = [...data];
+        const totalBeforeFilter = data.length;
+        let limit = null;
+        let offset = 0;
+
+        for (const query of queries) {
+            const parsed = this._parseQuery(query);
+            if (!parsed) continue;
+
+            const { method, args } = parsed;
+
+            switch (method) {
+                case 'equal':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => {
+                            const docValue = doc[field];
+                            // Handle relationship fields (e.g., students with $id)
+                            if (docValue && typeof docValue === 'object' && docValue.$id) {
+                                return docValue.$id === value;
+                            }
+                            // Handle array values
+                            if (Array.isArray(value)) {
+                                return value.includes(docValue);
+                            }
+                            return docValue === value;
+                        });
+                    }
+                    break;
+
+                case 'notEqual':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => doc[field] !== value);
+                    }
+                    break;
+
+                case 'greaterThan':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => doc[field] > value);
+                    }
+                    break;
+
+                case 'greaterThanEqual':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => doc[field] >= value);
+                    }
+                    break;
+
+                case 'lessThan':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => doc[field] < value);
+                    }
+                    break;
+
+                case 'lessThanEqual':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        result = result.filter(doc => doc[field] <= value);
+                    }
+                    break;
+
+                case 'search':
+                    if (args.length >= 2) {
+                        const [field, value] = args;
+                        const searchTerm = String(value).toLowerCase();
+                        result = result.filter(doc => 
+                            String(doc[field] || '').toLowerCase().includes(searchTerm)
+                        );
+                    }
+                    break;
+
+                case 'orderDesc':
+                    if (args.length >= 1) {
+                        const field = args[0];
+                        result.sort((a, b) => {
+                            const aVal = a[field];
+                            const bVal = b[field];
+                            if (aVal < bVal) return 1;
+                            if (aVal > bVal) return -1;
+                            return 0;
+                        });
+                    }
+                    break;
+
+                case 'orderAsc':
+                    if (args.length >= 1) {
+                        const field = args[0];
+                        result.sort((a, b) => {
+                            const aVal = a[field];
+                            const bVal = b[field];
+                            if (aVal < bVal) return -1;
+                            if (aVal > bVal) return 1;
+                            return 0;
+                        });
+                    }
+                    break;
+
+                case 'limit':
+                    if (args.length >= 1) {
+                        limit = Number(args[0]);
+                    }
+                    break;
+
+                case 'offset':
+                    if (args.length >= 1) {
+                        offset = Number(args[0]);
+                    }
+                    break;
+
+                case 'cursorAfter':
+                case 'cursorBefore':
+                    // Cursor-based pagination - find the document and slice from there
+                    if (args.length >= 1) {
+                        const cursorId = args[0];
+                        const cursorIndex = result.findIndex(doc => doc.$id === cursorId);
+                        if (cursorIndex !== -1) {
+                            if (method === 'cursorAfter') {
+                                result = result.slice(cursorIndex + 1);
+                            } else {
+                                result = result.slice(0, cursorIndex);
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // Store total after filtering but before pagination
+        const totalAfterFilter = result.length;
+
+        // Apply offset and limit last
+        if (offset > 0) {
+            result = result.slice(offset);
+        }
+        if (limit !== null && limit > 0) {
+            result = result.slice(0, limit);
+        }
+
+        return {
+            documents: result,
+            total: totalAfterFilter,
+            limit,
+            offset
+        };
+    }
+
     async listDocuments(databaseId, collectionId, queries = []) {
         await delay(MOCK_DELAY);
         let data = getMockData(collectionId);
 
-        // Simple query processing
-        queries.forEach(query => {
-            if (typeof query === 'object') {
-                // Handle Query objects if needed
-            }
-        });
+        // Apply query processing
+        const { documents, total, limit, offset } = this._applyQueries(data, queries);
 
         return {
-            documents: [...data],
-            total: data.length
+            documents,
+            total
         };
     }
 

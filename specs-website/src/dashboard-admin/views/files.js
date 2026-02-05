@@ -1,6 +1,7 @@
 import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
+import toast from '../../shared/toast.js';
 
 import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
 import downloadIcon from 'bootstrap-icons/icons/download.svg';
@@ -11,6 +12,7 @@ import cloudArrowUp from 'bootstrap-icons/icons/cloud-arrow-up.svg';
 import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import infoCircle from 'bootstrap-icons/icons/info-circle.svg';
+import arrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg';
 
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
@@ -66,16 +68,21 @@ function getFilesHTML() {
     return `
     <div class="files-view-container container-fluid py-4 px-md-5">
         <header class="row align-items-center mb-5 gy-4">
-            <div class="col-12 col-lg-7">
+            <div class="col-12 col-lg-5">
                 <h1 class="display-6 fw-bold text-dark mb-1">File Management</h1>
                 <p class="text-muted mb-0">View, search, and manage all uploaded organization documents.</p>
             </div>
-            <div class="col-12 col-lg-5">
-                <div class="input-group shadow-sm rounded-3 overflow-hidden border-0 bg-white">
-                    <span class="input-group-text bg-white border-0 ps-3">
-                        <img src="${searchIcon}" width="18" style="opacity:0.4">
-                    </span>
-                    <input type="search" id="fileSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search files by name...">
+            <div class="col-12 col-lg-7">
+                <div class="d-flex flex-wrap gap-3 justify-content-lg-end">
+                    <button id="refreshFilesBtn" class="btn btn-light btn-sm d-flex align-items-center gap-2 rounded-pill shadow-sm px-3" title="Refresh files">
+                        <img src="${arrowRepeat}" alt="Refresh" style="width: 1rem; opacity: 0.6;">
+                    </button>
+                    <div class="input-group shadow-sm rounded-3 overflow-hidden border-0 bg-white" style="max-width: 300px;">
+                        <span class="input-group-text bg-white border-0 ps-3">
+                            <img src="${searchIcon}" width="18" style="opacity:0.4">
+                        </span>
+                        <input type="search" id="fileSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search files by name...">
+                    </div>
                 </div>
             </div>
         </header>
@@ -106,7 +113,14 @@ function getFilesHTML() {
         <div class="modal fade" id="uploadFileModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><form id="uploadFileForm"><div class="modal-header border-0 pt-4 px-4"><h5 class="modal-title fw-bold">Upload Document</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><div class="mb-3"><label class="form-label fw-bold small">Title</label><input type="text" id="newFileName" class="form-control" required></div><div class="mb-3"><label class="form-label fw-bold small">Description</label><textarea id="newFileDescription" class="form-control" rows="3"></textarea></div><div class="mb-3"><label class="form-label fw-bold small">File</label><input type="file" id="fileUpload" class="form-control" required></div></div><div class="modal-footer border-0 pb-4 px-4"><button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Upload</button></div></form></div></div>
         </div>
-    </div>`;
+    </div>
+    
+    <style>
+        #refreshFilesBtn.refreshing img { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .file-card { transition: all 0.3s ease; }
+        .file-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.1) !important; }
+    </style>`;
 }
 
 async function attachFilesListeners() {
@@ -116,6 +130,7 @@ async function attachFilesListeners() {
     const uploadModal = new Modal(document.getElementById('uploadFileModal'));
     const grid = document.getElementById('file-cards-container');
     const searchInput = document.getElementById('fileSearchInput');
+    const refreshBtn = document.getElementById('refreshFilesBtn');
 
     // Load user lookup for uploader names
     try {
@@ -153,7 +168,12 @@ async function attachFilesListeners() {
         grid.innerHTML = files.map(doc => createFileCard(doc, userLookup)).join('');
     };
 
-    const loadFiles = async (searchTerm = '') => {
+    const loadFiles = async (searchTerm = '', isRefresh = false) => {
+        if (isRefresh && refreshBtn) {
+            refreshBtn.classList.add('refreshing');
+            refreshBtn.disabled = true;
+        }
+
         updateGridLayout(true);
         grid.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div>`;
 
@@ -166,15 +186,33 @@ async function attachFilesListeners() {
             const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, queries);
             allFiles = res.documents;
             renderGrid(allFiles);
+            
+            if (isRefresh) {
+                toast.success('Files refreshed successfully');
+            }
         } catch (error) {
             console.error("Search failed:", error);
             updateGridLayout(true);
-            grid.innerHTML = `<div class="text-danger fw-bold">Failed to load files.</div>`;
+            grid.innerHTML = `
+                <div class="text-danger fw-bold mb-3">Failed to load files.</div>
+                <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">Retry</button>
+            `;
+            toast.error('Failed to load files');
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.classList.remove('refreshing');
+                refreshBtn.disabled = false;
+            }
         }
     };
 
     // Initial Load
     await loadFiles();
+
+    // Refresh button handler
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadFiles(searchInput.value.trim(), true));
+    }
 
     // Real-time search
     let searchTimeout;
@@ -205,15 +243,31 @@ async function attachFilesListeners() {
 
         if (delBtn && confirm('Are you sure you want to permanently delete this file? This action cannot be undone.')) {
             delBtn.disabled = true;
+            const card = delBtn.closest('.col');
+            
             try {
                 await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, delBtn.dataset.docId);
                 await storage.deleteFile(BUCKET_ID_UPLOADS, delBtn.dataset.fileId);
 
-                allFiles = allFiles.filter(f => f.$id !== delBtn.dataset.docId);
-                renderGrid(allFiles);
+                // Animate card removal
+                if (card) {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.9)';
+                    
+                    setTimeout(() => {
+                        allFiles = allFiles.filter(f => f.$id !== delBtn.dataset.docId);
+                        renderGrid(allFiles);
+                    }, 300);
+                } else {
+                    allFiles = allFiles.filter(f => f.$id !== delBtn.dataset.docId);
+                    renderGrid(allFiles);
+                }
+                
+                toast.success('File deleted successfully');
             } catch (err) {
                 console.error('Delete failed:', err);
-                alert('Failed to delete file.');
+                toast.error('Failed to delete file');
                 delBtn.disabled = false;
             }
         }
@@ -245,9 +299,10 @@ async function attachFilesListeners() {
             uploadModal.hide();
             e.target.reset();
             await loadFiles(searchInput.value.trim());
+            toast.success('File uploaded successfully!', { title: 'Upload Complete' });
         } catch (err) {
             console.error(err);
-            alert('Upload failed. Check console for details.');
+            toast.error('Upload failed. Please check the file and try again.');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Upload';
