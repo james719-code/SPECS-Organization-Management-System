@@ -1,10 +1,10 @@
 // views/renderAdmin/stories.js (Admin)
-import { databases, storage } from '../../shared/appwrite.js';
+import { databases, storage, functions, account } from '../../shared/appwrite.js';
+import { DATABASE_ID, COLLECTION_ID_STORIES, FUNCTION_ID } from '../../shared/constants.js';
 import { Query } from 'appwrite';
+import toast from '../../shared/toast.js';
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
 
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STORIES = import.meta.env.VITE_COLLECTION_ID_STORIES;
 const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES;
 
 export default function renderStoriesView() {
@@ -25,6 +25,13 @@ export default function renderStoriesView() {
 
     const afterRender = async () => {
         const container = document.getElementById('admin-stories-container');
+
+        let currentUser;
+        try {
+            currentUser = await account.get();
+        } catch (err) {
+            console.error('Failed to get current user:', err);
+        }
 
         const fetchPendingStories = async () => {
             try {
@@ -78,20 +85,34 @@ export default function renderStoriesView() {
                         e.currentTarget.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Publishing...';
                         
                         try {
-                            await databases.updateDocument(
-                                DATABASE_ID,
-                                COLLECTION_ID_STORIES,
-                                storyId,
-                                {
-                                    adminApproval: true,
-                                    isAccepted: true // Make it public
-                                }
-                            );
+                            if (FUNCTION_ID) {
+                                await functions.createExecution(
+                                    FUNCTION_ID,
+                                    JSON.stringify({
+                                        action: 'approve_story',
+                                        payload: { story_id: storyId },
+                                        requestingUserId: currentUser?.$id
+                                    }),
+                                    false
+                                );
+                            } else {
+                                // Fallback: direct DB update if function not configured
+                                await databases.updateDocument(
+                                    DATABASE_ID,
+                                    COLLECTION_ID_STORIES,
+                                    storyId,
+                                    {
+                                        adminApproval: true,
+                                        isAccepted: true
+                                    }
+                                );
+                            }
+                            toast.success('Story published successfully!', { title: 'Published' });
                             // Refresh
                             await fetchPendingStories();
                         } catch (err) {
                             console.error("Publish failed:", err);
-                            alert("Failed to publish story.");
+                            toast.error('Failed to publish story. Please try again.');
                             e.currentTarget.disabled = false;
                             e.currentTarget.innerHTML = 'Publish Story';
                         }

@@ -52,28 +52,229 @@
   font-size: 0.7rem;
 }
 
-// --- STATUS BADGES (Minimal) ---
+// --- STATUS BADGES (Enhanced) ---
 .status-badge {
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
+  padding: $space-1 $space-3;
+  border-radius: $radius-md;
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.3px;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
 
   &.status-pending {
-    background-color: rgba($warning, 0.12);
-    color: darken($warning, 25%);
+    background-color: rgba($warning, 0.15);
+    color: $warning-dark;
   }
 
-  &.status-approved {
+  &.status-approved, &.status-verified {
     background-color: rgba($success, 0.12);
-    color: darken($success, 10%);
+    color: darken($success, 5%);
   }
 
-  &.status-rejected {
+  &.status-rejected, &.status-danger {
     background-color: rgba($danger, 0.12);
     color: $danger;
+  }
+  
+  &.status-info, &.status-officer {
+    background-color: rgba($info, 0.12);
+    color: darken($info, 15%);
+  }
+  
+  &.status-deactivated {
+    background-color: $gray-100;
+    color: $gray-500;
+  }
+  
+  &.status-primary {
+    background-color: rgba($primary, 0.12);
+    color: $primary;
+  }
+}
+
+// --- MODERN FORM STYLING ---
+.form-control, .form-select {
+  border-radius: $radius-md;
+  border: 1px solid $gray-200;
+  padding: $space-2 $space-3;
+  font-size: 0.9rem;
+  transition: all $transition-fast;
+  
+  &:focus {
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba($primary, 0.1);
+  }
+  
+  &::placeholder {
+    color: $gray-400;
+  }
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: $gray-700;
+  margin-bottom: $space-1;
+}
+
+.form-text {
+  font-size: 0.75rem;
+  color: $gray-500;
+}
+
+.input-group {
+  .input-group-text {
+    background-color: $gray-50;
+    border: 1px solid $gray-200;
+    border-radius: $radius-md;
+    color: $gray-500;
+    padding: $space-2 $space-3;
+  }
+  
+  .form-control {
+    border-radius: $radius-md;
+  }
+  
+  // Fix border radius for input groups
+  > :not(:first-child):not(.dropdown-menu):not(.valid-tooltip):not(.valid-feedback):not(.invalid-tooltip):not(.invalid-feedback) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  
+  > :not(:last-child):not(.dropdown-menu):not(.dropdown-toggle) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+// --- ENHANCED MODAL STYLING ---
+.modal {
+  .modal-content {
+    border: none;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-xl;
+    overflow: hidden;
+  }
+  
+  .modal-header {
+    padding: $space-5 $space-5 $space-3;
+    border-bottom: 1px solid $gray-100;
+    
+    .modal-title {
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: $gray-800;
+    }
+    
+    .btn-close {
+      opacity: 0.5;
+      transition: opacity $transition-fast;
+      
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }
+  
+  .modal-body {
+    padding: $space-5;
+    
+    // Form rows in modals
+    .row.g-3 {
+      margin-top: 0;
+    }
+  }
+  
+  .modal-footer {
+    padding: $space-3 $space-5 $space-5;
+    border-top: 1px solid $gray-100;
+    background-color: $gray-50;
+    gap: $space-2;
+  }
+}
+
+// --- ENHANCED DROPDOWN STYLING ---
+.dropdown-menu {
+  border: none;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+  padding: $space-2;
+  min-width: 180px;
+  
+  .dropdown-header {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $gray-400;
+    padding: $space-2 $space-3;
+  }
+  
+  .dropdown-item {
+    border-radius: $radius-md;
+    padding: $space-2 $space-3;
+    font-size: 0.875rem;
+    color: $gray-700;
+    transition: all $transition-fast;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    
+    &:hover, &:focus {
+      background-color: $gray-100;
+      color: $gray-900;
+    }
+    
+    &.active, &:active {
+      background-color: rgba($primary, 0.1);
+      color: $primary;
+    }
+    
+    &.text-danger:hover {
+      background-color: rgba($danger, 0.08);
+      color: $danger;
+    }
+    
+    img, svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+  }
+  
+  .dropdown-divider {
+    margin: $space-2 0;
+    border-color: $gray-100;
+  }
+}
+
+// --- ALERT STYLING ---
+.alert {
+  border-radius: $radius-lg;
+  border: none;
+  padding: $space-4;
+  
+  &.alert-success {
+    background-color: rgba($success, 0.1);
+    color: darken($success, 10%);
+  }
+  
+  &.alert-danger {
+    background-color: rgba($danger, 0.1);
+    color: $danger;
+  }
+  
+  &.alert-warning {
+    background-color: rgba($warning, 0.12);
+    color: $warning-dark;
+  }
+  
+  &.alert-info {
+    background-color: rgba($info, 0.1);
+    color: darken($info, 15%);
   }
 }
 
@@ -145,6 +346,77 @@
       img {
         filter: invert(36%) sepia(35%) saturate(836%) hue-rotate(130deg) brightness(93%) contrast(92%);
       }
+    }
+  }
+}
+
+// --- SIDEBAR INDEPENDENT SCROLL ---
+// Makes the sidebar scroll independently from the main content
+aside.offcanvas-lg.offcanvas-start {
+  // Desktop: Fixed sidebar with independent scroll
+  @include media-breakpoint-up(lg) {
+    position: sticky !important;
+    top: 0;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    
+    // Ensure flex children can shrink
+    > * {
+      min-height: 0;
+    }
+  }
+  
+  // Header area (logo + hr) - keep fixed at top
+  > a:first-child,
+  > hr:first-of-type {
+    flex-shrink: 0;
+  }
+  
+  // Keep user dropdown at bottom, never scrolled
+  > .dropdown,
+  > .dropdown.mt-auto {
+    flex-shrink: 0;
+  }
+}
+
+// Scrollable nav wrapper with fading scrollbar (Desktop only)
+.sidebar-nav-scroll {
+  @include media-breakpoint-up(lg) {
+    // Firefox: hide scrollbar visually but keep scroll
+    scrollbar-width: none;
+    -ms-overflow-style: none; // IE/Edge
+    
+    // Show scrollbar on hover (Firefox)
+    &:hover {
+      scrollbar-width: thin;
+      scrollbar-color: $gray-300 transparent;
+    }
+    
+    // WebKit (Chrome, Safari, Edge): hide scrollbar visually
+    &::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    
+    // Show scrollbar on container hover (WebKit)
+    &:hover::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    &:hover::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    &:hover::-webkit-scrollbar-thumb {
+      background-color: $gray-300;
+      border-radius: 4px;
+    }
+    
+    &:hover::-webkit-scrollbar-thumb:hover {
+      background-color: $gray-400;
     }
   }
 }

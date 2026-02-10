@@ -1,10 +1,11 @@
-import { databases, functions } from '../../shared/appwrite.js';
+import { databases, functions, account } from '../../shared/appwrite.js';
 import {
     DATABASE_ID,
     COLLECTION_ID_ACCOUNTS,
-    FUNCTION_ACCEPT_STUDENT
+    FUNCTION_ID
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
+import { showToast } from '../../shared/toast.js';
 
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
@@ -176,9 +177,13 @@ async function attachEventListeners(currentUser, profile) {
             acceptBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
+                if (!FUNCTION_ID) {
+                    throw new Error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
+                }
+                
                 const execution = await functions.createExecution(
-                    FUNCTION_ACCEPT_STUDENT,
-                    JSON.stringify({ userId: docId, accountDocId: docId }),
+                    FUNCTION_ID,
+                    JSON.stringify({ action: 'accept_student', userId: docId, accountDocId: docId, requestingUserId: currentUser.$id }),
                     false
                 );
 
@@ -187,14 +192,14 @@ async function attachEventListeners(currentUser, profile) {
                     const acc = allAccounts.find(a => a.$id === docId);
                     if (acc) acc.verified = true;
                     applyFilters();
-                    alert("Student accepted!");
+                    showToast('Student accepted!', 'success');
                 } else {
-                    alert("Verification initiated. Refresh shortly.");
+                    showToast('Verification initiated. Refresh shortly.', 'info');
                     loadData();
                 }
             } catch (err) {
                 console.error(err);
-                alert("Error accepting student: " + err.message);
+                showToast('Error accepting student: ' + err.message, 'error');
                 acceptBtn.disabled = false;
                 acceptBtn.innerHTML = `<img src="${checkCircle}" width="14" class="me-1"> Accept Student`;
             }

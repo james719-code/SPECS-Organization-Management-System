@@ -6,6 +6,7 @@ import {
 } from '../../shared/constants.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
+import { showToast } from '../../shared/toast.js';
 
 import plusCircle from 'bootstrap-icons/icons/plus-circle.svg';
 import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
@@ -405,9 +406,10 @@ async function attachEventListeners(studentDoc, currentUser) {
             updateStats();
             updateGridState();
             showToast(isEdit ? 'Post updated!' : 'Post created and submitted for review!', 'success');
+
         } catch (err) {
             console.error(err);
-            showToast('Error: ' + err.message, 'danger');
+            showToast('Error: ' + err.message, 'error');
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = isEdit ? 'Save Changes' : 'Create Post';
@@ -451,43 +453,15 @@ async function attachEventListeners(studentDoc, currentUser) {
                 updateStats();
                 updateGridState();
                 showToast('Post deleted.', 'warning');
+
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 deleteBtn.disabled = false;
                 deleteBtn.innerHTML = `<img src="${trash}" width="14">`;
             }
         }
     });
-}
-
-function showToast(message, type = 'primary') {
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '1100';
-        document.body.appendChild(toastContainer);
-    }
-
-    const toastId = `toast-${Date.now()}`;
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
-
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-    const toastEl = document.getElementById(toastId);
-    const toast = new (window.bootstrap?.Toast || class { show() { } hide() { } })(toastEl, { delay: 3000 });
-    toast.show();
-
-    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 
 export default function renderPostsView(studentDoc, currentUser) {

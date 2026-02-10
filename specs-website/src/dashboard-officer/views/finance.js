@@ -2,6 +2,14 @@ import { databases } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import Chart from 'chart.js/auto';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
+import {
+    DATABASE_ID,
+    COLLECTION_ID_REVENUE,
+    COLLECTION_ID_EXPENSES,
+    COLLECTION_ID_EVENTS
+} from '../../shared/constants.js';
 
 import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import inbox from 'bootstrap-icons/icons/inbox.svg';
@@ -16,11 +24,6 @@ import searchIcon from 'bootstrap-icons/icons/search.svg';
 import wallet2 from 'bootstrap-icons/icons/wallet2.svg';
 import graphUpArrow from 'bootstrap-icons/icons/graph-up-arrow.svg';
 import graphDownArrow from 'bootstrap-icons/icons/graph-down-arrow.svg';
-
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
-const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES;
-const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const STORAGE_KEY_DATE_RANGE = 'finance_date_range_v2';
 
 let financeChart = null;
@@ -345,9 +348,10 @@ function attachDetailViewListeners(user, userLookup) {
         const { docId, collectionId } = row.dataset;
 
         if (btn.classList.contains('delete-btn')) {
-            if (confirm('Permanently delete this item?')) {
-                try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); row.remove(); }
-                catch (err) { alert('Delete failed.'); }
+            const confirmed = await confirmAction('Delete Transaction', 'Are you sure you want to permanently delete this item?', 'Delete', 'danger');
+            if (confirmed) {
+                try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); row.remove(); showToast('Transaction deleted', 'success'); }
+                catch (err) { showToast('Delete failed', 'error'); }
             }
         } else if (btn.classList.contains('edit-btn')) {
             row.classList.add('table-active'); // Highlight
@@ -387,7 +391,8 @@ function attachDetailViewListeners(user, userLookup) {
                     if (cell) cell.dataset.originalValue = v;
                 });
                 row.querySelector('.cancel-btn').click();
-            } catch (err) { alert('Update failed.'); } finally { btn.disabled = false; }
+                showToast('Transaction updated', 'success');
+            } catch (err) { showToast('Update failed', 'error'); } finally { btn.disabled = false; }
         }
     });
 }
@@ -463,7 +468,7 @@ function attachMainListeners(currentUser, userLookup, data) {
         e.preventDefault();
         const sY = parseInt(document.getElementById('sY').value), sM = parseInt(document.getElementById('sM').value);
         const eY = parseInt(document.getElementById('eY').value), eM = parseInt(document.getElementById('eM').value);
-        if (new Date(eY, eM) < new Date(sY, sM)) return alert('End date cannot be before start date.');
+        if (new Date(eY, eM) < new Date(sY, sM)) { showToast('End date cannot be before start date', 'warning'); return; }
         setStoredDateRange(sY, sM, eY, eM);
         dateModal.hide();
         renderFinanceView(userLookup, currentUser);
@@ -494,8 +499,9 @@ function attachMainListeners(currentUser, userLookup, data) {
 
             await databases.createDocument(DATABASE_ID, formData.get('type') === 'revenue' ? COLLECTION_ID_REVENUE : COLLECTION_ID_EXPENSES, ID.unique(), payload);
             addModal.hide();
+            showToast('Transaction created', 'success');
             renderFinanceView(userLookup, currentUser);
-        } catch (err) { alert('Error: ' + err.message); } finally { btn.disabled = false; btn.textContent = 'Save'; }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); } finally { btn.disabled = false; btn.textContent = 'Save'; }
     });
 
     // Search
@@ -525,7 +531,7 @@ function attachMainListeners(currentUser, userLookup, data) {
             container.innerHTML = getDetailViewHTML(groupName, revs.documents, exps.documents);
             attachDetailViewListeners(currentUser, userLookup);
             document.getElementById('backToFinanceMainBtn').addEventListener('click', () => renderFinanceView(userLookup, currentUser));
-        } catch (err) { alert('Error loading details.'); renderFinanceView(userLookup, currentUser); }
+        } catch (err) { showToast('Error loading details', 'error'); renderFinanceView(userLookup, currentUser); }
     });
 }
 

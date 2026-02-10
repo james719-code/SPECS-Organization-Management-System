@@ -316,15 +316,40 @@ async function attachEventListeners() {
 
             document.getElementById('studentDetailsModalLabel').textContent = name;
 
+            const volunteerStatus = student.volunteer_status || 'none';
+            const volunteerRequestStatus = student.volunteer_request_status || 'none';
+
+            const volunteerBadge = volunteerStatus === 'active'
+                ? '<span class="badge bg-success-subtle text-success rounded-pill">Active Volunteer</span>'
+                : volunteerStatus === 'inactive'
+                    ? '<span class="badge bg-secondary-subtle text-secondary rounded-pill">Inactive Volunteer</span>'
+                    : '<span class="badge bg-light text-muted rounded-pill border">Not a Volunteer</span>';
+
+            const requestBadge = volunteerRequestStatus === 'pending'
+                ? '<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">Request Pending</span>'
+                : volunteerRequestStatus === 'approved'
+                    ? '<span class="badge bg-success-subtle text-success rounded-pill">Approved</span>'
+                    : volunteerRequestStatus === 'rejected'
+                        ? '<span class="badge bg-danger-subtle text-danger rounded-pill">Rejected</span>'
+                        : '';
+
             studentDetailsModalBody.innerHTML = `
                 <div class="text-center mb-4">
                     <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow" style="width: 80px; height: 80px; font-size: 2rem; font-weight: bold;">
                         ${initials}
                     </div>
                     <h5 class="fw-bold">${name}</h5>
-                    <p class="text-muted">${student.yearLevel ? 'Year ' + student.yearLevel : 'Year not set'}</p>
+                    <p class="text-muted mb-2">${student.yearLevel ? 'Year ' + student.yearLevel : 'Year not set'}</p>
+                    <div class="d-flex gap-2 justify-content-center flex-wrap">
+                        ${volunteerBadge}
+                        ${requestBadge}
+                    </div>
                 </div>
                 <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Student ID</span>
+                        <span class="fw-medium font-monospace small">${student.student_id || student.$id.substring(0, 12)}</span>
+                    </div>
                     <div class="list-group-item d-flex justify-content-between px-0">
                         <span class="text-muted">Email</span>
                         <span class="fw-medium">${student.email || 'N/A'}</span>
@@ -342,10 +367,24 @@ async function attachEventListeners() {
                         <span class="fw-medium">${joinedDate}</span>
                     </div>
                 </div>
+                <div class="mt-3 d-grid">
+                    <button class="btn btn-outline-primary btn-sm rounded-pill view-payments-btn" data-student-name="${name}">
+                        View Payments
+                    </button>
+                </div>
             `;
 
             studentDetailsModal.show();
         }
+    });
+
+    // View Payments button in modal - navigate to payments view
+    studentDetailsModalBody.addEventListener('click', (e) => {
+        const btn = e.target.closest('.view-payments-btn');
+        if (!btn) return;
+        studentDetailsModal.hide();
+        const paymentsLink = document.querySelector('#adminSidebar [data-view="payments"]');
+        if (paymentsLink) paymentsLink.click();
     });
 }
 

@@ -416,7 +416,6 @@ export const cachedApi = {
         async listStudents({ limit = 100, offset = 0 } = {}, ttl = 2 * 60 * 1000) {
             const cacheKey = generateCacheKey('students_list', { limit, offset });
             return dataCache.getOrFetch(cacheKey, () => api.users.listStudents({ limit, offset }), ttl);
-            return dataCache.getOrFetch(cacheKey, () => api.users.listStudents(), ttl);
         }
     }
 };

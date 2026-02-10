@@ -3,6 +3,202 @@ import envelopeFill from 'bootstrap-icons/icons/envelope-fill.svg';
 import facebook from 'bootstrap-icons/icons/facebook.svg';
 import { Collapse } from 'bootstrap';
 
+// =====================================================
+// PERFORMANCE UTILITIES
+// =====================================================
+
+/**
+ * Debounce function - delays execution until after wait ms since last call
+ * Use for search inputs, resize handlers, etc.
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Delay in milliseconds
+ * @param {boolean} immediate - Execute on leading edge
+ * @returns {Function} Debounced function
+ */
+export function debounce(func, wait = 300, immediate = false) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            timeout = null;
+            if (!immediate) func.apply(this, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(this, args);
+    };
+}
+
+/**
+ * Throttle function - ensures function runs at most once per wait period
+ * Use for scroll handlers, mouse move, etc.
+ * @param {Function} func - Function to throttle
+ * @param {number} wait - Minimum time between calls in ms
+ * @returns {Function} Throttled function
+ */
+export function throttle(func, wait = 100) {
+    let lastTime = 0;
+    let timeout = null;
+    
+    return function executedFunction(...args) {
+        const now = Date.now();
+        const remaining = wait - (now - lastTime);
+        
+        if (remaining <= 0 || remaining > wait) {
+            if (timeout) {
+                clearTimeout(timeout);
+                timeout = null;
+            }
+            lastTime = now;
+            func.apply(this, args);
+        } else if (!timeout) {
+            timeout = setTimeout(() => {
+                lastTime = Date.now();
+                timeout = null;
+                func.apply(this, args);
+            }, remaining);
+        }
+    };
+}
+
+/**
+ * Chart instance manager - tracks and cleans up Chart.js instances
+ */
+const chartInstances = new Map();
+
+export const chartManager = {
+    /**
+     * Register a chart instance for cleanup
+     * @param {string} id - Unique identifier for the chart
+     * @param {Object} chart - Chart.js instance
+     */
+    register(id, chart) {
+        this.destroy(id); // Destroy existing if present
+        chartInstances.set(id, chart);
+    },
+    
+    /**
+     * Destroy a specific chart instance
+     * @param {string} id - Chart identifier
+     */
+    destroy(id) {
+        const chart = chartInstances.get(id);
+        if (chart) {
+            chart.destroy();
+            chartInstances.delete(id);
+        }
+    },
+    
+    /**
+     * Destroy all registered chart instances
+     */
+    destroyAll() {
+        chartInstances.forEach((chart, id) => {
+            try {
+                chart.destroy();
+            } catch (e) {
+                console.warn(`Failed to destroy chart ${id}:`, e);
+            }
+        });
+        chartInstances.clear();
+    },
+    
+    /**
+     * Get a registered chart instance
+     * @param {string} id - Chart identifier
+     * @returns {Object|null} Chart instance or null
+     */
+    get(id) {
+        return chartInstances.get(id) || null;
+    }
+};
+
+/**
+ * Animate number counting effect
+ * @param {HTMLElement} element - Element to update
+ * @param {number} targetValue - Target number
+ * @param {number} duration - Animation duration in ms
+ * @param {string} prefix - Prefix (e.g., '₱')
+ * @param {string} suffix - Suffix (e.g., '%')
+ */
+export function animateNumber(element, targetValue, duration = 600, prefix = '', suffix = '') {
+    if (!element) return;
+    
+    const startValue = 0;
+    const startTime = performance.now();
+    
+    const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function (ease-out quart)
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const currentValue = Math.round(startValue + (targetValue - startValue) * easeOutQuart);
+        
+        element.textContent = `${prefix}${currentValue.toLocaleString()}${suffix}`;
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    };
+    
+    requestAnimationFrame(animate);
+}
+
+/**
+ * Format relative time (e.g., "2 hours ago", "yesterday")
+ * @param {Date|string} date - Date to format
+ * @returns {string} Relative time string
+ */
+export function formatRelativeTime(date) {
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now - then;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffSecs < 60) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Copy text to clipboard with fallback
+ * @param {string} text - Text to copy
+ * @returns {Promise<boolean>} Success status
+ */
+export async function copyToClipboard(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return true;
+    } catch (err) {
+        console.error('Copy failed:', err);
+        return false;
+    }
+}
+
+// =====================================================
+// HEADER & FOOTER COMPONENTS
+// =====================================================
+
 export function renderHeader() {
     return `
     <header class="navbar navbar-expand-lg navbar-dark fixed-top">

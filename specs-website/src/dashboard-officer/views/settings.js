@@ -1,5 +1,12 @@
 import { databases, storage, account } from "../../shared/appwrite.js";
 import { ID } from "appwrite";
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
+import {
+    DATABASE_ID,
+    COLLECTION_ID_STUDENTS,
+    BUCKET_ID_SCHEDULES
+} from '../../shared/constants.js';
 
 import uploadIcon from 'bootstrap-icons/icons/upload.svg';
 import exclamationOctagonIcon from 'bootstrap-icons/icons/exclamation-octagon.svg';
@@ -7,10 +14,6 @@ import personGear from 'bootstrap-icons/icons/person-gear.svg';
 import lock from 'bootstrap-icons/icons/lock.svg';
 import shieldExclamation from 'bootstrap-icons/icons/shield-exclamation.svg';
 import calendarWeek from 'bootstrap-icons/icons/calendar-week.svg';
-
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
-const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
 
 function getSettingsHTML(user, profile) {
     const isStudent = profile.type === 'student';
@@ -215,7 +218,7 @@ function attachEventListeners(user, profile) {
                 btn.classList.replace('btn-primary', 'btn-danger');
                 btn.classList.replace('btn-warning', 'btn-danger');
                 btn.innerHTML = `<i class="bi bi-exclamation-triangle me-2"></i>Error`;
-                alert(error.message || "An unexpected error occurred.");
+                showToast(error.message || "An unexpected error occurred.", 'error');
 
                 setTimeout(() => {
                     btn.classList.replace('btn-danger', formId === 'changePasswordForm' ? 'btn-warning' : 'btn-primary');
@@ -275,8 +278,13 @@ function attachEventListeners(user, profile) {
     const delBtn = document.getElementById('deleteAccountBtn');
     if (delBtn) {
         delBtn.addEventListener('click', async () => {
-            const confirmText = prompt('Type "DELETE" to permanently delete your account:');
-            if (confirmText !== 'DELETE') return;
+            const confirmed = await confirmAction(
+                'Delete Account',
+                'This action is permanent. All your data will be wiped immediately.',
+                'Delete Account',
+                'danger'
+            );
+            if (!confirmed) return;
 
             delBtn.disabled = true;
             delBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
@@ -285,7 +293,7 @@ function attachEventListeners(user, profile) {
                 await account.deleteSession('current');
                 window.location.href = '/landing/';
             } catch (err) {
-                alert('Delete failed: ' + err.message);
+                showToast('Delete failed: ' + err.message, 'error');
                 delBtn.disabled = false;
                 delBtn.innerHTML = 'Delete Account';
             }

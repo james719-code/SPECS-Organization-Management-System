@@ -1,6 +1,13 @@
 import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
+import {
+    DATABASE_ID,
+    COLLECTION_ID_FILES,
+    BUCKET_ID_UPLOADS
+} from '../../shared/constants.js';
 
 import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
 import downloadIcon from 'bootstrap-icons/icons/download.svg';
@@ -12,9 +19,6 @@ import plusLg from 'bootstrap-icons/icons/plus-lg.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import infoCircle from 'bootstrap-icons/icons/info-circle.svg';
 
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
-const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;
 const FILES_PAGE_LIMIT = 12;
 
 /**
@@ -207,17 +211,21 @@ function attachEventListeners(currentUser, userLookup) {
             detailModal.show();
         }
 
-        if (delBtn && confirm('Are you sure you want to permanently delete this file?')) {
-            delBtn.disabled = true;
-            try {
-                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, delBtn.dataset.docId);
-                await storage.deleteFile(BUCKET_ID_UPLOADS, delBtn.dataset.fileId);
+        if (delBtn) {
+            const confirmed = await confirmAction('Delete File', 'Are you sure you want to permanently delete this file?', 'Delete', 'danger');
+            if (confirmed) {
+                delBtn.disabled = true;
+                try {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, delBtn.dataset.docId);
+                    await storage.deleteFile(BUCKET_ID_UPLOADS, delBtn.dataset.fileId);
 
-                allFiles = allFiles.filter(f => f.$id !== delBtn.dataset.docId);
-                renderGrid(allFiles);
-            } catch (err) {
-                alert('Failed to delete file.');
-                delBtn.disabled = false;
+                    allFiles = allFiles.filter(f => f.$id !== delBtn.dataset.docId);
+                    renderGrid(allFiles);
+                    showToast('File deleted successfully', 'success');
+                } catch (err) {
+                    showToast('Failed to delete file', 'error');
+                    delBtn.disabled = false;
+                }
             }
         }
     });
@@ -242,10 +250,11 @@ function attachEventListeners(currentUser, userLookup) {
             });
             uploadModal.hide();
             e.target.reset();
+            showToast('File uploaded successfully', 'success');
             loadFiles(searchInput.value.trim());
         } catch (err) {
             console.error(err);
-            alert('Upload failed. Check console for details.');
+            showToast('Upload failed. Please try again.', 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Upload';

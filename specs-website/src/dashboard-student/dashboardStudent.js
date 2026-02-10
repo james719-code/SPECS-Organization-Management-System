@@ -14,7 +14,8 @@ const viewModules = {
     events: () => import('./views/events.js'),
     profile: () => import('./views/profile.js'),
     payments: () => import('./views/payments.js'),
-    posts: () => import('./views/posts.js')
+    posts: () => import('./views/posts.js'),
+    attendance: () => import('./views/attendance.js')
 };
 
 const loadedModules = new Map();
@@ -33,6 +34,7 @@ import listIcon from 'bootstrap-icons/icons/list.svg';
 import bellIcon from 'bootstrap-icons/icons/bell.svg';
 import globeIcon from 'bootstrap-icons/icons/globe.svg';
 import fileTextIcon from 'bootstrap-icons/icons/file-text.svg';
+import clipboardCheckIcon from 'bootstrap-icons/icons/clipboard-check.svg';
 
 const MAIN_CONTENT_ID = 'dashboard-content';
 
@@ -44,6 +46,7 @@ const viewMeta = {
     '#events': { moduleKey: 'events', title: 'Events', icon: calendarIcon },
     '#profile': { moduleKey: 'profile', title: 'My Profile', icon: personIcon },
     '#payments': { moduleKey: 'payments', title: 'My Payments', icon: walletIcon },
+    '#attendance': { moduleKey: 'attendance', title: 'Attendance', icon: clipboardCheckIcon },
     '#posts': { moduleKey: 'posts', title: 'My Posts', icon: fileTextIcon },
     '': { moduleKey: 'events', title: 'Events', icon: calendarIcon }
 };
@@ -141,7 +144,7 @@ function setupLayout() {
     // Construct Sidebar HTML (Minimal Light Theme)
     const sidebar = `
         <div class="offcanvas-lg offcanvas-start sidebar-gradient" tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel" style="width: 260px;">
-            <div class="offcanvas-header border-bottom py-3" style="border-color: #e5e7eb !important;">
+            <div class="offcanvas-header border-bottom py-3" style="border-color: #e5e7eb !important; flex-shrink: 0;">
                 <h5 class="offcanvas-title fw-bold d-flex align-items-center gap-2" id="sidebarMenuLabel">
                     <div class="logo-wrapper">
                         <img src="${logo}" alt="SPECS" width="32" height="32" class="bg-primary rounded p-1" style="filter: brightness(0) invert(1);">
@@ -150,8 +153,8 @@ function setupLayout() {
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Close"></button>
             </div>
-            <div class="offcanvas-body d-flex flex-column h-100 p-0">
-                <div class="user-welcome-section px-3 py-3 border-bottom" style="border-color: #e5e7eb !important;">
+            <div class="offcanvas-body d-flex flex-column p-0" style="height: calc(100vh - 65px); overflow: hidden;">
+                <div class="user-welcome-section px-3 py-3 border-bottom" style="border-color: #e5e7eb !important; flex-shrink: 0;">
                     <div class="d-flex align-items-center gap-3">
                         <div class="user-avatar-ring">
                             <div class="user-avatar">${userInitial}</div>
@@ -163,7 +166,7 @@ function setupLayout() {
                     </div>
                 </div>
                 
-                <div class="px-3 py-3 flex-grow-1">
+                <div class="sidebar-nav-scroll px-3 py-3" style="flex: 1 1 0%; min-height: 0; overflow-y: auto;">
                     <div class="mb-2 px-2">
                         <small class="text-uppercase fw-bold nav-section-title">Navigation</small>
                     </div>
@@ -191,7 +194,7 @@ function setupLayout() {
                     </nav>
                 </div>
                 
-                <div class="mt-auto border-top p-3" style="border-color: #e5e7eb !important;">
+                <div class="border-top p-3" style="border-color: #e5e7eb !important; flex-shrink: 0;">
                     <button id="logout-btn" class="btn btn-logout w-100 d-flex align-items-center justify-content-center gap-2">
                         <img src="${boxArrowRightIcon}" width="16" style="opacity: 0.6;">
                         <span>Sign Out</span>

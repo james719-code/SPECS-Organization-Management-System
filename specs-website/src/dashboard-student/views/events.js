@@ -240,7 +240,7 @@ async function attachEventsListeners() {
     };
     
     try {
-        const response = await api.events.list(100);
+        const response = await api.events.list({ limit: 100 });
         allEvents = response.documents;
         render(allEvents);
 

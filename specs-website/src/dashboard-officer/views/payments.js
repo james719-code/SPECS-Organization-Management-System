@@ -2,6 +2,8 @@ import { api } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 import { formatCurrency } from '../../shared/formatters.js';
 import { createStudentPaymentCardHTML } from '../../shared/components/paymentCard.js';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
 
 import trashIcon from 'bootstrap-icons/icons/trash.svg';
 import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
@@ -432,24 +434,30 @@ async function attachEventListeners(currentUser, profile) {
             const paidBtn = e.target.closest('.paid-payment-btn');
             if (paidBtn) {
                 const payment = JSON.parse(paidBtn.dataset.payment.replace(/\\'/g, "'"));
-                if (confirm(`Mark "${payment.item_name}" as Paid?`)) {
+                const confirmed = await confirmAction('Mark as Paid', `Mark "${payment.item_name}" as Paid?`, 'Mark Paid', 'success');
+                if (confirmed) {
                     try {
                         const sData = currentStudent.students || {};
                         const sName = sData.name || currentStudent.username;
 
                         await api.payments.markPaid(payment, currentUser.$id, sName);
                         await refreshDataAndRender();
-                    } catch (error) { alert(`Error: ${error.message}`); }
+                        showToast('Payment marked as paid', 'success');
+                    } catch (error) { showToast(`Error: ${error.message}`, 'error'); }
                 }
                 return;
             }
 
             const deleteBtn = e.target.closest('.delete-payment-btn');
-            if (deleteBtn && confirm(`Delete "${deleteBtn.dataset.paymentName}"?`)) {
-                try {
-                    await api.payments.delete(deleteBtn.dataset.paymentId);
-                    await refreshDataAndRender();
-                } catch (error) { alert(`Error: ${error.message}`); }
+            if (deleteBtn) {
+                const confirmed = await confirmAction('Delete Payment', `Delete "${deleteBtn.dataset.paymentName}"?`, 'Delete', 'danger');
+                if (confirmed) {
+                    try {
+                        await api.payments.delete(deleteBtn.dataset.paymentId);
+                        await refreshDataAndRender();
+                        showToast('Payment deleted', 'success');
+                    } catch (error) { showToast(`Error: ${error.message}`, 'error'); }
+                }
             }
         });
 
@@ -495,9 +503,11 @@ async function attachEventListeners(currentUser, profile) {
                     };
 
                     if (isForAll) {
-                        if (confirm(`Assign to all ${allStudents.length} students?`)) {
+                        const confirmed = await confirmAction('Assign to All', `Assign to all ${allStudents.length} students?`, 'Assign All', 'primary');
+                        if (confirmed) {
                             const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
                             await Promise.all(ids.map(id => api.payments.create({ ...base, students: id })));
+                            showToast(`Payment assigned to ${ids.length} students`, 'success');
                         }
                     } else {
                         if (!selectedStudentDocId) throw new Error("Select a student.");
@@ -518,7 +528,7 @@ async function attachEventListeners(currentUser, profile) {
                     editPaymentModalInstance.hide();
                 }
                 await refreshDataAndRender();
-            } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
+            } catch (err) { showToast(err.message, 'error'); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
         });
 
         wrapper.addEventListener('change', e => {

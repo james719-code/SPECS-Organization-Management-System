@@ -1,10 +1,12 @@
-import { databases, functions } from '../../shared/appwrite.js';
+import { databases, functions, account } from '../../shared/appwrite.js';
 import {
     DATABASE_ID,
     COLLECTION_ID_STUDENTS,
-    FUNCTION_STUDENT_OFFICER_MANAGEMENT
+    FUNCTION_ID
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
 
 import checkCircleFill from 'bootstrap-icons/icons/check-circle-fill.svg';
 import xCircleFill from 'bootstrap-icons/icons/x-circle-fill.svg';
@@ -279,10 +281,11 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.approveVolunteerRequest(studentId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'approve_volunteer',
-                            payload: { student_id: studentId }
+                            payload: { student_id: studentId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
@@ -299,7 +302,7 @@ async function attachEventListeners(currentUser, profile) {
                 showToast('Volunteer request approved!', 'success');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 approveBtn.disabled = false;
                 approveBtn.innerHTML = `<img src="${checkCircleFill}" width="14" class="me-1" style="filter: brightness(0) invert(1);"> Approve`;
             }
@@ -309,7 +312,8 @@ async function attachEventListeners(currentUser, profile) {
         if (rejectBtn) {
             const studentId = rejectBtn.dataset.studentId;
 
-            if (!confirm('Are you sure you want to reject this volunteer request?')) {
+            const confirmed = await confirmAction('Reject Volunteer', 'Are you sure you want to reject this volunteer request?', 'Reject', 'warning');
+            if (!confirmed) {
                 return;
             }
 
@@ -322,10 +326,11 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.rejectVolunteerRequest(studentId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'reject_volunteer',
-                            payload: { student_id: studentId }
+                            payload: { student_id: studentId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
@@ -341,7 +346,7 @@ async function attachEventListeners(currentUser, profile) {
                 showToast('Volunteer request rejected.', 'warning');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 rejectBtn.disabled = false;
                 rejectBtn.innerHTML = `<img src="${xCircleFill}" width="14" class="me-1"> Reject`;
             }
@@ -352,7 +357,8 @@ async function attachEventListeners(currentUser, profile) {
         if (approveBackoutBtn) {
             const studentId = approveBackoutBtn.dataset.studentId;
 
-            if (!confirm('Are you sure you want to approve this volunteer leaving the program?')) {
+            const confirmed = await confirmAction('Approve Leave', 'Are you sure you want to approve this volunteer leaving the program?', 'Approve Leave', 'danger');
+            if (!confirmed) {
                 return;
             }
 
@@ -365,10 +371,11 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.approveVolunteerBackout(studentId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'approve_volunteer_backout',
-                            payload: { student_id: studentId }
+                            payload: { student_id: studentId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
@@ -385,7 +392,7 @@ async function attachEventListeners(currentUser, profile) {
                 showToast('Volunteer has been removed from the program.', 'success');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 approveBackoutBtn.disabled = false;
                 approveBackoutBtn.innerHTML = `<img src="${checkCircleFill}" width="14" class="me-1" style="filter: brightness(0) invert(1);"> Approve Leave`;
             }
@@ -404,10 +411,11 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.rejectVolunteerBackout(studentId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'reject_volunteer_backout',
-                            payload: { student_id: studentId }
+                            payload: { student_id: studentId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
@@ -423,43 +431,12 @@ async function attachEventListeners(currentUser, profile) {
                 showToast('Backout request denied - volunteer remains active.', 'info');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 rejectBackoutBtn.disabled = false;
                 rejectBackoutBtn.innerHTML = `<img src="${xCircleFill}" width="14" class="me-1"> Deny Leave`;
             }
         }
     });
-}
-
-function showToast(message, type = 'primary') {
-    // Create toast container if not exists
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '1100';
-        document.body.appendChild(toastContainer);
-    }
-
-    const toastId = `toast-${Date.now()}`;
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
-
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-    const toastEl = document.getElementById(toastId);
-    const toast = new (window.bootstrap?.Toast || class { show() { } hide() { } })(toastEl, { delay: 3000 });
-    toast.show();
-
-    // Clean up after hide
-    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 
 export default function renderVolunteersView(user, profile) {

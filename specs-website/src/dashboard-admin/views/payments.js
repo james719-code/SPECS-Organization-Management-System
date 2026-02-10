@@ -2,6 +2,8 @@ import { api } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 import { formatCurrency } from '../../shared/formatters.js';
 import { createStudentPaymentCardHTML } from '../../shared/components/paymentCard.js';
+import { confirmAction } from '../../shared/confirmModal.js';
+import { logActivity } from './activity-logs.js';
 
 import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
 import arrowLeftIcon from 'bootstrap-icons/icons/arrow-left.svg';
@@ -16,6 +18,55 @@ let allPayments = [];
 let events = [];
 let currentStudent = null;
 let addPaymentModalInstance, editPaymentModalInstance;
+
+function getPaymentSummaryHTML() {
+    const totalStudents = allStudents.length;
+    const totalPaid = allPayments.filter(p => p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const totalOutstanding = allPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const totalPayments = allPayments.length;
+    const paidCount = allPayments.filter(p => p.is_paid).length;
+    const completionRate = totalPayments > 0 ? Math.round((paidCount / totalPayments) * 100) : 0;
+
+    return `
+        <div class="row g-3 mb-4" id="paymentSummaryCards">
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">STUDENTS</div>
+                        <div class="h4 fw-bold text-dark mb-0">${totalStudents}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">OUTSTANDING</div>
+                        <div class="h4 fw-bold text-danger mb-0">${formatCurrency(totalOutstanding)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">COLLECTED</div>
+                        <div class="h4 fw-bold text-success mb-0">${formatCurrency(totalPaid)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">COMPLETION</div>
+                        <div class="h4 fw-bold text-primary mb-0">${completionRate}%</div>
+                        <div class="progress mt-1" style="height: 4px;">
+                            <div class="progress-bar bg-primary" style="width: ${completionRate}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 function getInitialPaymentViewHTML() {
     const eventOptions = events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('');
@@ -38,6 +89,8 @@ function getInitialPaymentViewHTML() {
                     </div>
                 </div>
             </header>
+
+            ${getPaymentSummaryHTML()}
 
             <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
             </div>
@@ -420,22 +473,24 @@ async function attachEventListeners(currentUser, profile) {
             const paidBtn = e.target.closest('.paid-payment-btn');
             if (paidBtn) {
                 const payment = JSON.parse(paidBtn.dataset.payment.replace(/\\'/g, "'"));
-                if (confirm(`Mark "${payment.item_name}" as Paid?`)) {
-                    try {
-                        const sData = currentStudent.students || {};
-                        const sName = sData.name || currentStudent.username;
+                if (!await confirmAction('Mark as Paid', `Mark "${payment.item_name}" as paid? This will record a revenue entry.`, 'Mark Paid', 'success')) return;
+                try {
+                    const sData = currentStudent.students || {};
+                    const sName = sData.name || currentStudent.username;
 
-                        await api.payments.markPaid(payment, currentUser.$id, sName);
-                        await refreshDataAndRender();
-                    } catch (error) { alert(`Error: ${error.message}`); }
-                }
+                    await api.payments.markPaid(payment, currentUser.$id, sName);
+                    logActivity('payment_marked_paid', `Marked "${payment.item_name}" as paid for ${sName}`);
+                    await refreshDataAndRender();
+                } catch (error) { alert(`Error: ${error.message}`); }
                 return;
             }
 
             const deleteBtn = e.target.closest('.delete-payment-btn');
-            if (deleteBtn && confirm(`Delete "${deleteBtn.dataset.paymentName}"?`)) {
+            if (deleteBtn) {
+                if (!await confirmAction('Delete Payment', `Delete "${deleteBtn.dataset.paymentName}"? This action cannot be undone.`, 'Delete', 'danger')) return;
                 try {
                     await api.payments.delete(deleteBtn.dataset.paymentId);
+                    logActivity('payment_created', `Deleted payment "${deleteBtn.dataset.paymentName}"`);
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
             }
@@ -483,14 +538,14 @@ async function attachEventListeners(currentUser, profile) {
                     };
 
                     if (isForAll) {
-                        if (confirm(`Assign to all ${allStudents.length} students?`)) {
-                            const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
-                            await Promise.all(ids.map(id => api.payments.create({ ...base, students: id })));
-                        }
+                        if (!await confirmAction('Assign to All Students', `This will create a payment record for all ${allStudents.length} students.`, 'Assign All', 'primary')) { btn.disabled = false; btn.innerHTML = 'Create Payment'; return; }
+                        const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
+                        await Promise.all(ids.map(id => api.payments.create({ ...base, students: id })));
                     } else {
                         if (!selectedStudentDocId) throw new Error("Select a student.");
                         await api.payments.create({ ...base, students: selectedStudentDocId });
                     }
+                    logActivity('payment_created', `Created payment "${base.item_name}"`);
                     addPaymentModalInstance.hide();
                     e.target.reset();
                 } else if (e.target.id === 'editPaymentForm') {

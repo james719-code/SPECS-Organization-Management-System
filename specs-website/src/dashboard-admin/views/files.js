@@ -2,6 +2,8 @@ import { databases, storage } from '../../shared/appwrite.js';
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import toast from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
+import { logActivity } from './activity-logs.js';
 
 import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
 import downloadIcon from 'bootstrap-icons/icons/download.svg';
@@ -26,6 +28,7 @@ const FILES_PAGE_LIMIT = 24;
 function createFileCard(fileDoc, userLookup) {
     const downloadUrl = storage.getFileDownload(BUCKET_ID_UPLOADS, fileDoc.fileID);
     const uploaderName = userLookup[fileDoc.uploader] || 'Unknown User';
+    const uploadDate = new Date(fileDoc.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     return `
         <div class="col">
@@ -39,12 +42,15 @@ function createFileCard(fileDoc, userLookup) {
                             <img src="${infoCircle}" width="18" style="opacity: 0.5;">
                         </button>
                     </div>
-                    
+
                     <h6 class="fw-bold text-dark mb-1 text-truncate" title="${fileDoc.fileName}">${fileDoc.fileName}</h6>
                     <p class="text-muted small line-clamp-2 mb-2">
                         ${fileDoc.description || 'No description provided.'}
                     </p>
-                    <small class="text-secondary mb-3"><img src="${personIcon}" width="12" class="me-1" style="opacity: 0.5;">${uploaderName}</small>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <small class="text-secondary"><img src="${personIcon}" width="12" class="me-1" style="opacity: 0.5;">${uploaderName}</small>
+                        <small class="text-secondary"><img src="${calendarIcon}" width="12" class="me-1" style="opacity: 0.5;">${uploadDate}</small>
+                    </div>
 
                     <div class="mt-auto pt-3 border-top border-light">
                         <div class="d-flex flex-wrap gap-2">
@@ -241,7 +247,7 @@ async function attachFilesListeners() {
             detailModal.show();
         }
 
-        if (delBtn && confirm('Are you sure you want to permanently delete this file? This action cannot be undone.')) {
+        if (delBtn && await confirmAction('Delete File', 'This will permanently delete this file. This action cannot be undone.', 'Delete', 'danger')) {
             delBtn.disabled = true;
             const card = delBtn.closest('.col');
             
@@ -265,6 +271,7 @@ async function attachFilesListeners() {
                 }
                 
                 toast.success('File deleted successfully');
+                logActivity('file_deleted', 'Deleted a file');
             } catch (err) {
                 console.error('Delete failed:', err);
                 toast.error('Failed to delete file');
@@ -300,6 +307,7 @@ async function attachFilesListeners() {
             e.target.reset();
             await loadFiles(searchInput.value.trim());
             toast.success('File uploaded successfully!', { title: 'Upload Complete' });
+            logActivity('file_uploaded', 'Uploaded a new file');
         } catch (err) {
             console.error(err);
             toast.error('Upload failed. Please check the file and try again.');

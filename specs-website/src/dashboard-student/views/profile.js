@@ -5,6 +5,7 @@ import {
     COLLECTION_ID_STUDENTS,
     COLLECTION_ID_ACCOUNTS
 } from '../../shared/constants.js';
+import { showToast } from '../../shared/toast.js';
 
 import personBadge from 'bootstrap-icons/icons/person-badge.svg';
 import envelope from 'bootstrap-icons/icons/envelope.svg';
@@ -175,10 +176,10 @@ function getProfileHTML() {
                                 <label for="edit-year" class="form-label small fw-bold text-muted text-uppercase">Year Level</label>
                                 <select class="form-select rounded-3 py-2" id="edit-year">
                                     <option value="">Select Year Level</option>
-                                    <option value="1st Year">1st Year</option>
-                                    <option value="2nd Year">2nd Year</option>
-                                    <option value="3rd Year">3rd Year</option>
-                                    <option value="4th Year">4th Year</option>
+                                    <option value="1">1st Year</option>
+                                    <option value="2">2nd Year</option>
+                                    <option value="3">3rd Year</option>
+                                    <option value="4">4th Year</option>
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -302,7 +303,7 @@ async function attachProfileListeners(studentDoc, currentUser) {
         // Fill in Student Details
         document.getElementById('profile-student-id').textContent = studentData.student_id || 'N/A';
         document.getElementById('profile-section').textContent = studentData.section || 'N/A';
-        document.getElementById('profile-year').textContent = studentData.yearLevel || 'N/A';
+        document.getElementById('profile-year').textContent = formatYearLevel(studentData.yearLevel);
         document.getElementById('profile-address').textContent = studentData.address || 'N/A';
 
         // Update Volunteer Status Section
@@ -353,10 +354,11 @@ async function attachProfileListeners(studentDoc, currentUser) {
             saveBtn.disabled = true;
             saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving...`;
 
+            const yearVal = document.getElementById('edit-year').value;
             const updatedData = {
                 name: document.getElementById('edit-name').value.trim(),
                 section: document.getElementById('edit-section').value.trim(),
-                yearLevel: document.getElementById('edit-year').value,
+                yearLevel: yearVal ? parseInt(yearVal, 10) : null,
                 address: document.getElementById('edit-address').value.trim()
             };
 
@@ -372,7 +374,7 @@ async function attachProfileListeners(studentDoc, currentUser) {
             document.getElementById('profile-name').textContent = updatedData.name;
             document.getElementById('profile-avatar').textContent = updatedData.name.charAt(0).toUpperCase();
             document.getElementById('profile-section').textContent = updatedData.section || 'N/A';
-            document.getElementById('profile-year').textContent = updatedData.yearLevel || 'N/A';
+            document.getElementById('profile-year').textContent = formatYearLevel(updatedData.yearLevel);
             document.getElementById('profile-address').textContent = updatedData.address || 'N/A';
 
             // Update local studentData
@@ -423,8 +425,8 @@ async function attachProfileListeners(studentDoc, currentUser) {
                 );
             }
 
-            // Delete the user's identity (this will log them out)
-            await account.deleteIdentity(currentUser.$id);
+            // Delete the user session and redirect
+            await account.deleteSession('current');
 
             // Redirect to landing page
             window.location.href = '/landing/';
@@ -607,46 +609,10 @@ function updateVolunteerStatus(studentData) {
     }
 }
 
-// Helper function to show toast notifications
-function showToast(message, type = 'info') {
-    // Create toast container if it doesn't exist - place inside #app
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '1100';
-        const appDiv = document.getElementById('app');
-        (appDiv || document.body).appendChild(toastContainer);
-    }
-
-    const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-primary';
-
-    const toastHTML = `
-        <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>
-    `;
-
-    const toastWrapper = document.createElement('div');
-    toastWrapper.innerHTML = toastHTML;
-    const toastEl = toastWrapper.firstElementChild;
-    toastContainer.appendChild(toastEl);
-
-    // Auto remove after 4 seconds
-    setTimeout(() => {
-        toastEl.classList.remove('show');
-        setTimeout(() => toastEl.remove(), 300);
-    }, 4000);
-
-    // Handle manual close
-    toastEl.querySelector('.btn-close')?.addEventListener('click', () => {
-        toastEl.classList.remove('show');
-        setTimeout(() => toastEl.remove(), 300);
-    });
+// Helper to format year level integer to display string
+function formatYearLevel(yearLevel) {
+    const labels = { 1: '1st Year', 2: '2nd Year', 3: '3rd Year', 4: '4th Year' };
+    return labels[yearLevel] || 'N/A';
 }
 
 export default function renderProfileView(studentDoc, currentUser) {

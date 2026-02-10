@@ -4,6 +4,18 @@
 // STUDENT DASHBOARD - MINIMALIST THEME
 // =====================================================
 
+// --- DASHBOARD WRAPPER ---
+.dashboard-wrapper {
+  height: 100vh;
+  overflow: hidden;
+  
+  // Main content area with independent scroll
+  .main-content-area {
+    height: 100vh;
+    overflow-y: auto;
+  }
+}
+
 // --- SIDEBAR (Clean Light Theme) ---
 .sidebar-gradient {
   background: $white !important;
@@ -15,6 +27,17 @@
   backface-visibility: hidden;
   -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
+  
+  // Desktop: Fixed sidebar with independent scroll
+  @include media-breakpoint-up(lg) {
+    position: sticky !important;
+    top: 0;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
   
   .logo-wrapper img {
     background: $primary;

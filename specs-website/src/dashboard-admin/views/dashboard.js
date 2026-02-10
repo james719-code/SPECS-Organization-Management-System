@@ -2,6 +2,9 @@ import { databases, storage } from '../../shared/appwrite.js';
 import { Query } from 'appwrite';
 import Chart from 'chart.js/auto';
 import toast from '../../shared/toast.js';
+import { formatCurrency } from '../../shared/formatters.js';
+import { chartManager, debounce, formatRelativeTime } from '../../shared/utils.js';
+import { errorState } from '../../shared/components/emptyState.js';
 
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import personExclamation from 'bootstrap-icons/icons/person-exclamation.svg';
@@ -10,27 +13,50 @@ import fileEarmarkArrowUpFill from 'bootstrap-icons/icons/file-earmark-arrow-up-
 import arrowUpShort from 'bootstrap-icons/icons/arrow-up-short.svg';
 import arrowDownShort from 'bootstrap-icons/icons/arrow-down-short.svg';
 import arrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg';
+import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
+import personHeartsFill from 'bootstrap-icons/icons/person-hearts.svg';
+import arrowRight from 'bootstrap-icons/icons/arrow-right.svg';
+import walletFill from 'bootstrap-icons/icons/wallet-fill.svg';
 
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
+const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
+const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES;
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
-let accountChart = null;
-let userTypeChart = null;
 let refreshIntervalId = null;
+let _dashboardUser = null;
+let _dashboardProfile = null;
 
-function getDashboardHTML() {
+// Theme colors for consistent chart styling
+const CHART_COLORS = {
+    primary: '#0d6b66',
+    primaryLight: '#149a93',
+    secondary: '#f4a261',
+    success: '#2a9d8f',
+    warning: '#e9c46a',
+    danger: '#e76f51',
+    info: '#60a5fa',
+    gray: '#64748b',
+    gradientStart: 'rgba(13, 107, 102, 0.2)',
+    gradientEnd: 'rgba(13, 107, 102, 0.0)',
+    tooltipBg: '#1e293b',
+    gridColor: '#f1f5f9'
+};
+
+function getDashboardHTML(user, profile) {
+    const adminName = profile?.username || user?.name || 'Admin';
     return `
         <div class="admin-dashboard-container animate-fade-in-up">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
                 <div class="mb-2 mb-md-0">
                     <h2 class="fw-bold m-0 text-primary">Dashboard Overview</h2>
-                    <p class="text-muted m-0 small">Welcome back, Admin</p>
+                    <p class="text-muted m-0 small">Welcome back, ${adminName}</p>
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     <button id="refreshDashboardBtn" class="btn btn-light btn-sm d-flex align-items-center gap-2 rounded-pill shadow-sm px-3" title="Refresh data">
@@ -119,6 +145,48 @@ function getDashboardHTML() {
                 </div>
             </div>
 
+            <!-- Finance Summary Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm hover-lift" style="cursor: pointer;" data-quick-action="finance">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="icon-shape bg-success-subtle text-success rounded-3 p-2">
+                                        <img src="${walletFill}" alt="Finance" style="width: 1.25rem; height: 1.25rem;">
+                                    </div>
+                                    <div>
+                                        <h6 class="card-subtitle text-muted text-uppercase fw-semibold mb-1" style="font-size: 0.75rem;">Finance Overview</h6>
+                                        <span class="text-muted small">Click to view detailed reports</span>
+                                    </div>
+                                </div>
+                                <img src="${arrowRight}" style="width: 1rem; opacity: 0.4;">
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-4 text-center">
+                                    <div class="text-muted small fw-bold text-uppercase">Revenue</div>
+                                    <div class="h5 fw-bold text-success mb-0" id="dashboard-revenue-stat">
+                                        <div class="skeleton-loader mx-auto" style="width: 80px; height: 24px;"></div>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-center border-start border-end">
+                                    <div class="text-muted small fw-bold text-uppercase">Expenses</div>
+                                    <div class="h5 fw-bold text-danger mb-0" id="dashboard-expenses-stat">
+                                        <div class="skeleton-loader mx-auto" style="width: 80px; height: 24px;"></div>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div class="text-muted small fw-bold text-uppercase">Net Balance</div>
+                                    <div class="h5 fw-bold mb-0" id="dashboard-balance-stat">
+                                        <div class="skeleton-loader mx-auto" style="width: 80px; height: 24px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-4">
                 <div class="col-lg-8">
                     <div class="card border-0 shadow-sm">
@@ -143,6 +211,84 @@ function getDashboardHTML() {
                 </div>
             </div>
             
+            <!-- Quick Actions -->
+            <div class="row g-3 mt-4">
+                <div class="col-12">
+                    <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 0.75rem;">Quick Actions</h6>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm hover-lift quick-action-card" role="button" data-quick-action="accounts-pending">
+                        <div class="card-body p-3 d-flex align-items-center gap-3">
+                            <div class="bg-warning-subtle text-warning rounded-3 p-2 d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                <img src="${personExclamation}" style="width:1.1rem;">
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="small fw-bold text-dark">Pending Accounts</div>
+                                <div class="text-muted" style="font-size:0.7rem;">Review & verify</div>
+                            </div>
+                            <img src="${arrowRight}" style="width:0.8rem;opacity:0.3;">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm hover-lift quick-action-card" role="button" data-quick-action="events">
+                        <div class="card-body p-3 d-flex align-items-center gap-3">
+                            <div class="bg-info-subtle text-info rounded-3 p-2 d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                <img src="${calendarEventFill}" style="width:1.1rem;">
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="small fw-bold text-dark">Manage Events</div>
+                                <div class="text-muted" style="font-size:0.7rem;">View & create</div>
+                            </div>
+                            <img src="${arrowRight}" style="width:0.8rem;opacity:0.3;">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm hover-lift quick-action-card" role="button" data-quick-action="payments">
+                        <div class="card-body p-3 d-flex align-items-center gap-3">
+                            <div class="bg-success-subtle text-success rounded-3 p-2 d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                <img src="${creditCardFill}" style="width:1.1rem;">
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="small fw-bold text-dark">Payments</div>
+                                <div class="text-muted" style="font-size:0.7rem;">Manage dues</div>
+                            </div>
+                            <img src="${arrowRight}" style="width:0.8rem;opacity:0.3;">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 shadow-sm hover-lift quick-action-card" role="button" data-quick-action="volunteers">
+                        <div class="card-body p-3 d-flex align-items-center gap-3">
+                            <div class="bg-primary-subtle text-primary rounded-3 p-2 d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                <img src="${personHeartsFill}" style="width:1.1rem;">
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="small fw-bold text-dark">Volunteers</div>
+                                <div class="text-muted" style="font-size:0.7rem;">Review requests</div>
+                            </div>
+                            <img src="${arrowRight}" style="width:0.8rem;opacity:0.3;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 fw-bold text-primary">Recent Activity</h6>
+                            <a href="#" class="small text-primary text-decoration-none fw-medium" data-quick-action="activity-logs">View All</a>
+                        </div>
+                        <div class="card-body p-0" id="recentActivityList">
+                            <div class="text-center py-4 text-muted small">No recent activity</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="text-center mt-3">
                 <small class="text-muted" id="last-updated-time">Last updated: Just now</small>
             </div>
@@ -167,6 +313,10 @@ function getDashboardHTML() {
             #refreshDashboardBtn:hover { background-color: #e9ecef; }
             #refreshDashboardBtn.refreshing img { animation: spin 1s linear infinite; }
             @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            .quick-action-card { transition: all 0.2s ease; cursor: pointer; }
+            .quick-action-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.08) !important; }
+            .activity-item { border-bottom: 1px solid #f1f5f9; }
+            .activity-item:last-child { border-bottom: none; }
         </style>
     `;
 }
@@ -181,6 +331,11 @@ async function attachDashboardListeners() {
     const pendingStatusEl = document.getElementById('pending-status');
     const lastUpdatedEl = document.getElementById('last-updated-time');
     const refreshBtn = document.getElementById('refreshDashboardBtn');
+
+    // Finance elements
+    const dashboardRevenueEl = document.getElementById('dashboard-revenue-stat');
+    const dashboardExpensesEl = document.getElementById('dashboard-expenses-stat');
+    const dashboardBalanceEl = document.getElementById('dashboard-balance-stat');
 
     const growthChartCanvas = document.getElementById('accountGrowthChart');
     const typeChartCanvas = document.getElementById('userTypeChart');
@@ -229,7 +384,7 @@ async function attachDashboardListeners() {
         }
 
         try {
-            let allAccounts, upcomingEventsCount, filesCount;
+            let allAccounts, upcomingEventsCount, filesCount, totalRevenue = 0, totalExpenses = 0;
 
             if (DEV_BYPASS) {
                 const { mockUsers, mockEvents, mockFiles, getMockDashboardStats } = await import('../../shared/mock/mockData.js');
@@ -237,17 +392,27 @@ async function attachDashboardListeners() {
                 allAccounts = mockUsers;
                 upcomingEventsCount = stats.upcomingEvents;
                 filesCount = stats.totalFiles;
+                totalRevenue = stats.totalRevenue || 0;
+                totalExpenses = stats.totalExpenses || 0;
                 console.log('[DEV] Using mock dashboard data');
             } else {
-                const [usersResponse, eventsResponse, filesResponse] = await Promise.all([
+                const [usersResponse, eventsResponse, filesResponse, revenueResponse, expensesResponse] = await Promise.all([
                     databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]),
                     databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', new Date().toISOString())]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)])
+                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.limit(1000)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.limit(1000)])
                 ]);
                 allAccounts = usersResponse.documents;
                 upcomingEventsCount = eventsResponse.total;
                 filesCount = filesResponse.total;
+                
+                // Calculate finance totals
+                totalRevenue = revenueResponse.documents.reduce((sum, r) => sum + ((r.price || 0) * (r.quantity || 1)), 0);
+                totalExpenses = expensesResponse.documents.reduce((sum, e) => sum + ((e.price || 0) * (e.quantity || 1)), 0);
             }
+
+            const netBalance = totalRevenue - totalExpenses;
 
             const studentAccounts = allAccounts.filter(u => u.type !== 'admin');
             const pendingVerifications = studentAccounts.filter(u => !u.verified).length;
@@ -292,10 +457,23 @@ async function attachDashboardListeners() {
                 }
             }
 
+            // Update finance stats
+            if (dashboardRevenueEl) {
+                dashboardRevenueEl.textContent = formatCurrency(totalRevenue);
+            }
+            if (dashboardExpensesEl) {
+                dashboardExpensesEl.textContent = formatCurrency(totalExpenses);
+            }
+            if (dashboardBalanceEl) {
+                dashboardBalanceEl.textContent = formatCurrency(netBalance);
+                dashboardBalanceEl.className = `h5 fw-bold mb-0 ${netBalance >= 0 ? 'text-success' : 'text-danger'}`;
+            }
+
             updateTimestamp();
 
-            if (accountChart) accountChart.destroy();
-            if (userTypeChart) userTypeChart.destroy();
+            // Clean up existing charts using chart manager
+            chartManager.destroy('accountGrowth');
+            chartManager.destroy('userType');
 
             // Line Chart Data Preparation
             const recentSignups = allAccounts.filter(u => new Date(u.$createdAt) > thirtyDaysAgo);
@@ -316,9 +494,9 @@ async function attachDashboardListeners() {
             }
 
             Chart.defaults.font.family = "'Poppins', 'Segoe UI', sans-serif";
-            Chart.defaults.color = '#64748b';
+            Chart.defaults.color = CHART_COLORS.gray;
 
-            accountChart = new Chart(growthChartCanvas, {
+            const accountChart = new Chart(growthChartCanvas, {
                 type: 'line',
                 data: {
                     labels: chartLabels,
@@ -329,19 +507,19 @@ async function attachDashboardListeners() {
                         backgroundColor: (context) => {
                             const ctx = context.chart.ctx;
                             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-                            gradient.addColorStop(0, 'rgba(13, 107, 102, 0.2)');
-                            gradient.addColorStop(1, 'rgba(13, 107, 102, 0.0)');
+                            gradient.addColorStop(0, CHART_COLORS.gradientStart);
+                            gradient.addColorStop(1, CHART_COLORS.gradientEnd);
                             return gradient;
                         },
-                        borderColor: '#0d6b66',
+                        borderColor: CHART_COLORS.primary,
                         borderWidth: 2,
                         tension: 0.4,
                         pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#0d6b66',
+                        pointBorderColor: CHART_COLORS.primary,
                         pointBorderWidth: 2,
                         pointRadius: 3,
                         pointHoverRadius: 6,
-                        pointHoverBackgroundColor: '#0d6b66',
+                        pointHoverBackgroundColor: CHART_COLORS.primary,
                         pointHoverBorderColor: '#ffffff',
                         pointHoverBorderWidth: 2
                     }]
@@ -356,7 +534,7 @@ async function attachDashboardListeners() {
                     scales: {
                         y: {
                             beginAtZero: true,
-                            grid: { borderDash: [5, 5], color: '#f1f5f9' },
+                            grid: { borderDash: [5, 5], color: CHART_COLORS.gridColor },
                             ticks: { stepSize: 1 }
                         },
                         x: {
@@ -366,7 +544,7 @@ async function attachDashboardListeners() {
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#1e293b',
+                            backgroundColor: CHART_COLORS.tooltipBg,
                             padding: 12,
                             cornerRadius: 8,
                             displayColors: false,
@@ -378,20 +556,23 @@ async function attachDashboardListeners() {
                     }
                 }
             });
+            
+            // Register chart with manager for cleanup
+            chartManager.register('accountGrowth', accountChart);
 
             const adminCount = allAccounts.length - studentAccounts.length;
             const officerCount = studentAccounts.filter(u => u.type === 'officer').length;
             const studentCount = studentAccounts.length - officerCount;
             
-            userTypeChart = new Chart(typeChartCanvas, {
+            const userTypeChart = new Chart(typeChartCanvas, {
                 type: 'doughnut',
                 data: {
                     labels: ['Students', 'Officers', 'Admins'],
                     datasets: [{
                         label: 'User Roles',
                         data: [studentCount, officerCount, adminCount],
-                        backgroundColor: ['#0d6b66', '#14b8a6', '#f4a261'],
-                        hoverBackgroundColor: ['#0a5450', '#0d9488', '#e8923d'],
+                        backgroundColor: [CHART_COLORS.primary, CHART_COLORS.primaryLight, CHART_COLORS.secondary],
+                        hoverBackgroundColor: [CHART_COLORS.primary, CHART_COLORS.success, CHART_COLORS.warning],
                         hoverOffset: 8,
                         borderWidth: 0
                     }]
@@ -409,7 +590,7 @@ async function attachDashboardListeners() {
                             } 
                         },
                         tooltip: {
-                            backgroundColor: '#1e293b',
+                            backgroundColor: CHART_COLORS.tooltipBg,
                             padding: 12,
                             cornerRadius: 8,
                             callbacks: {
@@ -424,6 +605,9 @@ async function attachDashboardListeners() {
                     cutout: '70%'
                 }
             });
+            
+            // Register chart with manager for cleanup
+            chartManager.register('userType', userTypeChart);
 
             if (isRefresh) {
                 toast.success('Dashboard data refreshed successfully');
@@ -437,19 +621,29 @@ async function attachDashboardListeners() {
             upcomingEventsEl.textContent = '-';
             totalFilesEl.textContent = '-';
             
-            growthChartCanvas.parentElement.innerHTML = `
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <i class="bi bi-exclamation-triangle display-6 mb-2 opacity-50"></i>
-                    <p class="mb-2">Could not load chart data</p>
-                    <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">Retry</button>
-                </div>
-            `;
+            // Use errorState component for better visual consistency
+            const chartErrorHtml = errorState({
+                title: 'Unable to load chart',
+                message: 'Check your connection and try again.',
+                retryId: 'chart-retry-btn'
+            });
+            
+            growthChartCanvas.parentElement.innerHTML = chartErrorHtml;
             typeChartCanvas.parentElement.innerHTML = `
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <i class="bi bi-exclamation-triangle display-6 mb-2 opacity-50"></i>
-                    <p class="mb-0">Could not load chart data</p>
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted py-4">
+                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 16 16" class="mb-2 opacity-50">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                        <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+                    </svg>
+                    <p class="mb-0 small">Could not load data</p>
                 </div>
             `;
+            
+            // Attach retry handler
+            const retryBtn = document.getElementById('chart-retry-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => loadDashboardData(true));
+            }
             
             toast.error('Failed to load dashboard data. Please try again.');
         } finally {
@@ -460,21 +654,94 @@ async function attachDashboardListeners() {
         }
     };
 
+    // Load recent activity from localStorage
+    const loadRecentActivity = () => {
+        const activityList = document.getElementById('recentActivityList');
+        if (!activityList) return;
+
+        try {
+            const stored = localStorage.getItem('admin_activity_logs');
+            const logs = stored ? JSON.parse(stored) : [];
+            const recent = logs.slice(0, 5);
+
+            if (recent.length === 0) {
+                activityList.innerHTML = '<div class="text-center py-4 text-muted small">No recent activity</div>';
+                return;
+            }
+
+            const ACTIVITY_COLORS = {
+                account_created: 'success', account_verified: 'success', account_promoted: 'info',
+                account_demoted: 'warning', account_deactivated: 'secondary', account_reactivated: 'success',
+                account_deleted: 'danger', event_created: 'primary', event_deleted: 'danger',
+                file_uploaded: 'primary', file_deleted: 'danger', payment_created: 'success',
+                payment_marked_paid: 'success', bulk_action: 'info', login: 'primary',
+                logout: 'secondary', export_data: 'info'
+            };
+
+            activityList.innerHTML = recent.map(log => {
+                const color = ACTIVITY_COLORS[log.type] || 'secondary';
+                const timeAgo = getTimeAgo(new Date(log.timestamp));
+                return `
+                    <div class="activity-item d-flex align-items-center gap-3 px-4 py-3">
+                        <div class="bg-${color}-subtle text-${color} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;">
+                            <i class="bi bi-circle-fill" style="font-size:0.4rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="small text-dark">${log.description}</div>
+                        </div>
+                        <span class="text-muted small flex-shrink-0">${timeAgo}</span>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            activityList.innerHTML = '<div class="text-center py-4 text-muted small">No recent activity</div>';
+        }
+    };
+
+    function getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        const intervals = { year: 31536000, month: 2592000, week: 604800, day: 86400, hour: 3600, minute: 60 };
+        for (const [unit, secs] of Object.entries(intervals)) {
+            const interval = Math.floor(seconds / secs);
+            if (interval >= 1) return `${interval}${unit.charAt(0)} ago`;
+        }
+        return 'Just now';
+    }
+
+    // Quick action navigation
+    document.querySelectorAll('[data-quick-action]').forEach(card => {
+        card.addEventListener('click', (e) => {
+            e.preventDefault();
+            const action = card.dataset.quickAction;
+            const viewMap = {
+                'accounts-pending': 'accounts',
+                'events': 'events',
+                'payments': 'payments',
+                'volunteers': 'volunteers',
+                'activity-logs': 'activity-logs',
+                'finance': 'finance'
+            };
+            const viewName = viewMap[action] || action;
+            const sidebarLink = document.querySelector(`#adminSidebar [data-view="${viewName}"]`);
+            if (sidebarLink) sidebarLink.click();
+        });
+    });
+
     // Initial load
     await loadDashboardData();
+    loadRecentActivity();
 
     // Refresh button handler
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => loadDashboardData(true));
     }
-
-    // Auto-refresh every 5 minutes (optional - can be disabled)
-    // refreshIntervalId = setInterval(() => loadDashboardData(false), 5 * 60 * 1000);
 }
 
-export default function renderAdminDashboardView() {
+export default function renderAdminDashboardView(user, profile) {
+    _dashboardUser = user;
+    _dashboardProfile = profile;
     return {
-        html: getDashboardHTML(),
+        html: getDashboardHTML(user, profile),
         afterRender: attachDashboardListeners
     };
 }

@@ -1,11 +1,13 @@
-import { databases, functions } from '../../shared/appwrite.js';
+import { databases, functions, account } from '../../shared/appwrite.js';
 import {
     DATABASE_ID,
     COLLECTION_ID_STORIES,
     COLLECTION_ID_STUDENTS,
-    FUNCTION_STUDENT_OFFICER_MANAGEMENT
+    FUNCTION_ID
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
 
 import checkCircleFill from 'bootstrap-icons/icons/check-circle-fill.svg';
 import xCircleFill from 'bootstrap-icons/icons/x-circle-fill.svg';
@@ -286,26 +288,27 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.approveStory(storyId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'approve_story',
-                            payload: { story_id: storyId }
+                            payload: { story_id: storyId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
                 }
 
-                // Update local state
+                // Update local state - officer approval sends to admin queue
                 const story = allStories.find(s => s.$id === storyId);
                 if (story) {
-                    story.isAccepted = true;
+                    story.officerApproval = true;
                 }
                 updateStats();
                 applyFilters();
-                showToast('Story approved and published!', 'success');
+                showToast('Story approved! Sent to admin for final review.', 'success');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 approveBtn.disabled = false;
                 approveBtn.innerHTML = `<img src="${checkCircleFill}" width="14" style="filter: brightness(0) invert(1);">`;
             }
@@ -316,7 +319,8 @@ async function attachEventListeners(currentUser, profile) {
         if (rejectBtn) {
             const storyId = rejectBtn.dataset.storyId;
 
-            if (!confirm('Are you sure you want to reject and delete this story?')) {
+            const confirmed = await confirmAction('Reject Story', 'Are you sure you want to reject and delete this story?', 'Reject', 'danger');
+            if (!confirmed) {
                 return;
             }
 
@@ -329,10 +333,11 @@ async function attachEventListeners(currentUser, profile) {
                     await mockApi.rejectStory(storyId, currentUser.$id);
                 } else {
                     await functions.createExecution(
-                        FUNCTION_STUDENT_OFFICER_MANAGEMENT,
+                        FUNCTION_ID,
                         JSON.stringify({
                             action: 'reject_story',
-                            payload: { story_id: storyId }
+                            payload: { story_id: storyId },
+                            requestingUserId: currentUser.$id
                         }),
                         false
                     );
@@ -345,7 +350,7 @@ async function attachEventListeners(currentUser, profile) {
                 showToast('Story rejected and removed.', 'warning');
             } catch (err) {
                 console.error(err);
-                showToast('Error: ' + err.message, 'danger');
+                showToast('Error: ' + err.message, 'error');
                 rejectBtn.disabled = false;
                 rejectBtn.innerHTML = `<img src="${xCircleFill}" width="14">`;
             }
@@ -372,35 +377,6 @@ function showStoryModal(story, studentLookup) {
     // Show modal using Bootstrap
     const bsModal = new (window.bootstrap?.Modal || class { show() { } })(modal);
     bsModal.show();
-}
-
-function showToast(message, type = 'primary') {
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        toastContainer.style.zIndex = '1100';
-        document.body.appendChild(toastContainer);
-    }
-
-    const toastId = `toast-${Date.now()}`;
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
-
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-    const toastEl = document.getElementById(toastId);
-    const toast = new (window.bootstrap?.Toast || class { show() { } hide() { } })(toastEl, { delay: 3000 });
-    toast.show();
-
-    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 
 export default function renderStoriesView(user, profile) {

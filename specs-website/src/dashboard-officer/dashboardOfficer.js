@@ -8,6 +8,7 @@ import { cache } from "../shared/cache.js";
 import { prefetchModule } from "../shared/lazyLoadHelper.js";
 import { Query } from "appwrite";
 import { Offcanvas, Dropdown } from 'bootstrap';
+import { setCurrentUser } from '../dashboard-admin/views/activity-logs.js';
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -95,25 +96,30 @@ export default async function renderDashboard() {
       }, {});
     }
 
+    // Initialize the current user context for activity logging
+    setCurrentUser(user, profile);
+
     app.innerHTML = `
-      <div class="d-flex" style="min-height: 100vh;">
-        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3" style="width: 260px; background-color: #fff; border-right: 1px solid #e5e7eb;" tabindex="-1" id="sidebar">
-          <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-decoration-none">
+      <div class="d-flex" style="height: 100vh; overflow: hidden;">
+        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3" style="width: 260px; height: 100vh; background-color: #fff; border-right: 1px solid #e5e7eb;" tabindex="-1" id="sidebar">
+          <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-decoration-none" style="flex-shrink: 0;">
             <span class="fs-5 fw-bold text-dark">SPECS</span>
           </a>
-          <hr class="my-2" style="border-color: #e5e7eb;">
-          <ul class="nav nav-pills flex-column">
-            <li><a href="#" class="nav-link" data-view="finance"><img src="${wallet}" alt="Finance" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Finance</a></li>
-            <li><a href="#" class="nav-link" data-view="files"><img src="${folder}" alt="Files" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Files</a></li>
-            <li><a href="#" class="nav-link" data-view="events"><img src="${calendarEvent}" alt="Events" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Events</a></li>
-            <li><a href="#" class="nav-link" data-view="students"><img src="${personBadgeFill}" alt="Students" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Students</a></li>
-            <li><a href="#" class="nav-link" data-view="payments"><img src="${creditCardFill}" alt="Payments" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Payments</a></li>
-            <li><a href="#" class="nav-link" data-view="volunteers"><img src="${personHearts}" alt="Volunteers" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Volunteers</a></li>
-            <li><a href="#" class="nav-link" data-view="stories"><img src="${fileTextFill}" alt="Stories" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Stories</a></li>
-            <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Settings</a></li>
-          </ul>
+          <hr class="my-2" style="border-color: #e5e7eb; flex-shrink: 0;">
+          <div class="sidebar-nav-scroll" style="flex: 1 1 0%; min-height: 0; overflow-y: auto;">
+            <ul class="nav nav-pills flex-column">
+              <li><a href="#" class="nav-link" data-view="finance"><img src="${wallet}" alt="Finance" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Finance</a></li>
+              <li><a href="#" class="nav-link" data-view="files"><img src="${folder}" alt="Files" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Files</a></li>
+              <li><a href="#" class="nav-link" data-view="events"><img src="${calendarEvent}" alt="Events" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Events</a></li>
+              <li><a href="#" class="nav-link" data-view="students"><img src="${personBadgeFill}" alt="Students" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Students</a></li>
+              <li><a href="#" class="nav-link" data-view="payments"><img src="${creditCardFill}" alt="Payments" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Payments</a></li>
+              <li><a href="#" class="nav-link" data-view="volunteers"><img src="${personHearts}" alt="Volunteers" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Volunteers</a></li>
+              <li><a href="#" class="nav-link" data-view="stories"><img src="${fileTextFill}" alt="Stories" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Stories</a></li>
+              <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Settings</a></li>
+            </ul>
+          </div>
           
-          <div class="dropdown mt-auto">
+          <div class="dropdown" style="flex-shrink: 0;">
             <hr class="my-2" style="border-color: #e5e7eb;">
             <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
               <img src="${personCircle}" alt="User" class="me-2" style="width: 28px; height: 28px; opacity: 0.7;">
@@ -127,7 +133,7 @@ export default async function renderDashboard() {
           </div>
         </aside>
 
-        <div class="flex-grow-1" style="overflow-y: auto; height: 100vh; background-color: #f9fafb;">
+        <div class="flex-grow-1" style="overflow-y: auto; height: 100%; background-color: #f9fafb;">
           <header class="navbar d-lg-none bg-white border-bottom">
             <div class="container-fluid">
               <a class="navbar-brand fw-semibold" href="#">Dashboard</a>

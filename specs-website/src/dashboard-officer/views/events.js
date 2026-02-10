@@ -1,6 +1,8 @@
 import { api } from '../../shared/api.js';
 import { ID } from 'appwrite';
 import { Modal } from 'bootstrap';
+import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
 
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import pencilSquare from 'bootstrap-icons/icons/pencil-square.svg';
@@ -319,15 +321,23 @@ function attachEventListeners(currentUser, userLookup) {
             editEventModal.show();
         }
 
-        if (markEndedBtn && confirm('End this event?')) {
-            await api.events.markEnded(markEndedBtn.dataset.docId);
-            loadAllEvents();
+        if (markEndedBtn) {
+            const confirmed = await confirmAction('End Event', 'Are you sure you want to mark this event as ended?', 'End Event', 'warning');
+            if (confirmed) {
+                await api.events.markEnded(markEndedBtn.dataset.docId);
+                showToast('Event marked as ended', 'success');
+                loadAllEvents();
+            }
         }
 
-        if (deleteBtn && confirm('Delete permanently?')) {
-            await api.events.delete(deleteBtn.dataset.docId);
-            await api.files.deleteEventImage(deleteBtn.dataset.fileId);
-            loadAllEvents();
+        if (deleteBtn) {
+            const confirmed = await confirmAction('Delete Event', 'Are you sure you want to permanently delete this event?', 'Delete', 'danger');
+            if (confirmed) {
+                await api.events.delete(deleteBtn.dataset.docId);
+                await api.files.deleteEventImage(deleteBtn.dataset.fileId);
+                showToast('Event deleted', 'success');
+                loadAllEvents();
+            }
         }
     });
 
@@ -361,21 +371,27 @@ function attachEventListeners(currentUser, userLookup) {
         const sId = link.dataset.sid;
         const name = link.dataset.name;
 
-        if (confirm(`Mark ${name} as present?`)) {
+        const confirmed = await confirmAction('Mark Present', `Mark ${name} as present?`, 'Mark Present', 'success');
+        if (confirmed) {
             try {
                 await api.attendance.create(currentAttendanceEventId, sId, currentUserId, "Present");
                 attSearch.value = '';
                 attResults.style.display = 'none';
                 refreshAttendanceList(currentAttendanceEventId);
-            } catch (err) { alert(err.message); }
+                showToast(`${name} marked as present`, 'success');
+            } catch (err) { showToast(err.message, 'error'); }
         }
     });
 
     document.getElementById('attendanceListBody').addEventListener('click', async (e) => {
         const btn = e.target.closest('.delete-attendance-btn');
-        if (btn && confirm('Remove this attendance record?')) {
-            await api.attendance.delete(btn.dataset.id);
-            refreshAttendanceList(currentAttendanceEventId);
+        if (btn) {
+            const confirmed = await confirmAction('Remove Attendance', 'Remove this attendance record?', 'Remove', 'danger');
+            if (confirmed) {
+                await api.attendance.delete(btn.dataset.id);
+                refreshAttendanceList(currentAttendanceEventId);
+                showToast('Attendance record removed', 'success');
+            }
         }
     });
 
@@ -396,7 +412,8 @@ function attachEventListeners(currentUser, userLookup) {
                 event_ended: false
             });
             addEventModal.hide(); e.target.reset(); await loadAllEvents();
-        } catch (error) { alert('Failed to create event'); } finally { submitBtn.disabled = false; }
+            showToast('Event created successfully', 'success');
+        } catch (error) { showToast('Failed to create event', 'error'); } finally { submitBtn.disabled = false; }
     });
 
     document.getElementById('editEventForm').addEventListener('submit', async (e) => {
@@ -418,7 +435,8 @@ function attachEventListeners(currentUser, userLookup) {
             }
             await api.events.update(document.getElementById('editEventId').value, data);
             editEventModal.hide(); await loadAllEvents();
-        } catch (error) { alert('Update failed'); } finally { submitBtn.disabled = false; }
+            showToast('Event updated successfully', 'success');
+        } catch (error) { showToast('Update failed', 'error'); } finally { submitBtn.disabled = false; }
     });
 
     // Search
