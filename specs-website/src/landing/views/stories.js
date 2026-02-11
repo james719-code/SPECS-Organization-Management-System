@@ -150,6 +150,7 @@ export async function renderStoriesPage(container, page = 1) {
             <div class="container pt-3 pt-md-4 pt-lg-5">
                 <div class="row justify-content-center">
                     <div class="col-lg-10 col-xl-8 text-center">
+                        <span class="badge rounded-pill px-3 py-2 mb-3" style="background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); font-size: 0.7rem; letter-spacing: 1px; border: 1px solid rgba(255,255,255,0.15);">COMMUNITY</span>
                         <h1 class="display-6 fw-bold mb-3 pt-2">Organization Highlights</h1>
                         <p class="lead fs-6 mb-4 opacity-75 px-2">
                             Celebrating our achievements, milestones, and collaborative successes that define the SPECS community.
@@ -160,10 +161,11 @@ export async function renderStoriesPage(container, page = 1) {
         </section>
 
         <!-- Main Content -->
-        <section class="py-5 bg-light-subtle">
+        <section class="py-5" style="background: linear-gradient(180deg, #f8fafa 0%, #ffffff 100%);">
             <div class="container">
                 <div class="row mb-5">
                     <div class="col-12">
+                        <span class="badge rounded-pill px-3 py-2 mb-2" style="background: rgba(13,107,102,0.08); color: #0d6b66; font-size: 0.7rem; letter-spacing: 1px; font-weight: 600;">LATEST</span>
                         <h2 class="fw-bold mb-2 fs-3">Latest Stories</h2>
                         <p class="text-muted mb-0 mt-2">Discover what's happening in our community</p>
                     </div>

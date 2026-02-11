@@ -87,12 +87,14 @@ function getFilesHTML(fileList) {
     <div class="files-view-container container-fluid py-4 px-md-5">
         <header class="row align-items-center mb-5 gy-4">
             <div class="col-12 col-lg-7">
-                <h1 class="display-6 fw-bold text-dark mb-1">Shared Files</h1>
-                <p class="text-muted mb-0">Browse, search, and manage organization documents.</p>
+                <div class="officer-page-header mb-0">
+                    <h1 class="page-title mb-1">Shared Files</h1>
+                    <p class="page-subtitle mb-0">Browse, search, and manage organization documents.</p>
+                </div>
             </div>
             <div class="col-12 col-lg-5">
-                <div class="input-group shadow-sm rounded-3 overflow-hidden border-0 bg-white">
-                    <span class="input-group-text bg-white border-0 ps-3">
+                <div class="officer-search-bar d-flex align-items-center">
+                    <span class="input-group-text bg-transparent border-0 ps-3">
                         <img src="${searchIcon}" width="18" style="opacity:0.4">
                     </span>
                     <input type="search" id="fileSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Type and press Enter to search...">
@@ -129,10 +131,24 @@ function getFilesHTML(fileList) {
     </div>`;
 }
 
-function attachEventListeners(currentUser, userLookup) {
+function attachEventListeners(currentUser, userLookup, initialData) {
     let allFiles = [];
-    const detailModal = new Modal(document.getElementById('fileDetailsModal'));
-    const uploadModal = new Modal(document.getElementById('uploadFileModal'));
+    const detailModalEl = document.getElementById('fileDetailsModal');
+    const uploadModalEl = document.getElementById('uploadFileModal');
+    const detailModal = new Modal(detailModalEl);
+    const uploadModal = new Modal(uploadModalEl);
+
+    // Fix aria-hidden focus issue: blur active element before modal hides
+    [detailModalEl, uploadModalEl].forEach(el => {
+        if (el) {
+            el.addEventListener('hide.bs.modal', () => {
+                if (el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            });
+        }
+    });
+
     const grid = document.getElementById('file-cards-container');
     const searchInput = document.getElementById('fileSearchInput');
 
@@ -182,8 +198,13 @@ function attachEventListeners(currentUser, userLookup) {
         }
     };
 
-    // Initial Load
-    loadFiles();
+    // Initial Load — use prefetched data when available to avoid redundant fetch
+    if (initialData && initialData.files && initialData.files.length > 0) {
+        allFiles = initialData.files;
+        renderGrid(allFiles);
+    } else {
+        loadFiles();
+    }
 
     // Search on Enter Key
     searchInput.addEventListener('keydown', (e) => {
@@ -265,6 +286,6 @@ function attachEventListeners(currentUser, userLookup) {
 export default function renderFilesView(initialData, userLookup, user) {
     return {
         html: getFilesHTML(initialData.files),
-        afterRender: () => attachEventListeners(user, userLookup)
+        afterRender: () => attachEventListeners(user, userLookup, initialData)
     };
 }

@@ -340,18 +340,35 @@ export async function renderResourcesPage(container) {
                         ${createPolicyCardHTML({
         title: 'Privacy Policy',
         icon: shieldCheck,
-        lastUpdated: 'October 26, 2025',
+        lastUpdated: 'February 11, 2026',
         content: `
                                 <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">1. Introduction</h5>
-                                <p class="text-muted small mb-3">SPECS respects your privacy. This policy explains our data handling in accordance with our Constitution.</p>
+                                <p class="text-muted small mb-3">SPECS respects your privacy. This policy is based on <strong>Article XI — Data Confidentiality</strong> of the SPECS Constitution and explains how we collect, use, and protect your personal data.</p>
 
                                 <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">2. Data We Collect</h5>
-                                <p class="text-muted small mb-3">We collect limited technical data only. No personally identifiable information is collected through public browsing.</p>
+                                <p class="text-muted small mb-2">SPECS may collect members' personal data — including but not limited to:</p>
+                                <ul class="text-muted small mb-3">
+                                    <li>Full name and student ID</li>
+                                    <li>Contact numbers and email addresses</li>
+                                    <li>Year level, section, and address</li>
+                                    <li>Other relevant information as needed</li>
+                                </ul>
 
-                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">3. Data Protection</h5>
-                                <p class="text-muted small mb-3">All data is accessed only by authorized SPECS officers under strict confidentiality standards.</p>
+                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">3. Purpose of Data Collection</h5>
+                                <p class="text-muted small mb-2">Personal data is collected <strong>strictly</strong> for the following purposes:</p>
+                                <ul class="text-muted small mb-3">
+                                    <li><strong>Emergency purposes</strong> — to reach members or their contacts in urgent situations</li>
+                                    <li><strong>Organizational coordination</strong> — for event management, attendance tracking, and internal communications</li>
+                                    <li><strong>OSAS and university reporting compliance</strong> — to fulfill mandatory reporting requirements</li>
+                                </ul>
 
-                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">4. Contact</h5>
+                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">4. Member Obligations</h5>
+                                <p class="text-muted small mb-3">Members are required to provide accurate information when requested by authorized officers to fulfill organizational and OSAS requirements.</p>
+
+                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">5. Data Access & Protection</h5>
+                                <p class="text-muted small mb-3">Access to personal data is <strong>restricted to authorized officers only</strong>. Unauthorized disclosure, misuse, or sharing of member data without written consent or OSAS approval is strictly prohibited and will result in disciplinary action.</p>
+
+                                <h5 class="fw-bold mt-3 mt-md-4 mb-2 mb-md-3 text-dark fs-6 fs-md-5">6. Contact</h5>
                                 <p class="text-muted small">
                                     <strong>SPECS Organization</strong><br>
                                     Email: <a href="mailto:specs.cecs@parsu.edu.ph" class="text-primary">specs.cecs@parsu.edu.ph</a><br>

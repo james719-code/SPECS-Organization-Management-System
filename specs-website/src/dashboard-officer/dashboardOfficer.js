@@ -34,16 +34,14 @@ function prefetchCommonViews() {
   prefetchModule(viewModules.events);
 }
 
-import wallet from 'bootstrap-icons/icons/wallet.svg';
-import folder from 'bootstrap-icons/icons/folder.svg';
-import calendarEvent from 'bootstrap-icons/icons/calendar-event.svg';
+import folderFill from 'bootstrap-icons/icons/folder-fill.svg';
+import calendarEventFill from 'bootstrap-icons/icons/calendar-event-fill.svg';
 import personBadgeFill from 'bootstrap-icons/icons/person-badge-fill.svg';
 import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
-import gear from 'bootstrap-icons/icons/gear.svg';
-import personCircle from 'bootstrap-icons/icons/person-circle.svg';
+import cashStack from 'bootstrap-icons/icons/cash-stack.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
-import personHearts from 'bootstrap-icons/icons/person-hearts.svg';
+import personHeartsFill from 'bootstrap-icons/icons/person-hearts.svg';
 import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
 
 const FILES_PAGE_LIMIT = 10;
@@ -99,51 +97,118 @@ export default async function renderDashboard() {
     // Initialize the current user context for activity logging
     setCurrentUser(user, profile);
 
+    const displayName = profile.username || profile.fullname || 'Officer';
+    const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
     app.innerHTML = `
-      <div class="d-flex" style="height: 100vh; overflow: hidden;">
-        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0 p-3" style="width: 260px; height: 100vh; background-color: #fff; border-right: 1px solid #e5e7eb;" tabindex="-1" id="sidebar">
-          <a href="#" class="d-flex align-items-center mb-3 me-md-auto text-decoration-none" style="flex-shrink: 0;">
-            <span class="fs-5 fw-bold text-dark">SPECS</span>
-          </a>
-          <hr class="my-2" style="border-color: #e5e7eb; flex-shrink: 0;">
+      <div class="officer-dashboard d-flex" style="height: 100vh; overflow: hidden;">
+        <!-- Sidebar -->
+        <aside class="offcanvas-lg offcanvas-start d-flex flex-column flex-shrink-0" style="width: 280px; height: 100vh;" tabindex="-1" id="sidebar">
+          
+          <!-- Sidebar Header / Branding -->
+          <div class="sidebar-header" style="flex-shrink: 0;">
+            <a href="#" class="sidebar-brand text-decoration-none">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10.125 7.125L12 3.375L13.875 7.125M12 3.375V10.875M16.875 13.875L20.625 12L16.875 10.125M20.625 12H13.125M7.125 10.125L3.375 12L7.125 13.875M3.375 12H10.875M13.875 16.875L12 20.625L10.125 16.875M12 20.625V13.125" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              SPECS
+            </a>
+            <div class="sidebar-subtitle">Officer Dashboard</div>
+          </div>
+          
+          <!-- Scrollable Navigation -->
           <div class="sidebar-nav-scroll" style="flex: 1 1 0%; min-height: 0; overflow-y: auto;">
+            <div class="nav-section-label">Management</div>
             <ul class="nav nav-pills flex-column">
-              <li><a href="#" class="nav-link" data-view="finance"><img src="${wallet}" alt="Finance" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Finance</a></li>
-              <li><a href="#" class="nav-link" data-view="files"><img src="${folder}" alt="Files" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Files</a></li>
-              <li><a href="#" class="nav-link" data-view="events"><img src="${calendarEvent}" alt="Events" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Events</a></li>
-              <li><a href="#" class="nav-link" data-view="students"><img src="${personBadgeFill}" alt="Students" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Students</a></li>
-              <li><a href="#" class="nav-link" data-view="payments"><img src="${creditCardFill}" alt="Payments" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Payments</a></li>
-              <li><a href="#" class="nav-link" data-view="volunteers"><img src="${personHearts}" alt="Volunteers" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Volunteers</a></li>
-              <li><a href="#" class="nav-link" data-view="stories"><img src="${fileTextFill}" alt="Stories" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Stories</a></li>
-              <li><a href="#" class="nav-link" data-view="settings"><img src="${gear}" alt="Settings" class="me-2" style="width:1.1em; height:1.1em; opacity: 0.6;">Settings</a></li>
+              <li class="nav-item">
+                <a href="#" class="nav-link" data-view="finance">
+                  <img src="${cashStack}" alt="Finance">Finance
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="payments">
+                  <img src="${creditCardFill}" alt="Payments">Payments
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="students">
+                  <img src="${personBadgeFill}" alt="Students">Students
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="volunteers">
+                  <img src="${personHeartsFill}" alt="Volunteers">Volunteers
+                </a>
+              </li>
+            </ul>
+            
+            <div class="nav-section-label">Content</div>
+            <ul class="nav nav-pills flex-column">
+              <li>
+                <a href="#" class="nav-link" data-view="events">
+                  <img src="${calendarEventFill}" alt="Events">Events
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="files">
+                  <img src="${folderFill}" alt="Files">Files
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="stories">
+                  <img src="${fileTextFill}" alt="Stories">Stories
+                </a>
+              </li>
+            </ul>
+            
+            <div class="nav-section-label">Account</div>
+            <ul class="nav nav-pills flex-column">
+              <li>
+                <a href="#" class="nav-link" data-view="settings">
+                  <img src="${gearFill}" alt="Settings">Settings
+                </a>
+              </li>
             </ul>
           </div>
           
-          <div class="dropdown" style="flex-shrink: 0;">
-            <hr class="my-2" style="border-color: #e5e7eb;">
-            <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
-              <img src="${personCircle}" alt="User" class="me-2" style="width: 28px; height: 28px; opacity: 0.7;">
-              <strong class="small">${profile.username || 'User'}</strong>
-            </a>
-            <ul class="dropdown-menu text-small shadow-sm border">
-              <li><a class="dropdown-item" href="#" data-view="settings"><img src="${gearFill}" alt="Settings" class="me-2" style="width: 1em; height: 1em; opacity: 0.6;">Settings</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item text-danger fw-medium" href="#" id="logout-btn"><img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 1em; height: 1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out</a></li>
-            </ul>
+          <!-- User Profile Area -->
+          <div class="sidebar-user-area" style="flex-shrink: 0;">
+            <div class="dropdown w-100">
+              <a href="#" class="d-flex align-items-center gap-3 text-decoration-none p-2 rounded-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="transition: background 0.15s;">
+                <div class="user-avatar">${initials}</div>
+                <div class="user-info flex-grow-1">
+                  <div class="user-name">${displayName}</div>
+                  <div class="user-role">Officer</div>
+                </div>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end text-small shadow border-0 w-100">
+                <li>
+                  <a class="dropdown-item py-2" href="#" data-view="settings">
+                    <img src="${gearFill}" alt="Settings" class="me-2" style="width: 16px; opacity: 0.5;">Settings
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                  <a class="dropdown-item text-danger fw-medium py-2" href="#" id="logout-btn">
+                    <img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 16px; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
         </aside>
 
-        <div class="flex-grow-1" style="overflow-y: auto; height: 100%; background-color: #f9fafb;">
-          <header class="navbar d-lg-none bg-white border-bottom">
-            <div class="container-fluid">
-              <a class="navbar-brand fw-semibold" href="#">Dashboard</a>
-              <button class="navbar-toggler border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
-                <span class="navbar-toggler-icon"></span>
-              </button>
-            </div>
+        <!-- Main Content Wrapper -->
+        <div class="flex-grow-1 d-flex flex-column" style="overflow-y: auto; height: 100%; background-color: var(--officer-content-bg, #f9fafb);">
+          <!-- Mobile Header -->
+          <header class="officer-mobile-header d-lg-none d-flex align-items-center justify-content-between">
+            <span class="mobile-brand">SPECS</span>
+            <button class="btn btn-link p-0 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+            </button>
           </header>
           
-          <main id="dashboard-content" class="p-4"></main>
+          <main id="dashboard-content" class="flex-grow-1"></main>
         </div>
       </div>
     `;
@@ -151,16 +216,23 @@ export default async function renderDashboard() {
     const contentEl = document.getElementById("dashboard-content");
     const viewLinks = document.querySelectorAll('#sidebar [data-view]');
     const sidebar = document.getElementById('sidebar');
-    const sidebarInstance = Offcanvas.getOrCreateInstance(sidebar);
 
-    const userDropdown = new Dropdown(document.querySelector('.dropdown-toggle'));
+    // Initialize Bootstrap components that require it.
+    new Dropdown(document.querySelector('.dropdown-toggle'));
 
     const renderContent = async (viewName) => {
-      contentEl.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
+      // Fade out current content and show loading spinner
+      contentEl.style.opacity = '0';
+      contentEl.style.transition = 'opacity 0.15s ease';
+      contentEl.innerHTML = `
+        <div class="officer-loading">
+          <div class="spinner-ring"></div>
+          <span class="loading-text">Loading ${viewName}...</span>
+        </div>
+      `;
+      contentEl.style.opacity = '1';
 
-      viewLinks.forEach((link) => {
-        link.classList.remove("active");
-      });
+      viewLinks.forEach(link => link.classList.remove("active"));
 
       const activeLink = document.querySelector(`#sidebar [data-view="${viewName}"]`);
       if (activeLink) {
@@ -180,6 +252,9 @@ export default async function renderDashboard() {
 
         const renderFn = module.default;
         let view;
+
+        // Fade transition: hide, render, then animate in
+        contentEl.style.opacity = '0';
 
         switch (viewName) {
           case "finance":
@@ -223,9 +298,26 @@ export default async function renderDashboard() {
           default:
             await renderFn(userLookup, user);
         }
+
+        // Animate content in smoothly
+        requestAnimationFrame(() => {
+          contentEl.style.opacity = '1';
+          contentEl.style.transition = 'opacity 0.25s ease';
+        });
       } catch (error) {
         console.error(`Error rendering ${viewName} view:`, error);
-        contentEl.innerHTML = `<div class="alert alert-danger mx-4"><h4>Error</h4><p>Could not load the ${viewName} page.</p></div>`;
+        contentEl.style.opacity = '1';
+        contentEl.innerHTML = `
+          <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 60vh;">
+            <div class="text-center">
+              <div class="bg-danger-subtle rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                <svg width="28" height="28" fill="currentColor" class="text-danger" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+              </div>
+              <h5 class="fw-bold text-dark mb-2">Failed to load ${viewName}</h5>
+              <p class="text-muted small mb-3">Something went wrong. Please try again.</p>
+              <button class="btn btn-sm btn-primary rounded-pill px-4" onclick="location.reload()">Reload Page</button>
+            </div>
+          </div>`;
       }
     };
 

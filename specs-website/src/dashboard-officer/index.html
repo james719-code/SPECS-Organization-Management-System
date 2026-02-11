@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0d6b66">
-    <title>SPECS - Student Portal</title>
-    <meta name="description" content="The official portal for the Society of Programmers and Enthusiasts in Computer Science (SPECS) at Partido State University.">
+    <title>SPECS - Officer Dashboard</title>
+    <meta name="description" content="Officer management dashboard for the Society of Programmers and Enthusiasts in Computer Science (SPECS) at Partido State University.">
 
     <link rel="icon" href="/logo.webp" sizes="any">
     <style>
@@ -16,7 +16,7 @@
             align-items: center;
             height: 100vh;
             width: 100%;
-            background-color: #f4fefc;
+            background-color: #f9fafb;
             position: fixed;
             top: 0;
             left: 0;
@@ -25,17 +25,26 @@
         }
 
         .loading-logo {
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             animation: pulse 1.5s infinite ease-in-out;
         }
 
         .loading-text {
             margin-top: 1.25rem;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            color: #0f172a;
-            font-weight: 500;
+            font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+            color: #0d6b66;
+            font-weight: 600;
+            font-size: 0.9rem;
             letter-spacing: 0.5px;
+        }
+        
+        .loading-subtitle {
+            margin-top: 0.35rem;
+            font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+            color: #6b7280;
+            font-weight: 400;
+            font-size: 0.8rem;
         }
 
         @keyframes pulse {
@@ -61,7 +70,8 @@
         <svg class="loading-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10.125 7.125L12 3.375L13.875 7.125M12 3.375V10.875M16.875 13.875L20.625 12L16.875 10.125M20.625 12H13.125M7.125 10.125L3.375 12L7.125 13.875M3.375 12H10.875M13.875 16.875L12 20.625L10.125 16.875M12 20.625V13.125" stroke="#0d6b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p class="loading-text">Loading Dashboard</p>
+        <p class="loading-text">SPECS</p>
+        <p class="loading-subtitle">Loading Officer Dashboard</p>
     </div>
 </div>
 

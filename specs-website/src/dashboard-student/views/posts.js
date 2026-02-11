@@ -4,6 +4,8 @@ import {
     COLLECTION_ID_STORIES,
     BUCKET_ID_EVENT_IMAGES
 } from '../../shared/constants.js';
+
+const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES;
 import { Query, ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import { showToast } from '../../shared/toast.js';
@@ -185,6 +187,16 @@ function getPostsHTML(isVolunteer) {
                                 </div>
                             </div>
                             
+                            <div class="mb-4">
+                                <label for="postImageInput" class="form-label fw-medium">Cover Image (optional)</label>
+                                <input type="file" class="form-control" id="postImageInput" accept="image/jpeg,image/png,image/webp">
+                                <div class="form-text">Recommended: 1200×630px, JPG/PNG/WebP, max 5 MB</div>
+                                <div id="postImagePreview" class="mt-2 d-none">
+                                    <img id="postImagePreviewImg" src="" alt="Preview" class="rounded border" style="max-height: 160px; max-width: 100%; object-fit: cover;">
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="removePostImage">Remove</button>
+                                </div>
+                            </div>
+
                             <div class="mb-3">
                                 <label for="postLinksInput" class="form-label fw-medium">Related Links (optional)</label>
                                 <input type="text" class="form-control" id="postLinksInput" placeholder="Enter URLs separated by commas">
@@ -280,11 +292,59 @@ async function attachEventListeners(studentDoc, currentUser) {
         }
     };
 
+    // Image upload helpers
+    let pendingImageFile = null;
+    let existingImageId = null;
+
+    const setupImageHandlers = () => {
+        const imageInput = document.getElementById('postImageInput');
+        const previewWrap = document.getElementById('postImagePreview');
+        const previewImg = document.getElementById('postImagePreviewImg');
+        const removeBtn = document.getElementById('removePostImage');
+
+        imageInput?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image must be under 5 MB.', 'error');
+                imageInput.value = '';
+                return;
+            }
+
+            pendingImageFile = file;
+            previewImg.src = URL.createObjectURL(file);
+            previewWrap.classList.remove('d-none');
+        });
+
+        removeBtn?.addEventListener('click', () => {
+            pendingImageFile = null;
+            existingImageId = null;
+            imageInput.value = '';
+            previewWrap.classList.add('d-none');
+            previewImg.src = '';
+        });
+    };
+
+    const resetImageState = () => {
+        pendingImageFile = null;
+        existingImageId = null;
+        const imageInput = document.getElementById('postImageInput');
+        const previewWrap = document.getElementById('postImagePreview');
+        const previewImg = document.getElementById('postImagePreviewImg');
+        if (imageInput) imageInput.value = '';
+        if (previewWrap) previewWrap.classList.add('d-none');
+        if (previewImg) previewImg.src = '';
+    };
+
+    setupImageHandlers();
+
     const openCreateModal = () => {
         document.getElementById('postModalTitle').textContent = 'Create New Post';
         document.getElementById('postSubmitBtn').textContent = 'Create Post';
         document.getElementById('postId').value = '';
         postForm.reset();
+        resetImageState();
         updateCharCounters();
 
         modalInstance = new Modal(postModal);
@@ -300,6 +360,18 @@ async function attachEventListeners(studentDoc, currentUser) {
         document.getElementById('postContentInput').value = story.post_details || '';
         document.getElementById('postLinksInput').value = (story.related_links || []).join(', ');
         updateCharCounters();
+
+        // Show existing image if present
+        resetImageState();
+        if (story.image_bucket && BUCKET_ID_HIGHLIGHT_IMAGES) {
+            try {
+                existingImageId = story.image_bucket;
+                const previewImg = document.getElementById('postImagePreviewImg');
+                const previewWrap = document.getElementById('postImagePreview');
+                previewImg.src = storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket, 600, 320);
+                previewWrap.classList.remove('d-none');
+            } catch { /* skip */ }
+        }
 
         modalInstance = new Modal(postModal);
         modalInstance.show();
@@ -356,6 +428,25 @@ async function attachEventListeners(studentDoc, currentUser) {
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
         try {
+            // Handle image upload if a new file was selected
+            let imageBucketId = existingImageId || null;
+            if (pendingImageFile && BUCKET_ID_HIGHLIGHT_IMAGES) {
+                try {
+                    const uploadRes = await storage.createFile(
+                        BUCKET_ID_HIGHLIGHT_IMAGES,
+                        ID.unique(),
+                        pendingImageFile
+                    );
+                    imageBucketId = uploadRes.$id;
+                } catch (uploadErr) {
+                    console.error('Image upload failed:', uploadErr);
+                    showToast('Image upload failed: ' + uploadErr.message, 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = isEdit ? 'Save Changes' : 'Create Post';
+                    return;
+                }
+            }
+
             const postData = {
                 title,
                 post_description: description,
@@ -381,10 +472,12 @@ async function attachEventListeners(studentDoc, currentUser) {
                 }
             } else {
                 if (isEdit) {
-                    await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, postId, postData);
+                    const updatePayload = { ...postData };
+                    if (imageBucketId !== undefined) updatePayload.image_bucket = imageBucketId;
+                    await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, postId, updatePayload);
                     const idx = myPosts.findIndex(p => p.$id === postId);
                     if (idx !== -1) {
-                        myPosts[idx] = { ...myPosts[idx], ...postData };
+                        myPosts[idx] = { ...myPosts[idx], ...updatePayload };
                     }
                 } else {
                     const newStory = await databases.createDocument(
@@ -395,7 +488,7 @@ async function attachEventListeners(studentDoc, currentUser) {
                             ...postData,
                             students: studentDoc.$id,
                             isAccepted: false,
-                            image_bucket: null
+                            image_bucket: imageBucketId
                         }
                     );
                     myPosts.unshift(newStory);

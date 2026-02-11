@@ -87,12 +87,14 @@ function getEventsHTML() {
     <div class="events-view-container container-fluid py-4 px-md-5">
         <header class="row align-items-center mb-5 gy-4">
             <div class="col-12 col-lg-7">
-                <h1 class="display-6 fw-bold text-dark mb-1">Events</h1>
-                <p class="text-muted mb-0">Manage and browse upcoming community activities.</p>
+                <div class="officer-page-header mb-0">
+                    <h1 class="page-title mb-1">Events</h1>
+                    <p class="page-subtitle mb-0">Manage and browse upcoming community activities.</p>
+                </div>
             </div>
             <div class="col-12 col-lg-5">
-                <div class="input-group shadow-sm rounded-3 overflow-hidden border-0">
-                    <span class="input-group-text bg-white border-0 ps-3"><img src="${search}" width="18" style="opacity:0.4"></span>
+                <div class="officer-search-bar d-flex align-items-center">
+                    <span class="input-group-text bg-transparent border-0 ps-3"><img src="${search}" width="18" style="opacity:0.4"></span>
                     <input type="search" id="eventSearchInput" class="form-control border-0 py-2 ps-2" placeholder="Search events...">
                 </div>
             </div>
@@ -219,11 +221,25 @@ function renderEventsToContainer(events, container, userLookup, currentUserId) {
     }
 }
 
-function attachEventListeners(currentUser, userLookup) {
+function attachEventListeners(currentUser, userLookup, initialEvents) {
     const currentUserId = currentUser.$id;
-    const addEventModal = new Modal(document.getElementById('addEventModal'));
-    const editEventModal = new Modal(document.getElementById('editEventModal'));
-    const attendanceModal = new Modal(document.getElementById('attendanceModal'));
+    const addEventEl = document.getElementById('addEventModal');
+    const editEventEl = document.getElementById('editEventModal');
+    const attendanceEl = document.getElementById('attendanceModal');
+    const addEventModal = new Modal(addEventEl);
+    const editEventModal = new Modal(editEventEl);
+    const attendanceModal = new Modal(attendanceEl);
+
+    // Fix aria-hidden focus issue: blur active element before modal hides
+    [addEventEl, editEventEl, attendanceEl].forEach(el => {
+        if (el) {
+            el.addEventListener('hide.bs.modal', () => {
+                if (el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            });
+        }
+    });
 
     const eventsViewContainer = document.querySelector('.events-view-container');
     const searchInput = document.getElementById('eventSearchInput');
@@ -249,7 +265,16 @@ function attachEventListeners(currentUser, userLookup) {
     // Pre-fetch students for attendance search
     api.users.listStudents().then(res => { allStudentsCache = res.documents; });
 
-    loadAllEvents();
+    // Use prefetched events when available to avoid redundant fetch
+    if (initialEvents && initialEvents.length > 0) {
+        allEventsCache = initialEvents;
+        const wrapper = document.getElementById('events-list-wrapper');
+        const upcoming = allEventsCache.filter(e => !e.event_ended);
+        const ended = allEventsCache.filter(e => e.event_ended);
+        renderEventLists(wrapper, upcoming, ended, userLookup, currentUserId);
+    } else {
+        loadAllEvents();
+    }
 
     // ATTENDANCE LOGIC
     const refreshAttendanceList = async (eventId) => {
@@ -453,6 +478,6 @@ function attachEventListeners(currentUser, userLookup) {
 export default function renderEventsView(initialEvents, user, userLookup) {
     return {
         html: getEventsHTML(),
-        afterRender: () => attachEventListeners(user, userLookup)
+        afterRender: () => attachEventListeners(user, userLookup, initialEvents)
     };
 }

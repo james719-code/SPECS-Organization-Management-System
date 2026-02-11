@@ -1,13 +1,49 @@
 @import '../shared/dashboard.scss';
 
 // =====================================================
-// OFFICER DASHBOARD - MINIMALIST THEME
+// OFFICER DASHBOARD - ENHANCED PROFESSIONAL THEME
 // =====================================================
 
-// --- SIDEBAR (Minimal Light) ---
+// --- CSS CUSTOM PROPERTIES (Runtime theming) ---
+:root {
+  --officer-sidebar-bg: #{$white};
+  --officer-content-bg: #{$gray-100};
+  --officer-card-bg: #{$white};
+  --officer-border-color: #{$gray-200};
+  --officer-text-primary: #{$gray-800};
+  --officer-text-secondary: #{$gray-500};
+  --officer-hover-bg: #{$gray-50};
+  --officer-accent: #{$primary};
+  --officer-accent-soft: rgba(#{red($primary)}, #{green($primary)}, #{blue($primary)}, 0.08);
+}
+
+// --- GLOBAL TRANSITIONS ---
+.officer-dashboard * {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
+
+// --- PAGE FADE-IN ANIMATION ---
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.35s ease-out both;
+}
+
+// --- SIDEBAR (Refined Light Theme) ---
 #sidebar {
-  background-color: $white !important;
-  border-right: 1px solid $gray-200;
+  background-color: var(--officer-sidebar-bg) !important;
+  border-right: 1px solid var(--officer-border-color);
   
   // GPU acceleration to prevent glitching on mobile
   -webkit-backface-visibility: hidden;
@@ -15,36 +51,118 @@
   -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
 
+  // Sidebar header/branding area
+  .sidebar-header {
+    padding: $space-5 $space-4;
+    border-bottom: 1px solid var(--officer-border-color);
+    
+    .sidebar-brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: $primary;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: $space-2;
+    }
+    
+    .sidebar-subtitle {
+      font-size: 0.7rem;
+      color: var(--officer-text-secondary);
+      margin-top: $space-1;
+      letter-spacing: 0.3px;
+    }
+  }
+  
+  // Navigation section label
+  .nav-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $gray-400;
+    padding: $space-4 $space-4 $space-2;
+    margin: 0;
+  }
+
   .nav-link {
-    color: $gray-600;
-    border-radius: 6px;
-    margin-bottom: 0.15rem;
-    padding: 0.65rem 0.85rem;
+    color: var(--officer-text-secondary);
+    border-radius: $radius-md;
+    margin: 0 $space-2 $space-1;
+    padding: $space-3 $space-4;
     font-weight: 500;
     font-size: 0.875rem;
+    transition: all $transition-base;
+    display: flex;
+    align-items: center;
+    gap: $space-3;
 
     &:hover {
-      background-color: $gray-100;
-      color: $gray-800;
+      background-color: var(--officer-hover-bg);
+      color: var(--officer-text-primary);
+      transform: translateX(2px);
     }
 
     &.active {
-      background-color: rgba($primary, 0.1);
-      color: $primary;
+      background-color: $primary;
+      color: $white;
+      box-shadow: $shadow-primary;
       
       img {
-        filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);
+        filter: brightness(0) invert(1);
       }
     }
 
     img {
+      width: 18px;
+      height: 18px;
+      opacity: 0.65;
+      transition: opacity $transition-fast;
       position: relative;
       top: -1px;
-      opacity: 0.7;
     }
     
     &:hover img {
-      opacity: 1;
+      opacity: 0.9;
+    }
+  }
+  
+  // User profile area at bottom
+  .sidebar-user-area {
+    border-top: 1px solid var(--officer-border-color);
+    padding: $space-3 $space-4;
+    
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: $radius-full;
+      background: rgba($primary, 0.1);
+      color: $primary;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .user-info {
+      min-width: 0;
+      
+      .user-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--officer-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      .user-role {
+        font-size: 0.7rem;
+        color: var(--officer-text-secondary);
+        letter-spacing: 0.3px;
+      }
     }
   }
 }
@@ -53,7 +171,7 @@
 @include media-breakpoint-down(lg) {
   #sidebar {
     z-index: 1055 !important;
-    width: 260px !important;
+    width: 280px !important;
     max-width: 85vw;
     
     // GPU acceleration for smooth animations
@@ -87,29 +205,109 @@
   }
 }
 
-// --- MAIN CONTENT ---
-#dashboard-content {
-  background-color: $gray-100;
-  min-height: 100vh;
+// --- MOBILE HEADER BAR ---
+.officer-mobile-header {
+  background-color: $white;
+  border-bottom: 1px solid var(--officer-border-color);
+  padding: $space-3 $space-4;
+  
+  .mobile-brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: $primary;
+  }
 }
 
-// --- CARDS ---
+// --- MAIN CONTENT ---
+#dashboard-content {
+  background-color: var(--officer-content-bg);
+  min-height: 100vh;
+  padding: $space-5;
+  
+  @include media-breakpoint-up(lg) {
+    padding: $space-6;
+  }
+}
+
+// --- OFFICER PAGE HEADER (Consistent across views) ---
+.officer-page-header {
+  margin-bottom: $space-5;
+  
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: $primary;
+    margin-bottom: $space-1;
+  }
+  
+  .page-subtitle {
+    font-size: 0.875rem;
+    color: var(--officer-text-secondary);
+    margin: 0;
+  }
+}
+
+// --- CARDS (Enhanced) ---
 .card {
-  border: 1px solid $gray-200;
-  border-radius: 8px;
-  box-shadow: none;
+  border: 1px solid var(--officer-border-color);
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  background-color: var(--officer-card-bg);
+  transition: all $transition-bounce;
   
   &:hover {
     border-color: $gray-300;
   }
 }
 
-// --- TABLES ---
-.table-responsive {
-  border-radius: 8px;
+// --- HOVER LIFT EFFECT ---
+.hover-lift {
+  transition: all $transition-bounce;
+  
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: $shadow-lg;
+    border-color: $gray-300;
+  }
+}
+
+// --- STAT CARDS ---
+.officer-stat-card {
+  border: 1px solid var(--officer-border-color);
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  transition: all $transition-bounce;
   overflow: hidden;
-  border: 1px solid $gray-200;
-  background-color: $white;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, $primary, $primary-light);
+    opacity: 0;
+    transition: opacity $transition-base;
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+    
+    &::before {
+      opacity: 1;
+    }
+  }
+}
+
+// --- TABLES (Enhanced) ---
+.table-responsive {
+  border-radius: $radius-lg;
+  overflow: hidden;
+  border: 1px solid var(--officer-border-color);
+  background-color: var(--officer-card-bg);
   
   table {
     margin-bottom: 0;
@@ -122,7 +320,7 @@
       font-size: 0.7rem;
       letter-spacing: 0.3px;
       padding: 0.85rem 1rem;
-      border-bottom: 1px solid $gray-200;
+      border-bottom: 1px solid var(--officer-border-color);
     }
     
     tbody td {
@@ -136,38 +334,158 @@
       border-bottom: none;
     }
     
-    tbody tr:hover {
-      background-color: $gray-50;
+    tbody tr {
+      transition: background-color $transition-fast;
+      
+      &:hover {
+        background-color: $gray-50;
+      }
     }
   }
 }
 
-// --- FORMS ---
+// --- FORMS (Enhanced) ---
 .form-control,
 .form-select {
-  border: 1px solid $gray-200;
-  border-radius: 6px;
+  border: 1px solid var(--officer-border-color);
+  border-radius: $radius-md;
+  transition: all $transition-fast;
   
   &:focus {
     border-color: $primary;
-    box-shadow: 0 0 0 2px rgba($primary, 0.1);
+    box-shadow: 0 0 0 3px rgba($primary, 0.1);
   }
 }
 
-// --- BADGES ---
+// --- BADGES (Enhanced) ---
 .badge {
   font-weight: 600;
   padding: 0.35rem 0.6rem;
-  border-radius: 4px;
+  border-radius: $radius-md;
 }
 
-// --- EMPTY STATES ---
+// --- EMPTY STATES (Enhanced) ---
 .empty-state {
-  padding: 3rem 2rem;
+  padding: 4rem 2rem;
   text-align: center;
+  background: var(--officer-card-bg);
+  border: 1px dashed $gray-300;
+  border-radius: $radius-lg;
+  
+  .empty-state-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: $radius-full;
+    background: $gray-100;
+    margin: 0 auto $space-4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    img {
+      width: 40px;
+      opacity: 0.25;
+    }
+  }
+  
+  h4 {
+    font-weight: 700;
+    color: $gray-700;
+    margin-bottom: $space-2;
+  }
+  
+  p {
+    color: $gray-500;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+}
+
+// --- FAB BUTTON (Enhanced) ---
+.officer-fab {
+  width: 56px;
+  height: 56px;
+  border-radius: $radius-full;
+  box-shadow: $shadow-lg, $shadow-primary;
+  border: none;
+  background: $primary;
+  color: $white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-bounce;
+  
+  &:hover {
+    transform: scale(1.08);
+    box-shadow: 0 8px 30px rgba($primary, 0.35);
+    background: $primary-dark;
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  img {
+    width: 1.4rem;
+    filter: invert(1);
+  }
+}
+
+// --- SEARCH BAR (Enhanced) ---
+.officer-search-bar {
   background: $white;
-  border: 1px solid $gray-200;
-  border-radius: 8px;
+  border: 1px solid var(--officer-border-color);
+  border-radius: $radius-lg;
+  overflow: hidden;
+  transition: all $transition-base;
+  
+  &:focus-within {
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba($primary, 0.08);
+  }
+  
+  .input-group-text {
+    background: transparent;
+    border: none;
+  }
+  
+  .form-control {
+    border: none;
+    box-shadow: none;
+    
+    &:focus {
+      box-shadow: none;
+    }
+  }
+}
+
+// --- LOADING SPINNER (Enhanced) ---
+.officer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  
+  .spinner-ring {
+    width: 48px;
+    height: 48px;
+    border: 3px solid $gray-200;
+    border-top-color: $primary;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  
+  .loading-text {
+    margin-top: $space-4;
+    font-size: 0.875rem;
+    color: $gray-500;
+    font-weight: 500;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 // =====================================================
@@ -175,11 +493,25 @@
 // =====================================================
 
 @include media-breakpoint-down(md) {
+  // --- MOBILE CONTENT PADDING ---
+  #dashboard-content {
+    padding: $space-4 !important;
+  }
+  
   // --- MOBILE HEADER ADJUSTMENTS ---
   .student-directory-container,
   .admin-payments-container,
-  .finance-container {
+  .finance-container,
+  .events-view-container,
+  .files-view-container,
+  .volunteers-container,
+  .stories-container,
+  .settings-container {
+    padding: 0 !important;
+    
     header {
+      margin-bottom: $space-4 !important;
+      
       .display-6 {
         font-size: 1.25rem !important;
       }
@@ -211,7 +543,8 @@
   }
   
   // --- MOBILE SEARCH/FILTER ---
-  .input-group {
+  .input-group,
+  .officer-search-bar {
     max-width: 100% !important;
     
     .form-control {
@@ -295,6 +628,25 @@
     }
   }
   
+  // --- MOBILE STAT CARDS ---
+  .officer-stat-card .card-body {
+    padding: $space-3 !important;
+    
+    .display-6 {
+      font-size: 1.5rem !important;
+    }
+  }
+  
+  // --- MOBILE FAB ---
+  .officer-fab {
+    width: 50px !important;
+    height: 50px !important;
+    
+    img {
+      width: 1.25rem !important;
+    }
+  }
+  
   // --- MOBILE DETAIL VIEW TABLES ---
   .finance-detail-view {
     .table-responsive {
@@ -308,7 +660,8 @@
   }
   
   // --- MOBILE FAB BUTTON ---
-  .position-fixed[style*="width: 60px"] {
+  .position-fixed[style*="width: 60px"],
+  .officer-fab {
     width: 50px !important;
     height: 50px !important;
     margin: 0.85rem !important;

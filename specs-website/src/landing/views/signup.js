@@ -91,6 +91,19 @@ export function renderSignupPage() {
                                     <input id="password2" name="password2" type="password" class="form-control" placeholder="Retype your password" required />
                                 </div>
                             </div>
+
+                            <!-- Data Privacy Consent -->
+                            <div class="mt-4">
+                                <div class="p-3 rounded-3" style="background: rgba(13,107,102,0.04); border: 1px solid rgba(13,107,102,0.12);">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="privacyConsent" required>
+                                        <label class="form-check-label small" for="privacyConsent">
+                                            I agree to the <a href="#resources" target="_blank" class="fw-semibold">Privacy Policy</a> and consent to SPECS collecting my personal data (name, student ID, email, and contact information) strictly for emergency purposes, organizational coordination, and OSAS/university reporting compliance as stated in the SPECS Constitution.
+                                        </label>
+                                    </div>
+                                    <p class="text-muted mt-2 mb-0" style="font-size: 0.72rem; padding-left: 1.5rem;">Your data is restricted to authorized officers only. Unauthorized disclosure or misuse is strictly prohibited and will result in disciplinary action.</p>
+                                </div>
+                            </div>
                             
                             <div class="d-grid mt-4">
                                 <button type="submit" class="btn btn-primary btn-lg">
@@ -142,6 +155,7 @@ export function renderSignupPage() {
         if (formData.password.length < 8) { showFormError("Password must be at least 8 characters long."); return; }
         if (formData.password !== formData.password2) { showFormError("Passwords do not match."); return; }
         if (!formData.email.endsWith('@parsu.edu.ph')) { showFormError("Invalid email domain."); return; }
+        if (!document.getElementById('privacyConsent').checked) { showFormError("You must agree to the Privacy Policy to create an account."); return; }
         if (!signupForm.checkValidity()) { showFormError("Please fill out all required fields."); return; }
 
         submitButton.disabled = true;

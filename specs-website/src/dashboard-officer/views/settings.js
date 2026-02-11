@@ -1,11 +1,13 @@
-import { databases, storage, account } from "../../shared/appwrite.js";
+import { databases, storage, account, functions } from "../../shared/appwrite.js";
 import { ID } from "appwrite";
 import { showToast } from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
 import {
     DATABASE_ID,
+    COLLECTION_ID_ACCOUNTS,
     COLLECTION_ID_STUDENTS,
-    BUCKET_ID_SCHEDULES
+    BUCKET_ID_SCHEDULES,
+    FUNCTION_ID
 } from '../../shared/constants.js';
 
 import uploadIcon from 'bootstrap-icons/icons/upload.svg';
@@ -75,9 +77,9 @@ function getSettingsHTML(user, profile) {
 
     return `
     <div class="settings-container container-fluid py-4 px-md-5 animate-fade-in-up">
-        <header class="mb-5">
-            <h1 class="display-6 fw-bold text-primary mb-1">Settings</h1>
-            <p class="text-muted">Manage your profile details and security preferences.</p>
+        <header class="officer-page-header mb-5">
+            <h1 class="page-title mb-1">Settings</h1>
+            <p class="page-subtitle">Manage your profile details and security preferences.</p>
         </header>
 
         <div class="row g-4">
@@ -92,16 +94,16 @@ function getSettingsHTML(user, profile) {
                     <div class="card-body p-4">
                         <form id="editProfileForm">
                             <div class="row g-3">
-                                <div class="col-md-6">
+                                <div class="${isStudent ? 'col-md-6' : 'col-12'}">
                                     <label for="profileUsername" class="form-label small fw-bold text-secondary text-uppercase">Username</label>
                                     <input type="text" class="form-control bg-light border-0" id="profileUsername" name="username" value="${profile.username || ''}" required>
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="profileFullName" class="form-label small fw-bold text-secondary text-uppercase">Full Name</label>
-                                    <input type="text" class="form-control bg-light border-0" id="profileFullName" name="fullname" value="${profile.fullname || ''}" required>
-                                </div>
                                 
                                 ${isStudent ? `
+                                <div class="col-md-6">
+                                    <label for="profileFullName" class="form-label small fw-bold text-secondary text-uppercase">Full Name</label>
+                                    <input type="text" class="form-control bg-light border-0" id="profileFullName" name="name" value="${(profile.students && profile.students.name) || ''}" required>
+                                </div>
                                 <div class="col-md-6">
                                     <label for="profileYearLevel" class="form-label small fw-bold text-secondary text-uppercase">Year & Section</label>
                                     <select id="profileYearLevel" name="yearLevel" class="form-select bg-light border-0" required>
@@ -109,17 +111,13 @@ function getSettingsHTML(user, profile) {
                                         ${yearLevelOptions}
                                     </select>
                                 </div>
-                                ` : ''}
-                                
-                                <div class="col-md-6">
-                                    <label for="profileGender" class="form-label small fw-bold text-secondary text-uppercase">Gender</label>
-                                    <select class="form-select bg-light border-0" id="profileGender" name="gender" required>
-                                        <option value="">Select Gender</option>
-                                        <option value="male" ${profile.gender === 'male' ? 'selected' : ''}>Male</option>
-                                        <option value="female" ${profile.gender === 'female' ? 'selected' : ''}>Female</option>
-                                        <option value="other" ${profile.gender === 'other' ? 'selected' : ''}>Other</option>
-                                    </select>
+                                ` : `
+                                <div class="col-12">
+                                    <label class="form-label small fw-bold text-secondary text-uppercase">Email</label>
+                                    <input type="email" class="form-control bg-light border-0 text-muted" value="${user.email || ''}" disabled>
+                                    <div class="form-text">Email cannot be changed from here.</div>
                                 </div>
+                                `}
                             </div>
                             <div class="mt-4 pt-3 border-top d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">Save Changes</button>
@@ -232,7 +230,21 @@ function attachEventListeners(user, profile) {
     // 1. Edit Profile
     setupForm('editProfileForm', async (formData) => {
         const data = Object.fromEntries(formData.entries());
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id, data);
+
+        if (profile.type === 'student') {
+            // Students collection: map 'fullname' form field → 'name' attribute
+            const studentData = {};
+            if (data.fullname) studentData.name = data.fullname;
+            if (data.yearLevel) studentData.yearLevel = data.yearLevel;
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id, studentData);
+            // Also update username on accounts
+            if (data.username) {
+                await databases.updateDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id, { username: data.username });
+            }
+        } else {
+            // Officers/admins: accounts collection only supports 'username'
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id, { username: data.username });
+        }
     });
 
     // 2. Change Password
@@ -290,6 +302,13 @@ function attachEventListeners(user, profile) {
             delBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
 
             try {
+                if (FUNCTION_ID) {
+                    await functions.createExecution(
+                        FUNCTION_ID,
+                        JSON.stringify({ action: 'delete_account', userId: user.$id }),
+                        false
+                    );
+                }
                 await account.deleteSession('current');
                 window.location.href = '/landing/';
             } catch (err) {

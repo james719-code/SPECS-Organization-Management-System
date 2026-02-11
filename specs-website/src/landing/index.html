@@ -16,41 +16,59 @@
             align-items: center;
             height: 100vh;
             width: 100%;
-            background-color: #f4fefc;
+            background: linear-gradient(135deg, #264653 0%, #0d6b66 50%, #1a2c38 100%);
             position: fixed;
             top: 0;
             left: 0;
             z-index: 9999;
-            transition: opacity 0.3s ease-in-out;
+            transition: opacity 0.4s ease-in-out;
         }
 
         .loading-logo {
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             animation: pulse 1.5s infinite ease-in-out;
+            filter: drop-shadow(0 4px 12px rgba(244, 162, 97, 0.3));
         }
 
         .loading-text {
-            margin-top: 1.25rem;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            color: #0f172a;
+            margin-top: 1.5rem;
+            font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.8);
             font-weight: 500;
-            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .loading-bar {
+            width: 120px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+
+        .loading-bar::after {
+            content: '';
+            display: block;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, #f4a261, #e76f51);
+            border-radius: 3px;
+            animation: loadingSlide 1.2s ease-in-out infinite;
         }
 
         @keyframes pulse {
-            0% {
-                transform: scale(0.95);
-                opacity: 0.7;
-            }
-            50% {
-                transform: scale(1.05);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(0.95);
-                opacity: 0.7;
-            }
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
+        @keyframes loadingSlide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
         }
     </style>
 </head>
@@ -59,9 +77,10 @@
 <div id="app">
     <div id="loading-placeholder">
         <svg class="loading-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10.125 7.125L12 3.375L13.875 7.125M12 3.375V10.875M16.875 13.875L20.625 12L16.875 10.125M20.625 12H13.125M7.125 10.125L3.375 12L7.125 13.875M3.375 12H10.875M13.875 16.875L12 20.625L10.125 16.875M12 20.625V13.125" stroke="#0d6b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10.125 7.125L12 3.375L13.875 7.125M12 3.375V10.875M16.875 13.875L20.625 12L16.875 10.125M20.625 12H13.125M7.125 10.125L3.375 12L7.125 13.875M3.375 12H10.875M13.875 16.875L12 20.625L10.125 16.875M12 20.625V13.125" stroke="#f4a261" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p class="loading-text">Loading Website</p>
+        <p class="loading-text">Loading</p>
+        <div class="loading-bar"></div>
     </div>
 </div>
 

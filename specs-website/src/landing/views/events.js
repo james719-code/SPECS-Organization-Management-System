@@ -146,14 +146,40 @@ function initializeImageLoader() {
 
 export function renderEventsPage(container) {
     container.innerHTML = `
-        <section id="events" class="py-5 pt-7">
+        <!-- Hero Section -->
+        <section class="hero-section-gradient py-5 py-md-6 pt-7 pt-md-8">
+            <div class="container pt-3 pt-md-4 pt-lg-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10 col-xl-8 text-center">
+                        <span class="badge rounded-pill px-3 py-2 mb-3" style="background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); font-size: 0.7rem; letter-spacing: 1px; border: 1px solid rgba(255,255,255,0.15);">STAY UPDATED</span>
+                        <h1 class="display-6 fw-bold mb-3 pt-2">Our Events</h1>
+                        <p class="lead fs-6 mb-4 opacity-75 px-2">
+                            Stay updated with our latest activities, workshops, and community gatherings.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <section id="events" class="py-5" style="background: linear-gradient(180deg, #f8fafa 0%, #ffffff 100%);">
             <div class="container">
-                <h2 class="text-center fw-bold mb-3">Our Events</h2>
-                <p class="text-center text-muted mb-5">Stay updated with our latest activities and workshops.</p>
-                <h3 class="fw-bold mb-4">Upcoming Events</h3>
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #0d6b66, #2a9d8f);">
+                        <img src="${calendar}" alt="Calendar" style="width: 18px; height: 18px; filter: brightness(0) invert(1);">
+                    </div>
+                    <h3 class="fw-bold mb-0">Upcoming Events</h3>
+                </div>
                 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="upcoming-events-grid-container"></div>
-                <hr class="my-5">
-                <h3 class="fw-bold mb-4">Past Events</h3>
+                
+                <hr class="my-5" style="border-color: rgba(0,0,0,0.06);">
+                
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #6b7280, #9ca3af);">
+                        <img src="${clockHistory}" alt="Past events" style="width: 18px; height: 18px; filter: brightness(0) invert(1);">
+                    </div>
+                    <h3 class="fw-bold mb-0">Past Events</h3>
+                </div>
                 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="past-events-grid-container"></div>
             </div>
         </section>
@@ -162,8 +188,4 @@ export function renderEventsPage(container) {
     Promise.all([fetchUpcomingEvents(), fetchPastEvents()]).then(() => {
         initializeImageLoader();
     });
-    
-    // Check if smooth scrolling function is imported or available in utils, 
-    // if not we skip it or assume it's global.
-    // setupSmoothScrolling(); // Removing as it's not defined in this scope
 }

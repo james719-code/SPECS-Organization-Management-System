@@ -1,4 +1,4 @@
-import { databases, functions, account } from '../../shared/appwrite.js';
+import { databases, functions } from '../../shared/appwrite.js';
 import {
     DATABASE_ID,
     COLLECTION_ID_STUDENTS,
@@ -102,8 +102,10 @@ function getVolunteersHTML() {
         <div class="volunteers-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">Volunteer Requests</h1>
-                    <p class="text-muted mb-0">Review and manage student volunteer applications.</p>
+                    <div class="officer-page-header mb-0">
+                        <h1 class="page-title mb-1">Volunteer Requests</h1>
+                        <p class="page-subtitle mb-0">Review and manage student volunteer applications.</p>
+                    </div>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
@@ -114,8 +116,8 @@ function getVolunteersHTML() {
                             <option value="rejected">Rejected</option>
                             <option value="all">All Students</option>
                         </select>
-                        <div class="input-group shadow-sm rounded-3 overflow-hidden bg-white border-0" style="max-width: 300px;">
-                            <span class="input-group-text bg-white border-0 ps-3">
+                        <div class="officer-search-bar d-flex align-items-center" style="max-width: 300px;">
+                            <span class="input-group-text bg-transparent border-0 ps-3">
                                 <img src="${searchIcon}" width="16" style="opacity:0.4">
                             </span>
                             <input type="search" id="volunteerSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search students...">
@@ -127,7 +129,7 @@ function getVolunteersHTML() {
             <!-- Stats Row -->
             <div class="row g-4 mb-5">
                 <div class="col-6 col-lg">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card officer-stat-card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-warning mb-1" id="stat-pending">-</div>
                             <div class="text-muted small">Pending Requests</div>
@@ -135,7 +137,7 @@ function getVolunteersHTML() {
                     </div>
                 </div>
                 <div class="col-6 col-lg">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card officer-stat-card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-info mb-1" id="stat-backout">-</div>
                             <div class="text-muted small">Backout Requests</div>
@@ -143,7 +145,7 @@ function getVolunteersHTML() {
                     </div>
                 </div>
                 <div class="col-6 col-lg">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card officer-stat-card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-success mb-1" id="stat-approved">-</div>
                             <div class="text-muted small">Active Volunteers</div>
@@ -151,7 +153,7 @@ function getVolunteersHTML() {
                     </div>
                 </div>
                 <div class="col-6 col-lg">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card officer-stat-card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-danger mb-1" id="stat-rejected">-</div>
                             <div class="text-muted small">Rejected</div>
@@ -159,7 +161,7 @@ function getVolunteersHTML() {
                     </div>
                 </div>
                 <div class="col-12 col-lg">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card officer-stat-card border-0 shadow-sm h-100">
                         <div class="card-body text-center py-4">
                             <div class="display-6 fw-bold text-primary mb-1" id="stat-total">-</div>
                             <div class="text-muted small">Total Students</div>
@@ -402,6 +404,12 @@ async function attachEventListeners(currentUser, profile) {
         const rejectBackoutBtn = e.target.closest('.reject-backout-btn');
         if (rejectBackoutBtn) {
             const studentId = rejectBackoutBtn.dataset.studentId;
+
+            const confirmed = await confirmAction('Deny Leave', 'Are you sure you want to deny this volunteer\'s leave request?', 'Deny Leave', 'warning');
+            if (!confirmed) {
+                return;
+            }
+
             rejectBackoutBtn.disabled = true;
             rejectBackoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 

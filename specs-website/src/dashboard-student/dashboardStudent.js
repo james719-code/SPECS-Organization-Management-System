@@ -233,12 +233,6 @@ function setupLayout() {
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-3">
-                        <button class="btn btn-light rounded-circle p-2 position-relative shadow-sm border" data-bs-toggle="tooltip" title="Notifications">
-                            <img src="${bellIcon}" width="18" class="icon-primary-filter">
-                            <span class="position-absolute top-1 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
-                                <span class="visually-hidden">New alerts</span>
-                            </span>
-                        </button>
                         <div class="user-info d-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-light border shadow-sm">
                             <div class="user-avatar-small bg-primary text-white">${userInitial}</div>
                             <span class="fw-medium text-dark small">${userName}</span>

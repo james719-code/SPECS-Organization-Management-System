@@ -219,10 +219,10 @@ function createAccountCardHTML(account, showCheckbox = false) {
                                 </div>
                             </div>
                             <div class="dropdown ms-2">
-                                <button class="btn btn-light btn-sm rounded-circle p-1 action-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                <button class="btn btn-light btn-sm rounded-circle p-1 action-menu-btn" type="button" aria-expanded="false" title="Actions">
                                     <img src="${threeDotsVertical}" alt="Options" style="width: 1.1rem; height: 1.1rem; opacity: 0.7;">
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-3 py-2">
+                                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-3 py-2" style="display:none;">
                                     ${actions}
                                 </ul>
                             </div>
@@ -461,7 +461,7 @@ function getAccountsHTML() {
             </div>
             
             <!-- Account Cards Grid -->
-            <div id="user-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4">
+            <div id="user-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4" style="overflow: visible; padding-bottom: 6rem;">
                 ${getSkeletonCards(8)}
             </div>
             
@@ -630,15 +630,51 @@ function getAccountsHTML() {
             /* Account Card Styles */
             .account-card {
                 border-radius: 16px;
-                overflow: hidden;
+                overflow: visible;
                 transition: all 0.25s ease;
                 background: white;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.04);
                 position: relative;
             }
+            .account-card .card-body {
+                border-radius: 0 0 16px 16px;
+                overflow: hidden;
+            }
+            .account-card .card-accent {
+                border-radius: 16px 16px 0 0;
+            }
             .account-card:hover {
                 transform: translateY(-4px);
                 box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+            }
+            /* Ensure dropdown menus are not clipped */
+            .account-card .dropdown-menu {
+                z-index: 1050;
+            }
+            
+            /* Teleported dropdown menu styles */
+            .dropdown-menu-teleported {
+                box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 10px rgba(0,0,0,0.08);
+                border: none;
+                border-radius: 12px;
+                padding: 0.5rem 0;
+                background: white;
+                animation: dropdownFadeIn 0.15s ease;
+            }
+            .dropdown-menu-teleported .dropdown-item {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+                transition: background 0.15s ease;
+            }
+            .dropdown-menu-teleported .dropdown-item:hover {
+                background: #f0f4f8;
+            }
+            .dropdown-menu-teleported .dropdown-item.text-danger:hover {
+                background: #fef2f2;
+            }
+            @keyframes dropdownFadeIn {
+                from { opacity: 0; transform: translateY(-4px); }
+                to { opacity: 1; transform: translateY(0); }
             }
             .account-card.deactivated {
                 opacity: 0.7;
@@ -1231,7 +1267,112 @@ async function attachAccountsListeners() {
         // Render pagination
         renderPagination(filtered.length, page);
 
-        document.querySelectorAll('.dropdown-toggle').forEach(dd => new Dropdown(dd));
+        // Initialize card-level dropdowns — teleport menus to body so they escape
+        // the scrollable container's overflow clipping
+        const scrollContainer = document.querySelector('.flex-grow-1[style*="overflow-y"]');
+        let activeMenuCleanup = null; // stores cleanup function for currently open menu
+
+        function closeActiveMenu() {
+            if (activeMenuCleanup) {
+                activeMenuCleanup();
+                activeMenuCleanup = null;
+            }
+        }
+
+        document.querySelectorAll('.account-card .action-menu-btn').forEach(btn => {
+            const menu = btn.nextElementSibling; // the <ul> dropdown-menu
+            if (!menu) return;
+            const originalParent = menu.parentNode;
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                // If this menu is already open, close it
+                if (menu.classList.contains('show')) {
+                    closeActiveMenu();
+                    return;
+                }
+
+                // Close any other open menu first
+                closeActiveMenu();
+
+                // Move the actual menu element to body
+                menu._originalParent = originalParent;
+                document.body.appendChild(menu);
+
+                // Position relative to button
+                const rect = btn.getBoundingClientRect();
+                const menuWidth = 220;
+                let left = rect.right - menuWidth;
+                let top = rect.bottom + 4;
+
+                menu.style.cssText = `
+                    position: fixed;
+                    z-index: 9999;
+                    min-width: ${menuWidth}px;
+                    display: block;
+                    opacity: 0;
+                `;
+                menu.classList.add('show', 'dropdown-menu-teleported');
+
+                const menuHeight = menu.offsetHeight;
+                const viewportH = window.innerHeight;
+                if (top + menuHeight > viewportH - 8) {
+                    top = rect.top - menuHeight - 4;
+                }
+                if (left < 8) left = 8;
+                if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+
+                menu.style.left = `${left}px`;
+                menu.style.top = `${top}px`;
+                menu.style.opacity = '1';
+
+                // Cleanup function to close this menu and restore it
+                function doClose() {
+                    menu.classList.remove('show', 'dropdown-menu-teleported');
+                    menu.style.cssText = 'display:none;';
+                    if (menu.parentNode !== originalParent) {
+                        originalParent.appendChild(menu);
+                    }
+                    document.removeEventListener('click', outsideClickHandler, true);
+                    if (scrollContainer) scrollContainer.removeEventListener('scroll', scrollCloseHandler);
+                    menu.removeEventListener('click', menuItemClickHandler);
+                    activeMenuCleanup = null;
+                }
+
+                // Close on menu item click — move back first so event delegation works
+                const menuItemClickHandler = (ev) => {
+                    const clickedItem = ev.target.closest('.dropdown-item');
+                    if (clickedItem) {
+                        // Move menu back and dispatch click on the original item
+                        const docid = clickedItem.dataset?.docid;
+                        const actionClasses = [...clickedItem.classList].filter(c => c.endsWith('-btn'));
+                        doClose();
+
+                        if (docid && actionClasses.length > 0) {
+                            const originalItem = originalParent.querySelector(`.${actionClasses[0]}[data-docid="${docid}"]`);
+                            if (originalItem) originalItem.click();
+                        }
+                    }
+                };
+                menu.addEventListener('click', menuItemClickHandler);
+
+                const outsideClickHandler = (ev) => {
+                    if (!menu.contains(ev.target) && ev.target !== btn && !btn.contains(ev.target)) {
+                        doClose();
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', outsideClickHandler, true), 0);
+
+                const scrollCloseHandler = () => doClose();
+                if (scrollContainer) scrollContainer.addEventListener('scroll', scrollCloseHandler, { once: true });
+
+                activeMenuCleanup = doClose;
+            });
+        });
+
+        // Initialize other dropdowns normally (e.g. sort dropdown in header)
+        document.querySelectorAll('.search-actions-bar .dropdown-toggle').forEach(dd => new Dropdown(dd));
 
         // Restore checkbox states if in bulk mode
         if (bulkModeActive) {
@@ -1682,7 +1823,13 @@ async function attachAccountsListeners() {
 
         if (deleteBtn) {
             e.preventDefault();
-            if (!await confirmAction('Delete User', 'This will permanently delete this user\'s profile. This cannot be undone.', 'Delete', 'danger')) return;
+            if (!await confirmAction('Delete User', 'This will permanently delete this user\'s account and profile. This cannot be undone.', 'Delete', 'danger')) return;
+            
+            if (!FUNCTION_ID) {
+                toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
+                console.error('FUNCTION_ID is undefined. Check your .env file.');
+                return;
+            }
             
             const docId = deleteBtn.dataset.docid;
             const card = deleteBtn.closest('.col');
@@ -1691,7 +1838,12 @@ async function attachAccountsListeners() {
             deleteBtn.classList.add('disabled');
             
             try {
-                await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, docId);
+                // Delete auth account via server function
+                await functions.createExecution(
+                    FUNCTION_ID,
+                    JSON.stringify({ action: 'delete_account', userId: docId, requestingUserId: currentUser?.$id }),
+                    false
+                );
                 
                 // Animate card removal
                 if (card) {
@@ -1710,11 +1862,11 @@ async function attachAccountsListeners() {
                     renderUserList(allAccounts, currentPage);
                 }
                 
-                toast.success('User profile deleted successfully');
+                toast.success('User account and profile deleted successfully');
                 logActivity('account_deleted', 'Deleted a user account');
             } catch (error) {
                 console.error('Failed to delete user:', error);
-                toast.error('Failed to delete user profile: ' + error.message);
+                toast.error('Failed to delete user account: ' + error.message);
                 deleteBtn.innerHTML = originalHTML;
                 deleteBtn.classList.remove('disabled');
             }

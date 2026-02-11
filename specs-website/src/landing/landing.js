@@ -97,11 +97,14 @@ function router() {
             initializeLayout();
         }
         document.getElementById('main-content').innerHTML = `
-            <div class="container text-center py-5" style="padding-top: 6rem !important; padding-bottom: 6rem !important;">
-                <h1 class="display-1 fw-bold">404</h1>
-                <h2 class="fw-semibold">Page Not Found</h2>
-                <p class="lead text-muted">Sorry, the page you are looking for does not exist.</p>
-                <a href="#home" class="btn btn-primary mt-3">Go to Homepage</a>
+            <div class="container text-center py-5" style="padding-top: 8rem !important; padding-bottom: 8rem !important;">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-4" style="width: 80px; height: 80px; background: rgba(13,107,102,0.06);">
+                    <span class="display-4 fw-bold" style="color: #0d6b66;">?</span>
+                </div>
+                <h1 class="display-1 fw-bold" style="color: #264653; letter-spacing: -2px;">404</h1>
+                <h2 class="fw-semibold text-dark">Page Not Found</h2>
+                <p class="lead text-muted mb-4">Sorry, the page you are looking for does not exist.</p>
+                <a href="#home" class="btn btn-primary mt-3 rounded-pill px-5 fw-bold" style="background: linear-gradient(135deg, #0d6b66, #2a9d8f); border: none;">Go to Homepage</a>
             </div>
         `;
         updateActiveNavLink('');

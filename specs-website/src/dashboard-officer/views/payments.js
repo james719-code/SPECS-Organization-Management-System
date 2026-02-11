@@ -5,26 +5,105 @@ import { createStudentPaymentCardHTML } from '../../shared/components/paymentCar
 import { showToast } from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
 
-import trashIcon from 'bootstrap-icons/icons/trash.svg';
-import personCircleIcon from 'bootstrap-icons/icons/person-circle.svg';
 import plusLgIcon from 'bootstrap-icons/icons/plus-lg.svg';
 import arrowLeftIcon from 'bootstrap-icons/icons/arrow-left.svg';
 import threeDotsIcon from 'bootstrap-icons/icons/three-dots.svg';
-import checkCircleFillIcon from 'bootstrap-icons/icons/check-circle-fill.svg';
-import pencilFillIcon from 'bootstrap-icons/icons/pencil-fill.svg';
-import trashFillIcon from 'bootstrap-icons/icons/trash-fill.svg';
 import eraserIcon from 'bootstrap-icons/icons/eraser.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import peopleIcon from 'bootstrap-icons/icons/people.svg';
-import personXIcon from 'bootstrap-icons/icons/person-x.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
-import wallet2Icon from 'bootstrap-icons/icons/wallet2.svg';
 
 let allStudents = [];
 let allPayments = [];
 let events = [];
 let currentStudent = null;
 let addPaymentModalInstance, editPaymentModalInstance;
+
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+
+/** Debounce helper – returns a wrapper that delays `fn` by `ms` */
+function debounce(fn, ms = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), ms);
+    };
+}
+
+/** Resolve a human-readable name for what a payment is "for" */
+function resolvePaymentForName(payment) {
+    if (payment.is_event && payment.events) {
+        if (payment.events.event_name) return payment.events.event_name;
+        const evId = payment.events.$id || payment.events;
+        const ev = events.find(e => e.$id === evId);
+        return ev ? ev.event_name : 'Linked Event';
+    }
+    return payment.activity || '-';
+}
+
+/** Build a sanitised JSON string safe for embedding in data-attributes */
+function safePaymentData(payment) {
+    return JSON.stringify(payment).replace(/'/g, "\\'");
+}
+
+// ---------------------------------------------------------------------------
+// Summary cards (overview statistics)
+// ---------------------------------------------------------------------------
+
+function getPaymentSummaryHTML() {
+    const totalStudents = allStudents.length;
+    const totalPaid = allPayments.filter(p => p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const totalOutstanding = allPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const totalPayments = allPayments.length;
+    const paidCount = allPayments.filter(p => p.is_paid).length;
+    const completionRate = totalPayments > 0 ? Math.round((paidCount / totalPayments) * 100) : 0;
+
+    return `
+        <div class="row g-3 mb-4" id="paymentSummaryCards">
+            <div class="col-6 col-lg-3">
+                <div class="card officer-stat-card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">STUDENTS</div>
+                        <div class="h4 fw-bold text-dark mb-0">${totalStudents}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card officer-stat-card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">OUTSTANDING</div>
+                        <div class="h4 fw-bold text-danger mb-0">${formatCurrency(totalOutstanding)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card officer-stat-card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">COLLECTED</div>
+                        <div class="h4 fw-bold text-success mb-0">${formatCurrency(totalPaid)}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card officer-stat-card border-0 shadow-sm h-100">
+                    <div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">COMPLETION</div>
+                        <div class="h4 fw-bold text-primary mb-0">${completionRate}%</div>
+                        <div class="progress mt-1" style="height: 4px;">
+                            <div class="progress-bar bg-primary" style="width: ${completionRate}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ---------------------------------------------------------------------------
+// Main list view
+// ---------------------------------------------------------------------------
 
 function getInitialPaymentViewHTML() {
     const eventOptions = events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('');
@@ -33,13 +112,15 @@ function getInitialPaymentViewHTML() {
         <div class="admin-payments-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">Student Payments</h1>
-                    <p class="text-muted mb-0">Track dues, collect payments, and manage records.</p>
+                    <div class="officer-page-header mb-0">
+                        <h1 class="page-title mb-1">Student Payments</h1>
+                        <p class="page-subtitle mb-0">Track dues, collect payments, and manage records.</p>
+                    </div>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
-                        <div class="input-group shadow-sm rounded-3 overflow-hidden bg-white border-0" style="max-width: 300px;">
-                            <span class="input-group-text bg-white border-0 ps-3">
+                        <div class="officer-search-bar d-flex align-items-center" style="max-width: 300px;">
+                            <span class="input-group-text bg-transparent border-0 ps-3">
                                 <img src="${searchIcon}" width="16" style="opacity:0.4">
                             </span>
                             <input type="search" id="studentSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search student...">
@@ -47,6 +128,8 @@ function getInitialPaymentViewHTML() {
                     </div>
                 </div>
             </header>
+
+            ${getPaymentSummaryHTML()}
 
             <div id="student-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
                 </div>
@@ -61,7 +144,7 @@ function getInitialPaymentViewHTML() {
             <div class="modal-body p-4">
                 <div class="mb-3"><label class="form-label small fw-bold text-muted">ITEM NAME</label><input type="text" id="itemName" class="form-control" required placeholder="e.g. Membership Fee"></div>
                 <div class="row g-3 mb-3">
-                    <div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="price" class="form-control" min="0" step="0.01" required></div>
+                    <div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="price" class="form-control" min="0.01" step="0.01" required></div>
                     <div class="col-5"><label class="form-label small fw-bold text-muted">QTY</label><input type="number" id="quantity" class="form-control" value="1" min="1" required></div>
                 </div>
                 
@@ -71,7 +154,6 @@ function getInitialPaymentViewHTML() {
                 </div>
 
                 <div id="activity-group" class="mb-3"><label class="form-label small fw-bold text-muted">ACTIVITY NAME</label><input type="text" id="activityName" class="form-control" placeholder="e.g. 1st Semester Collection"></div>
-                <!-- UPDATED: Select value is Event ID now -->
                 <div id="event-group" class="mb-3 d-none"><label class="form-label small fw-bold text-muted">SELECT EVENT</label><select id="eventId" class="form-select">${eventOptions}</select></div>
                 
                 <hr class="my-4 text-muted opacity-25">
@@ -96,6 +178,7 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
     const pending = paymentsForStudent.filter(p => !p.is_paid);
     const paid = paymentsForStudent.filter(p => p.is_paid);
     const totalDue = pending.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+    const totalPaid = paid.reduce((sum, p) => sum + (p.price * p.quantity), 0);
     const eventOptions = events.map(event => `<option value="${event.$id}">${event.event_name}</option>`).join('');
 
     const studentData = student.students || {};
@@ -103,15 +186,8 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
 
     // Helper to generate mobile card for payment
     const createMobilePaymentCard = (p, isPending = true) => {
-        const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
-        let forName = p.activity;
-        if (p.is_event && p.events) {
-            if (p.events.event_name) forName = p.events.event_name;
-            else {
-                const ev = events.find(e => e.$id === p.events || e.$id === p.events.$id);
-                forName = ev ? ev.event_name : 'Linked Event';
-            }
-        }
+        const paymentData = safePaymentData(p);
+        const forName = resolvePaymentForName(p);
 
         return `
             <div class="mobile-payment-item">
@@ -122,7 +198,7 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                 <div class="item-details">
                     <div class="detail-row">
                         <span class="label">For</span>
-                        <span class="value">${forName || '-'}</span>
+                        <span class="value">${forName}</span>
                     </div>
                     <div class="detail-row">
                         <span class="label">Status</span>
@@ -160,6 +236,24 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                 </div>
             </div>
 
+            <!-- Student Summary -->
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm"><div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">PENDING</div>
+                        <div class="h5 fw-bold text-danger mb-0">${formatCurrency(totalDue)}</div>
+                        <small class="text-muted">${pending.length} item${pending.length !== 1 ? 's' : ''}</small>
+                    </div></div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm"><div class="card-body p-3">
+                        <div class="text-muted small fw-bold mb-1">PAID</div>
+                        <div class="h5 fw-bold text-success mb-0">${formatCurrency(totalPaid)}</div>
+                        <small class="text-muted">${paid.length} item${paid.length !== 1 ? 's' : ''}</small>
+                    </div></div>
+                </div>
+            </div>
+
             <!-- Pending Payments Section -->
             <div class="card border-0 shadow-sm mb-4 overflow-hidden">
                 <div class="card-header bg-warning-subtle border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -172,19 +266,12 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="bg-light text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Actions</th></tr></thead>
                         <tbody>${pending.length > 0 ? pending.map(p => {
-        const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
-        let forName = p.activity;
-        if (p.is_event && p.events) {
-            if (p.events.event_name) forName = p.events.event_name;
-            else {
-                const ev = events.find(e => e.$id === p.events || e.$id === p.events.$id);
-                forName = ev ? ev.event_name : 'Linked Event';
-            }
-        }
+        const paymentData = safePaymentData(p);
+        const forName = resolvePaymentForName(p);
 
         return `<tr>
                                 <td class="ps-4 fw-medium text-dark">${p.item_name}</td>
-                                <td class="text-muted small">${forName || '-'}</td>
+                                <td class="text-muted small">${forName}</td>
                                 <td class="text-end fw-bold text-dark">${formatCurrency(p.price * p.quantity)}</td>
                                 <td class="text-end pe-4">
                                     <div class="dropdown">
@@ -222,12 +309,8 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="bg-white text-secondary small text-uppercase"><tr><th class="ps-4 py-3">Item</th><th class="py-3">For</th><th class="text-end py-3">Total</th><th class="text-end pe-4 py-3">Status</th></tr></thead>
                         <tbody>${paid.length > 0 ? paid.map(p => {
-                let forName = p.activity;
-                if (p.is_event && p.events) {
-                    const ev = events.find(e => e.$id === p.events || e.$id === p.events.$id);
-                    forName = ev ? ev.event_name : 'Linked Event';
-                }
-                return `<tr><td class="ps-4 text-muted">${p.item_name}</td><td class="text-muted small">${forName || '-'}</td><td class="text-end text-muted">${formatCurrency(p.price * p.quantity)}</td><td class="text-end pe-4"><span class="badge bg-success-subtle text-success rounded-pill px-2">Paid</span></td></tr>`;
+                const forName = resolvePaymentForName(p);
+                return `<tr><td class="ps-4 text-muted">${p.item_name}</td><td class="text-muted small">${forName}</td><td class="text-end text-muted">${formatCurrency(p.price * p.quantity)}</td><td class="text-end pe-4"><span class="badge bg-success-subtle text-success rounded-pill px-2">Paid</span></td></tr>`;
             }).join('') : '<tr><td colspan="4" class="text-center text-muted py-5 small">No payment history yet.</td></tr>'}</tbody>
                     </table>
                 </div>
@@ -246,7 +329,7 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
             <div class="modal-body p-4">
                 <input type="hidden" id="editPaymentId">
                 <div class="mb-3"><label class="form-label small fw-bold text-muted">ITEM NAME</label><input type="text" id="editItemName" class="form-control" required></div>
-                <div class="row g-3 mb-3"><div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="editPrice" class="form-control" min="0" step="0.01" required></div><div class="col-5"><label class="form-label small fw-bold text-muted">QTY</label><input type="number" id="editQuantity" class="form-control" value="1" min="1" required></div></div>
+                <div class="row g-3 mb-3"><div class="col-7"><label class="form-label small fw-bold text-muted">PRICE</label><input type="number" id="editPrice" class="form-control" min="0.01" step="0.01" required></div><div class="col-5"><label class="form-label small fw-bold text-muted">QTY</label><input type="number" id="editQuantity" class="form-control" value="1" min="1" required></div></div>
                 <div class="form-check form-switch mb-3 p-3 bg-light rounded-3 border">
                     <input class="form-check-input ms-0 me-2" type="checkbox" id="editIsEventCheckbox" style="float:none;">
                     <label class="form-check-label fw-medium" for="editIsEventCheckbox">Link to Event</label>
@@ -301,6 +384,15 @@ const renderStudentCards = (studentsToRender, reason = 'initial') => {
     }
 };
 
+/** Update just the summary cards without re-rendering the whole view */
+function refreshSummaryCards() {
+    const existing = document.getElementById('paymentSummaryCards');
+    if (!existing) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = getPaymentSummaryHTML();
+    existing.replaceWith(tmp.firstElementChild);
+}
+
 const renderInitialView = () => {
     currentStudent = null;
     const wrapper = document.querySelector('.admin-payments-container-wrapper');
@@ -326,6 +418,7 @@ const refreshStudentDetailsView = async (accountId) => {
         initializeModals();
     } catch (error) {
         console.error(error);
+        showToast('Failed to load student details', 'error');
         renderInitialView();
     }
 };
@@ -335,9 +428,44 @@ function initializeModals() {
     const editModalEl = document.getElementById('editPaymentModal');
     if (addModalEl && !Modal.getInstance(addModalEl)) addPaymentModalInstance = new Modal(addModalEl);
     if (editModalEl && !Modal.getInstance(editModalEl)) editPaymentModalInstance = new Modal(editModalEl);
+
+    // Fix aria-hidden focus issue: blur active element before modal hides
+    [addModalEl, editModalEl].forEach(el => {
+        if (el) {
+            el.addEventListener('hide.bs.modal', () => {
+                if (el.contains(document.activeElement)) {
+                    document.activeElement.blur();
+                }
+            });
+        }
+    });
 }
 
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+function validatePaymentForm(data) {
+    const errors = [];
+    if (!data.item_name || !data.item_name.trim()) errors.push('Item name is required.');
+    if (typeof data.price !== 'number' || isNaN(data.price) || data.price <= 0) errors.push('Price must be greater than 0.');
+    if (typeof data.quantity !== 'number' || isNaN(data.quantity) || data.quantity < 1) errors.push('Quantity must be at least 1.');
+    if (!data.is_event && !data.activity?.trim()) errors.push('Activity name is required when not linked to an event.');
+    if (data.is_event && !data.events) errors.push('Please select an event.');
+    return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Main event wiring
+// ---------------------------------------------------------------------------
+
 async function attachEventListeners(currentUser, profile) {
+    // Reset module-level state to prevent stale data from previous renders
+    allStudents = [];
+    allPayments = [];
+    events = [];
+    currentStudent = null;
+
     const wrapper = document.querySelector('.admin-payments-container-wrapper');
     if (!wrapper) return;
 
@@ -345,20 +473,17 @@ async function attachEventListeners(currentUser, profile) {
     try {
         const [paymentsRes, eventsRes, accountsRes] = await Promise.all([
             api.payments.list(),
-            api.events.list(5000, false), // Check logic for order asc/desc if needed
+            api.events.list({ limit: 500, orderDesc: false }),
             api.users.listStudents()
         ]);
         allPayments = paymentsRes.documents;
-        events = eventsRes.documents.filter(e => !e.event_ended); // Filter in code or query? Query was event_ended=false. API `list` doesn't filter by `event_ended` by default.
-        // Actually api.events.list only sorts. We should probably filter.
-        // Or we can update api.events.list to accept filters. For now, filter in memory is safer or I update api.js.
-        // Let's stick to memory filter for simplicity as we already fetched.
-
+        events = eventsRes.documents.filter(e => !e.event_ended);
         allStudents = accountsRes.documents;
 
         renderInitialView();
         let selectedStudentDocId = null;
 
+        // Debounced search filters
         const applyFilters = () => {
             const searchInput = document.getElementById('studentSearchInput');
             if (!searchInput) return;
@@ -376,24 +501,63 @@ async function attachEventListeners(currentUser, profile) {
             renderStudentCards(filtered, (filtered.length === 0) ? 'filter' : 'initial');
         };
 
+        const debouncedApplyFilters = debounce(applyFilters, 250);
+        const debouncedAutocomplete = debounce((searchTerm) => {
+            const results = document.getElementById('autocomplete-results');
+            if (!results) return;
+            if (searchTerm.length < 2) { results.innerHTML = ''; return; }
+
+            const matches = allStudents.filter(s => {
+                const name = (s.students && s.students.name) ? s.students.name : s.username;
+                return name.toLowerCase().includes(searchTerm);
+            }).slice(0, 5);
+
+            results.innerHTML = matches.map(s => {
+                const name = (s.students && s.students.name) ? s.students.name : s.username;
+                const sDocId = (s.students && s.students.$id) ? s.students.$id : s.students;
+                return `<a href="#" class="list-group-item list-group-item-action" data-studentdocid="${sDocId}" data-name="${name}">${name}</a>`;
+            }).join('');
+        }, 200);
+
         const refreshDataAndRender = async () => {
             if (currentStudent) {
                 await refreshStudentDetailsView(currentStudent.$id);
             } else {
                 const paymentsRes = await api.payments.list();
                 allPayments = paymentsRes.documents;
+                refreshSummaryCards();
                 applyFilters();
             }
         };
 
         applyFilters();
 
+        // Reset selected student when add-payment modal closes
+        const addModalEl = document.getElementById('addPaymentModal');
+        if (addModalEl) {
+            addModalEl.addEventListener('hidden.bs.modal', () => {
+                selectedStudentDocId = null;
+                const nameInput = document.getElementById('studentName');
+                if (nameInput) { nameInput.value = ''; nameInput.disabled = false; nameInput.required = true; }
+                const allCb = document.getElementById('allStudentsCheckbox');
+                if (allCb) allCb.checked = false;
+                const results = document.getElementById('autocomplete-results');
+                if (results) results.innerHTML = '';
+            });
+        }
+
+        // ---------------------------------------------------------------
+        // Click delegation
+        // ---------------------------------------------------------------
         wrapper.addEventListener('click', async (e) => {
             const card = e.target.closest('.student-payment-card');
             if (card) { await refreshStudentDetailsView(card.dataset.studentId); return; }
 
             const backBtn = e.target.closest('#backToPaymentsBtn');
             if (backBtn) {
+                // Refresh global payment data so summary cards update
+                const paymentsRes = await api.payments.list();
+                allPayments = paymentsRes.documents;
                 renderInitialView();
                 applyFilters();
                 return;
@@ -431,106 +595,217 @@ async function attachEventListeners(currentUser, profile) {
                 return;
             }
 
+            // --- Mark Paid (with loading state) ---
             const paidBtn = e.target.closest('.paid-payment-btn');
             if (paidBtn) {
                 const payment = JSON.parse(paidBtn.dataset.payment.replace(/\\'/g, "'"));
                 const confirmed = await confirmAction('Mark as Paid', `Mark "${payment.item_name}" as Paid?`, 'Mark Paid', 'success');
                 if (confirmed) {
+                    paidBtn.disabled = true;
+                    paidBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
                     try {
                         const sData = currentStudent.students || {};
                         const sName = sData.name || currentStudent.username;
 
                         await api.payments.markPaid(payment, currentUser.$id, sName);
+                        showToast(`"${payment.item_name}" marked as paid`, 'success');
                         await refreshDataAndRender();
-                        showToast('Payment marked as paid', 'success');
-                    } catch (error) { showToast(`Error: ${error.message}`, 'error'); }
+                    } catch (error) {
+                        showToast(`Error: ${error.message}`, 'error');
+                        paidBtn.disabled = false;
+                        paidBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Mark Paid';
+                    }
                 }
                 return;
             }
 
+            // --- Delete (with loading state) ---
             const deleteBtn = e.target.closest('.delete-payment-btn');
             if (deleteBtn) {
-                const confirmed = await confirmAction('Delete Payment', `Delete "${deleteBtn.dataset.paymentName}"?`, 'Delete', 'danger');
+                const confirmed = await confirmAction('Delete Payment', `Delete "${deleteBtn.dataset.paymentName}"? This cannot be undone.`, 'Delete', 'danger');
                 if (confirmed) {
+                    deleteBtn.disabled = true;
                     try {
                         await api.payments.delete(deleteBtn.dataset.paymentId);
-                        await refreshDataAndRender();
                         showToast('Payment deleted', 'success');
-                    } catch (error) { showToast(`Error: ${error.message}`, 'error'); }
+                        await refreshDataAndRender();
+                    } catch (error) {
+                        showToast(`Error: ${error.message}`, 'error');
+                        deleteBtn.disabled = false;
+                    }
+                }
+                return;
+            }
+
+            // --- Clear paid records for a student ---
+            const clearBtn = e.target.closest('.clear-paid-records-btn');
+            if (clearBtn) {
+                const studentId = clearBtn.dataset.studentId;
+                const studentName = clearBtn.dataset.studentName;
+                const confirmed = await confirmAction(
+                    'Clear Paid Records',
+                    `Delete all paid payment records for "${studentName}"? This cannot be undone.`,
+                    'Clear All',
+                    'danger'
+                );
+                if (confirmed) {
+                    clearBtn.disabled = true;
+                    clearBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Clearing…';
+                    try {
+                        const studentDocId = (currentStudent.students && currentStudent.students.$id) ? currentStudent.students.$id : currentStudent.students;
+                        const paidRes = await api.payments.listForStudent(studentDocId);
+                        const paidPayments = paidRes.documents.filter(p => p.is_paid);
+
+                        if (paidPayments.length === 0) {
+                            showToast('No paid records to clear', 'info');
+                        } else {
+                            await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
+                            showToast(`Cleared ${paidPayments.length} paid record${paidPayments.length !== 1 ? 's' : ''}`, 'success');
+                        }
+                        await refreshDataAndRender();
+                    } catch (error) {
+                        showToast(`Error: ${error.message}`, 'error');
+                        clearBtn.disabled = false;
+                        clearBtn.innerHTML = '<i class="bi bi-trash me-1"></i> Clear';
+                    }
+                }
+                return;
+            }
+
+            // --- Clear student records from the card list ---
+            const clearCardBtn = e.target.closest('.clear-student-records-btn');
+            if (clearCardBtn) {
+                const accountId = clearCardBtn.dataset.studentId;
+                const studentName = clearCardBtn.dataset.studentName;
+                const confirmed = await confirmAction(
+                    'Clear Paid Records',
+                    `Delete all paid payment records for "${studentName}"?`,
+                    'Clear',
+                    'danger'
+                );
+                if (confirmed) {
+                    clearCardBtn.disabled = true;
+                    try {
+                        const acc = await api.users.getAccount(accountId);
+                        const sDocId = (acc.students && acc.students.$id) ? acc.students.$id : acc.students;
+                        const paidRes = await api.payments.listForStudent(sDocId);
+                        const paidPayments = paidRes.documents.filter(p => p.is_paid);
+                        if (paidPayments.length > 0) {
+                            await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
+                            showToast(`Cleared ${paidPayments.length} record${paidPayments.length !== 1 ? 's' : ''} for ${studentName}`, 'success');
+                        }
+                        const paymentsRes = await api.payments.list();
+                        allPayments = paymentsRes.documents;
+                        refreshSummaryCards();
+                        applyFilters();
+                    } catch (error) {
+                        showToast(`Error: ${error.message}`, 'error');
+                        clearCardBtn.disabled = false;
+                    }
                 }
             }
         });
 
+        // ---------------------------------------------------------------
+        // Input delegation (with debounce)
+        // ---------------------------------------------------------------
         wrapper.addEventListener('input', e => {
             if (e.target.id === 'studentSearchInput') {
-                applyFilters();
+                debouncedApplyFilters();
             } else if (e.target.id === 'studentName') {
-                const results = document.getElementById('autocomplete-results');
-                const searchTerm = e.target.value.toLowerCase();
-                if (searchTerm.length < 2) { results.innerHTML = ''; return; }
-
-                const matches = allStudents.filter(s => {
-                    const name = (s.students && s.students.name) ? s.students.name : s.username;
-                    return name.toLowerCase().includes(searchTerm);
-                }).slice(0, 5);
-
-                results.innerHTML = matches.map(s => {
-                    const name = (s.students && s.students.name) ? s.students.name : s.username;
-                    const sDocId = (s.students && s.students.$id) ? s.students.$id : s.students;
-                    return `<a href="#" class="list-group-item list-group-item-action" data-studentdocid="${sDocId}" data-name="${name}">${name}</a>`;
-                }).join('');
+                debouncedAutocomplete(e.target.value.toLowerCase());
             }
         });
 
+        // ---------------------------------------------------------------
+        // Form submissions
+        // ---------------------------------------------------------------
         wrapper.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.disabled = true; btn.innerHTML = 'Processing...';
+            const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const originalBtnText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing…';
+
             try {
-                if (e.target.id === 'addPaymentForm') {
+                if (form.id === 'addPaymentForm') {
                     const isForAll = document.getElementById('allStudentsCheckbox').checked;
                     const isEvent = document.getElementById('isEventCheckbox').checked;
 
                     const base = {
-                        item_name: document.getElementById('itemName').value,
+                        item_name: document.getElementById('itemName').value.trim(),
                         price: parseFloat(document.getElementById('price').value),
                         quantity: parseInt(document.getElementById('quantity').value, 10),
                         is_event: isEvent,
                         events: isEvent ? document.getElementById('eventId').value : null,
-                        activity: isEvent ? null : document.getElementById('activityName').value,
-                        is_paid: false,
-                        date_paid: new Date().toISOString()
+                        activity: isEvent ? null : document.getElementById('activityName').value.trim(),
+                        is_paid: false
                     };
 
+                    // --- Validation ---
+                    const errors = validatePaymentForm(base);
+                    if (!isForAll && !selectedStudentDocId) errors.push('Please select a student.');
+                    if (errors.length > 0) {
+                        showToast(errors[0], 'warning');
+                        return; // finally block re-enables button
+                    }
+
                     if (isForAll) {
-                        const confirmed = await confirmAction('Assign to All', `Assign to all ${allStudents.length} students?`, 'Assign All', 'primary');
-                        if (confirmed) {
-                            const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
-                            await Promise.all(ids.map(id => api.payments.create({ ...base, students: id })));
-                            showToast(`Payment assigned to ${ids.length} students`, 'success');
+                        const confirmed = await confirmAction('Assign to All', `Assign "${base.item_name}" to all ${allStudents.length} students?`, 'Assign All', 'primary');
+                        if (!confirmed) return;
+
+                        const ids = allStudents.map(s => (s.students && s.students.$id) ? s.students.$id : s.students).filter(Boolean);
+                        // Batch in chunks of 20 to avoid overwhelming the API
+                        const CHUNK = 20;
+                        let created = 0;
+                        for (let i = 0; i < ids.length; i += CHUNK) {
+                            const chunk = ids.slice(i, i + CHUNK);
+                            await Promise.all(chunk.map(id => api.payments.create({ ...base, students: id })));
+                            created += chunk.length;
+                            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${created}/${ids.length}`;
                         }
+                        showToast(`Payment assigned to ${created} students`, 'success');
                     } else {
-                        if (!selectedStudentDocId) throw new Error("Select a student.");
                         await api.payments.create({ ...base, students: selectedStudentDocId });
+                        showToast(`Payment "${base.item_name}" created`, 'success');
                     }
                     addPaymentModalInstance.hide();
-                    e.target.reset();
-                } else if (e.target.id === 'editPaymentForm') {
+                    form.reset();
+                    selectedStudentDocId = null;
+                } else if (form.id === 'editPaymentForm') {
                     const isEvent = document.getElementById('editIsEventCheckbox').checked;
-                    await api.payments.update(document.getElementById('editPaymentId').value, {
-                        item_name: document.getElementById('editItemName').value,
+                    const updateData = {
+                        item_name: document.getElementById('editItemName').value.trim(),
                         price: parseFloat(document.getElementById('editPrice').value),
                         quantity: parseInt(document.getElementById('editQuantity').value, 10),
                         is_event: isEvent,
                         events: isEvent ? document.getElementById('editEventId').value : null,
-                        activity: isEvent ? null : document.getElementById('editActivityName').value
-                    });
+                        activity: isEvent ? null : document.getElementById('editActivityName').value.trim()
+                    };
+
+                    const errors = validatePaymentForm(updateData);
+                    if (errors.length > 0) {
+                        showToast(errors[0], 'warning');
+                        return;
+                    }
+
+                    await api.payments.update(document.getElementById('editPaymentId').value, updateData);
+                    showToast('Payment updated', 'success');
                     editPaymentModalInstance.hide();
                 }
                 await refreshDataAndRender();
-            } catch (err) { showToast(err.message, 'error'); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnText;
+            }
         });
 
+        // ---------------------------------------------------------------
+        // Change delegation
+        // ---------------------------------------------------------------
         wrapper.addEventListener('change', e => {
             if (e.target.id.includes('IsEventCheckbox')) {
                 const isEdit = e.target.id.includes('edit');
@@ -548,7 +823,7 @@ async function attachEventListeners(currentUser, profile) {
 
     } catch (error) {
         console.error(error);
-        wrapper.innerHTML = `<div class="alert alert-danger">Error loading module.</div>`;
+        wrapper.innerHTML = `<div class="alert alert-danger m-4">Error loading payment module. Please try refreshing the page.</div>`;
     }
 }
 

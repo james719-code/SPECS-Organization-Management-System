@@ -342,6 +342,24 @@ function attachDetailViewListeners(user, userLookup) {
     view.addEventListener('click', async (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
+
+        // Handle mobile card actions
+        const mobileCard = btn.closest('.mobile-payment-item');
+        if (mobileCard) {
+            const { docId, collectionId } = mobileCard.dataset;
+            if (btn.classList.contains('delete-btn')) {
+                const confirmed = await confirmAction('Delete Transaction', 'Are you sure you want to permanently delete this item?', 'Delete', 'danger');
+                if (confirmed) {
+                    try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); mobileCard.remove(); showToast('Transaction deleted', 'success'); }
+                    catch (err) { showToast('Delete failed', 'error'); }
+                }
+            } else if (btn.classList.contains('edit-btn')) {
+                showToast('Please use desktop view for inline editing', 'info');
+            }
+            return;
+        }
+
+        // Handle desktop table row actions
         const row = btn.closest('tr');
         if (!row) return;
 
@@ -454,8 +472,22 @@ function attachMainListeners(currentUser, userLookup, data) {
     `;
 
     // 2. Event Handlers
-    const addModal = new Modal(document.getElementById('addTxnModal'));
-    const dateModal = new Modal(document.getElementById('dateFilterModal'));
+    const addModalEl = document.getElementById('addTxnModal');
+    const dateModalEl = document.getElementById('dateFilterModal');
+    const addModal = new Modal(addModalEl);
+    const dateModal = new Modal(dateModalEl);
+
+    // Fix aria-hidden focus issue: blur active element before modal hides
+    addModalEl.addEventListener('hide.bs.modal', () => {
+        if (addModalEl.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    });
+    dateModalEl.addEventListener('hide.bs.modal', () => {
+        if (dateModalEl.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    });
 
     // Date Filter Setup
     document.getElementById('dateFilterModal').addEventListener('show.bs.modal', () => {
@@ -563,13 +595,16 @@ export default async function renderFinanceView(userLookup, currentUser) {
         container.innerHTML = `
             <div class="finance-overview animate-fade-in-up">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 gap-3">
-                    <div><h1 class="display-6 fw-bold text-dark mb-1">Financial Overview</h1><p class="text-muted m-0">Performance summary from ${start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} to ${end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p></div>
+                    <div class="officer-page-header mb-0">
+                        <h1 class="page-title mb-1">Financial Overview</h1>
+                        <p class="page-subtitle m-0">Performance summary from ${start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} to ${end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
+                    </div>
                     <div class="d-flex gap-2">
-                        <div class="input-group shadow-sm bg-white rounded-3 border-0" style="width: 250px;">
-                            <span class="input-group-text bg-white border-0 ps-3"><img src="${searchIcon}" width="16" class="opacity-50"></span>
+                        <div class="officer-search-bar d-flex align-items-center" style="width: 250px;">
+                            <span class="input-group-text bg-transparent border-0 ps-3"><img src="${searchIcon}" width="16" class="opacity-50"></span>
                             <input type="search" id="finSearch" class="form-control border-0 shadow-none ps-2" placeholder="Search activities...">
                         </div>
-                        <button class="btn btn-light shadow-sm d-flex align-items-center justify-content-center" style="width: 42px;" data-bs-toggle="modal" data-bs-target="#dateFilterModal" title="Filter Date"><img src="${calendarRange}" width="18" class="opacity-75"></button>
+                        <button class="btn btn-light shadow-sm d-flex align-items-center justify-content-center rounded-3" style="width: 42px;" data-bs-toggle="modal" data-bs-target="#dateFilterModal" title="Filter Date"><img src="${calendarRange}" width="18" class="opacity-75"></button>
                     </div>
                 </div>
 

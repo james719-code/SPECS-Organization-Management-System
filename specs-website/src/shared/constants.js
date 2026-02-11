@@ -19,6 +19,7 @@ export const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES;
 export const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES;
 export const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES;
 export const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES;
+export const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;
 
 // Single unified function ID for all student/officer management operations
 export const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID;

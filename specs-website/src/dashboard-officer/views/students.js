@@ -6,13 +6,15 @@ import {
 } from '../../shared/constants.js';
 import { Query } from 'appwrite';
 import { showToast } from '../../shared/toast.js';
+import { confirmAction } from '../../shared/confirmModal.js';
 
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
+import xCircle from 'bootstrap-icons/icons/x-circle.svg';
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
 import envelopeIcon from 'bootstrap-icons/icons/envelope.svg';
 import mortarboardIcon from 'bootstrap-icons/icons/mortarboard.svg';
-
+import calendarIcon from 'bootstrap-icons/icons/calendar3.svg';
 
 
 function createStudentCardHTML(account) {
@@ -24,40 +26,70 @@ function createStudentCardHTML(account) {
     const name = isExpanded ? (studentData.name || account.username) : account.username;
     const email = isExpanded ? (studentData.email || 'No email') : 'No email';
     const section = isExpanded ? (studentData.section || 'No Section') : 'No Section';
+    const yearLevel = isExpanded ? studentData.yearLevel : null;
     const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const requestedDate = new Date(account.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    const acceptBtn = !isVerified
-        ? `<button class="btn btn-sm btn-outline-success w-100 mt-3 accept-btn" data-docid="${account.$id}">
-             <img src="${checkCircle}" width="14" class="me-1"> Accept Student
-           </button>`
-        : `<div class="mt-3 text-center small text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Verified</div>`;
+    const statusBadge = isVerified
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.7rem;">Verified</span>'
+        : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size: 0.7rem;">Pending</span>';
+
+    const actionButtons = !isVerified
+        ? `<div class="d-flex gap-2 mt-auto pt-3 border-top border-light">
+                <button class="btn btn-success btn-sm flex-fill d-flex align-items-center justify-content-center gap-1 accept-btn" data-docid="${account.$id}">
+                    <img src="${checkCircle}" width="14" style="filter: brightness(0) invert(1);">
+                    <span>Approve</span>
+                </button>
+                <button class="btn btn-outline-danger btn-sm flex-fill d-flex align-items-center justify-content-center gap-1 reject-btn" data-docid="${account.$id}">
+                    <img src="${xCircle}" width="14">
+                    <span>Reject</span>
+                </button>
+            </div>`
+        : `<div class="mt-auto pt-3 border-top border-light">
+                <div class="d-flex align-items-center justify-content-center gap-1 text-success small fw-semibold py-1">
+                    <img src="${checkCircle}" width="14" style="filter: invert(42%) sepia(93%) saturate(1352%) hue-rotate(87deg) brightness(119%) contrast(119%);">
+                    <span>Verified Student</span>
+                </div>
+            </div>`;
 
     return `
         <div class="col">
-            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-card group">
-                <div class="card-body p-4 position-relative">
-                    <div class="d-flex align-items-center mb-4">
-                        <div class="file-icon-wrapper bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 56px; height: 56px; font-weight: 700; font-size: 1.2rem;">
+            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-card" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-body p-0 d-flex flex-column">
+                    <!-- Header -->
+                    <div class="d-flex align-items-center gap-3 p-3 pb-0">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="width: 48px; height: 48px; font-weight: 700; font-size: 1.1rem; background: ${isVerified ? '#d1fae5' : '#fef3c7'}; color: ${isVerified ? '#059669' : '#d97706'};">
                             ${initials}
                         </div>
-                        <div style="max-width: calc(100% - 80px);">
-                            <h6 class="fw-bold text-dark mb-1 text-truncate" title="${name}">${name}</h6>
-                            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.75rem;">${section}</span>
+                        <div class="min-width-0 flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="fw-bold text-dark mb-0 text-truncate" style="font-size: 0.95rem;" title="${name}">${name}</h6>
+                                ${statusBadge}
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.7rem;">${section}</span>
                         </div>
                     </div>
                     
-                    <div class="d-flex flex-column gap-2 border-top border-light pt-3">
+                    <!-- Details -->
+                    <div class="d-flex flex-column gap-2 px-3 pt-3 pb-3">
                         <div class="d-flex align-items-center gap-2 text-secondary" title="${email}">
-                            <img src="${envelopeIcon}" width="14" style="opacity: 0.6;">
+                            <img src="${envelopeIcon}" width="13" style="opacity: 0.5; flex-shrink: 0;">
                             <span class="small text-truncate">${email}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2 text-secondary">
-                             <img src="${mortarboardIcon}" width="14" style="opacity: 0.6;">
-                            <span class="small text-truncate">${(isExpanded && studentData.yearLevel) ? 'Year ' + studentData.yearLevel : 'Year not set'}</span>
+                            <img src="${mortarboardIcon}" width="13" style="opacity: 0.5; flex-shrink: 0;">
+                            <span class="small">${yearLevel ? 'Year ' + yearLevel : 'Year not set'}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-secondary">
+                            <img src="${calendarIcon}" width="13" style="opacity: 0.5; flex-shrink: 0;">
+                            <span class="small">Requested: ${requestedDate}</span>
                         </div>
                     </div>
-                    
-                    ${acceptBtn}
+
+                    <!-- Actions -->
+                    <div class="px-3 pb-3">
+                        ${actionButtons}
+                    </div>
                 </div>
             </div>
         </div>`;
@@ -68,8 +100,10 @@ function getStudentHTML() {
         <div class="student-directory-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">Student Directory</h1>
-                    <p class="text-muted mb-0">View student records and accept pending signups.</p>
+                    <div class="officer-page-header mb-0">
+                        <h1 class="page-title mb-1">Student Directory</h1>
+                        <p class="page-subtitle mb-0">View student records and accept pending signups.</p>
+                    </div>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
@@ -78,8 +112,8 @@ function getStudentHTML() {
                             <option value="pending" selected>Pending Verification</option>
                             <option value="verified">Verified</option>
                         </select>
-                        <div class="input-group shadow-sm rounded-3 overflow-hidden bg-white border-0" style="max-width: 300px;">
-                            <span class="input-group-text bg-white border-0 ps-3">
+                        <div class="officer-search-bar d-flex align-items-center" style="max-width: 300px;">
+                            <span class="input-group-text bg-transparent border-0 ps-3">
                                 <img src="${searchIcon}" width="16" style="opacity:0.4">
                             </span>
                             <input type="search" id="studentSearchInput" class="form-control border-0 py-2 ps-2 shadow-none" placeholder="Search...">
@@ -152,7 +186,7 @@ async function attachEventListeners(currentUser, profile) {
             const res = await databases.listDocuments(
                 DATABASE_ID,
                 COLLECTION_ID_ACCOUNTS,
-                [Query.limit(100), Query.orderDesc('$createdAt')]
+                [Query.limit(5000), Query.orderDesc('$createdAt')]
             );
             allAccounts = res.documents;
             applyFilters();
@@ -192,16 +226,54 @@ async function attachEventListeners(currentUser, profile) {
                     const acc = allAccounts.find(a => a.$id === docId);
                     if (acc) acc.verified = true;
                     applyFilters();
-                    showToast('Student accepted!', 'success');
+                    showToast('Student approved!', 'success');
                 } else {
                     showToast('Verification initiated. Refresh shortly.', 'info');
                     loadData();
                 }
             } catch (err) {
                 console.error(err);
-                showToast('Error accepting student: ' + err.message, 'error');
+                showToast('Error approving student: ' + err.message, 'error');
                 acceptBtn.disabled = false;
-                acceptBtn.innerHTML = `<img src="${checkCircle}" width="14" class="me-1"> Accept Student`;
+                acceptBtn.innerHTML = `<img src="${checkCircle}" width="14" style="filter: brightness(0) invert(1);"> <span>Approve</span>`;
+            }
+        }
+
+        // Reject Button Action
+        const rejectBtn = e.target.closest('.reject-btn');
+        if (rejectBtn) {
+            const docId = rejectBtn.dataset.docid;
+
+            const confirmed = await confirmAction(
+                'Reject Student',
+                'Are you sure you want to reject this student request? This will remove their pending account.',
+                'Reject',
+                'danger'
+            );
+            if (!confirmed) return;
+
+            rejectBtn.disabled = true;
+            rejectBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                if (!FUNCTION_ID) {
+                    throw new Error('Account management function not configured.');
+                }
+
+                await functions.createExecution(
+                    FUNCTION_ID,
+                    JSON.stringify({ action: 'reject_student', userId: docId, accountDocId: docId, requestingUserId: currentUser.$id }),
+                    false
+                );
+
+                allAccounts = allAccounts.filter(a => a.$id !== docId);
+                applyFilters();
+                showToast('Student request rejected.', 'warning');
+            } catch (err) {
+                console.error(err);
+                showToast('Error rejecting student: ' + err.message, 'error');
+                rejectBtn.disabled = false;
+                rejectBtn.innerHTML = `<img src="${xCircle}" width="14"> <span>Reject</span>`;
             }
         }
     });
