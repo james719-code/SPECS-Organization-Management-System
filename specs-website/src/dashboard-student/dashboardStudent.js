@@ -143,7 +143,7 @@ function setupLayout() {
 
     // Construct Sidebar HTML (Minimal Light Theme)
     const sidebar = `
-        <div class="offcanvas-lg offcanvas-start sidebar-gradient" tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel" style="width: 260px;">
+        <div class="offcanvas-lg offcanvas-start sidebar-gradient flex-shrink-0" tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel" style="width: 260px;">
             <div class="offcanvas-header border-bottom py-3" style="border-color: #e5e7eb !important; flex-shrink: 0;">
                 <h5 class="offcanvas-title fw-bold d-flex align-items-center gap-2" id="sidebarMenuLabel">
                     <div class="logo-wrapper">
@@ -208,7 +208,7 @@ function setupLayout() {
     const mainHTML = `
         <div class="d-flex dashboard-wrapper">
             ${sidebar}
-            <div class="flex-grow-1 d-flex flex-column min-vh-100 main-content-area">
+            <div class="flex-grow-1 d-flex flex-column main-content-area">
                 <nav class="mobile-navbar d-lg-none sticky-top">
                     <div class="mobile-navbar-inner">
                         <button class="menu-toggle-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">

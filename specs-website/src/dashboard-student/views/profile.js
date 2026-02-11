@@ -27,8 +27,8 @@ const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
 function getProfileHTML() {
     return `
-        <div class="container-fluid py-4 px-md-5">
-            <header class="mb-5">
+        <div class="container-fluid py-3 px-md-4">
+            <header class="mb-3">
                 <h1 class="display-6 fw-bold text-dark mb-1">My Profile</h1>
                 <p class="text-muted mb-0">View and manage your student information.</p>
             </header>
@@ -36,7 +36,7 @@ function getProfileHTML() {
             <div class="row g-4">
                 <!-- Profile Card -->
                 <div class="col-lg-4">
-                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                         <div class="profile-header-bg" style="height: 100px; background: linear-gradient(135deg, #0d6b66 0%, #0a5651 100%);"></div>
                         <div class="card-body text-center position-relative" style="margin-top: -50px;">
                             <div id="profile-avatar" class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow-lg border border-4 border-white" style="width: 100px; height: 100px; font-size: 2.5rem; font-weight: bold;">
@@ -69,7 +69,7 @@ function getProfileHTML() {
                 
                 <!-- Details Card -->
                 <div class="col-lg-8">
-                    <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-header bg-white border-bottom py-3 px-4 rounded-top-4">
                             <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
                                 <img src="${cardList}" width="20" class="icon-primary-filter">
