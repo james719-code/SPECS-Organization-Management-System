@@ -141,7 +141,7 @@ export function renderSignupPage() {
         // 1. Safe Data Extraction (Fixes "Invalid Structure" error)
         const formData = {
             name: e.target.elements['name'].value,
-            username: e.target.elements['username'].value,
+            username: e.target.elements['username']?.value ?? '',
             email: e.target.elements['email'].value,
             section: e.target.elements['section'].value,
             yearNum: e.target.elements['yearNum'].value,
@@ -150,6 +150,18 @@ export function renderSignupPage() {
             password: e.target.elements['password'].value,
             password2: e.target.elements['password2'].value,
         };
+
+        // Ensure required accounts.username is always present
+        // (Appwrite treats undefined as missing; required attribute will fail)
+        let resolvedUsername = (formData.username || '').trim();
+        if (!resolvedUsername) {
+            const emailPrefix = (formData.email || '').split('@')[0] || '';
+            const nameSlug = (formData.name || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '');
+            resolvedUsername = (emailPrefix || nameSlug || 'user').slice(0, 150);
+        }
 
         formErrorDiv.classList.add('d-none');
         if (formData.password.length < 8) { showFormError("Password must be at least 8 characters long."); return; }
@@ -185,15 +197,35 @@ export function renderSignupPage() {
             );
 
             // 4. Create Account Document
+            const safeUsername = (() => {
+                const u = (resolvedUsername || '').trim();
+                if (u) return u;
+                const emailPrefix = (formData.email || '').split('@')[0] || '';
+                const nameSlug = (formData.name || '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_+|_+$/g, '');
+                return (emailPrefix || nameSlug || `user_${String(user.$id || '').slice(0, 8)}` || 'user').slice(0, 150);
+            })();
+
+            const accountDocPayload = {
+                username: safeUsername,
+                type: 'student',
+                verified: false,
+                students: studentDoc.$id
+            };
+
+            console.log('[signup] creating accounts doc', {
+                userId: user?.$id,
+                payload: accountDocPayload
+            });
+
             await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_ID_ACCOUNTS,
                 user.$id,
                 {
-                    username: formData.username,
-                    type: 'student',
-                    verified: false,
-                    students: studentDoc.$id
+                    ...accountDocPayload
                 }
             );
 
