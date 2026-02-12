@@ -173,7 +173,7 @@ export default async function renderDashboard() {
           
           <!-- User Profile Area -->
           <div class="sidebar-user-area" style="flex-shrink: 0;">
-            <div class="dropdown w-100">
+            <div class="dropup w-100">
               <a href="#" class="d-flex align-items-center gap-3 text-decoration-none p-2 rounded-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="transition: background 0.15s;">
                 <div class="user-avatar">${initials}</div>
                 <div class="user-info flex-grow-1">

@@ -183,7 +183,7 @@ export default async function renderDashboardAdmin() {
           </div>
           
           <!-- User Menu Dropdown -->
-          <div class="dropdown" style="flex-shrink: 0;">
+          <div class="dropup" style="flex-shrink: 0;">
             <hr class="my-2" style="border-color: #e5e7eb;">
             <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
               <img src="${personCircle}" alt="User" class="me-2" style="width: 28px; height: 28px; opacity: 0.7;">
