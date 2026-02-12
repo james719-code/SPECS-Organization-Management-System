@@ -7,7 +7,7 @@ import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_EVENTS, COLLECTION_I
 import { cache } from "../shared/cache.js";
 import { prefetchModule } from "../shared/lazyLoadHelper.js";
 import { Query } from "appwrite";
-import { Offcanvas, Dropdown } from 'bootstrap';
+import { Offcanvas } from 'bootstrap';
 import { setCurrentUser } from '../dashboard-admin/views/activity-logs.js';
 
 const IS_DEV = import.meta.env.DEV;
@@ -171,30 +171,19 @@ export default async function renderDashboard() {
             </ul>
           </div>
           
-          <!-- User Profile Area -->
+          <!-- User Profile & Logout -->
           <div class="sidebar-user-area" style="flex-shrink: 0;">
-            <div class="dropup w-100">
-              <a href="#" class="d-flex align-items-center gap-3 text-decoration-none p-2 rounded-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="transition: background 0.15s;">
-                <div class="user-avatar">${initials}</div>
-                <div class="user-info flex-grow-1">
-                  <div class="user-name">${displayName}</div>
-                  <div class="user-role">Officer</div>
-                </div>
-              </a>
-              <ul class="dropdown-menu dropdown-menu-end text-small shadow border-0 w-100">
-                <li>
-                  <a class="dropdown-item py-2" href="#" data-view="settings">
-                    <img src="${gearFill}" alt="Settings" class="me-2" style="width: 16px; opacity: 0.5;">Settings
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider my-1"></li>
-                <li>
-                  <a class="dropdown-item text-danger fw-medium py-2" href="#" id="logout-btn">
-                    <img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 16px; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out
-                  </a>
-                </li>
-              </ul>
+            <div class="d-flex align-items-center gap-3 p-2 rounded-3">
+              <div class="user-avatar">${initials}</div>
+              <div class="user-info flex-grow-1">
+                <div class="user-name">${displayName}</div>
+                <div class="user-role">Officer</div>
+              </div>
             </div>
+            <a href="#" class="d-flex align-items-center gap-2 text-danger text-decoration-none p-2 rounded-3 mt-1" id="logout-btn" style="transition: background 0.15s;">
+              <img src="${boxArrowRight}" alt="Sign out" style="width: 16px; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">
+              <span class="small fw-medium">Sign out</span>
+            </a>
           </div>
         </aside>
 
@@ -217,8 +206,7 @@ export default async function renderDashboard() {
     const viewLinks = document.querySelectorAll('#sidebar [data-view]');
     const sidebar = document.getElementById('sidebar');
 
-    // Initialize Bootstrap components that require it.
-    new Dropdown(document.querySelector('.dropdown-toggle'));
+
 
     const renderContent = async (viewName) => {
       // Fade out current content and show loading spinner

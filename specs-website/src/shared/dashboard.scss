@@ -375,8 +375,9 @@ aside.offcanvas-lg.offcanvas-start {
     flex-shrink: 0;
   }
   
-  // Keep user dropdown at bottom, never scrolled
+  // Keep user dropdown/dropup at bottom, never scrolled
   > .dropdown,
+  > .dropup,
   > .dropdown.mt-auto {
     flex-shrink: 0;
   }

@@ -5,7 +5,7 @@ import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from "../shared/constants.js";
 import { cache } from "../shared/cache.js";
 import { prefetchModule } from "../shared/lazyLoadHelper.js";
 import { chartManager } from "../shared/utils.js";
-import { Offcanvas, Dropdown } from 'bootstrap';
+import { Offcanvas } from 'bootstrap';
 import { setCurrentUser, logActivity } from './views/activity-logs.js';
 
 const IS_DEV = import.meta.env.DEV;
@@ -182,20 +182,17 @@ export default async function renderDashboardAdmin() {
             </ul>
           </div>
           
-          <!-- User Menu Dropdown -->
-          <div class="dropup" style="flex-shrink: 0;">
+          <!-- User Info & Logout -->
+          <div style="flex-shrink: 0;">
             <hr class="my-2" style="border-color: #e5e7eb;">
-            <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle p-2 rounded-2" data-bs-toggle="dropdown" aria-expanded="false">
+            <div class="d-flex align-items-center text-dark p-2 rounded-2">
               <img src="${personCircle}" alt="User" class="me-2" style="width: 28px; height: 28px; opacity: 0.7;">
               <strong class="small">${profile.username || 'Admin'}</strong>
+            </div>
+            <a href="#" class="d-flex align-items-center text-danger text-decoration-none p-2 rounded-2 mt-1" id="logout-btn" style="transition: background 0.15s;">
+              <img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 1em; height: 1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">
+              <span class="small fw-medium">Sign out</span>
             </a>
-            <ul class="dropdown-menu text-small shadow-sm border">
-              <li>
-                <a class="dropdown-item text-danger fw-medium" href="#" id="logout-btn">
-                  <img src="${boxArrowRight}" alt="Sign out" class="me-2" style="width: 1em; height: 1em; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">Sign out
-                </a>
-              </li>
-            </ul>
           </div>
         </aside>
 
@@ -220,8 +217,7 @@ export default async function renderDashboardAdmin() {
     const sidebar = document.getElementById('adminSidebar');
     const sidebarInstance = Offcanvas.getOrCreateInstance(sidebar);
 
-    // Initialize Bootstrap components that require it.
-    new Dropdown(document.querySelector('.dropdown-toggle'));
+
 
     /**
      * Renders the content for a given view name into the main content area.
