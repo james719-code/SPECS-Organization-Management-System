@@ -1,20 +1,55 @@
-# 🗄️ Database Schema Documentation (v2.0 - Fixed Relations)
+# 🗄️ Database Schema Documentation (v2.1)
+
+This document describes all 11 database collections and 6 storage buckets used by the SPECS Organization Management System.
+
+> **Referenced by:** [README.md](README.md) — see the Database Schema section for a relationship overview.
+
+---
+
+## Relationship Overview
+
+```
+accounts (central hub)
+├── students (one-to-one)
+│   ├── payments (one-to-many)
+│   ├── attendance (many-to-one from attendance)
+│   └── stories (many-to-one from stories)
+├── officers (one-to-one)
+│   └── students (one-to-one reference)
+└── admins (one-to-one)
+
+events
+├── attendance (one-to-one from attendance)
+├── payments (one-to-one from payments)
+└── expenses (many-to-one from expenses)
+
+officers
+├── attendance (one-to-many from attendance)
+└── payments (one-to-one from payments)
+```
+
+---
 
 ## 1. Collection: `accounts`
 
 **Collection ID:** `6858feff002fb157e032`
 
+Central hub collection linking Appwrite Auth users to their role-specific data.
+
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
 | **`$id`** | string | - | - | ✅ | - | - |
 | **`username`** | string | Size: 150 | ✅ | ✅ | - | - |
-| **`type`** | enum | - | ✅ | - | - | - |
+| **`type`** | enum | `student`, `officer`, `admin` | ✅ | - | - | - |
 | **`verified`** | boolean | - | - | - | `false` | - |
+| **`deactivated`** | boolean | - | - | - | `false` | Managed via Cloud Function |
 | **`students`** | relationship | - | - | - | `NULL` | One to one |
 | **`admins`** | relationship | - | - | - | `NULL` | One to one |
 | **`officers`** | relationship | - | - | - | `NULL` | One to one |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
+
+> **Note:** The `type` enum determines which relationship is populated. A `student` account links to `students`, an `officer` links to both `students` and `officers`, and an `admin` links to `admins`.
 
 ---
 
@@ -190,6 +225,8 @@
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
+> **Note:** The `meaning[]` array provides labels/tags for the corresponding `related_links[]` entries.
+
 ---
 
 ## 11. Collection: `files`
@@ -205,3 +242,28 @@
 | **`fileID`** | string | Size: 30 | - | - | `NULL` | - |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## Storage Buckets
+
+The application uses 6 storage buckets for file management:
+
+| Bucket | Env Variable | Purpose |
+| --- | --- | --- |
+| **Event Images** | `VITE_BUCKET_ID_EVENT_IMAGES` | Cover images for events |
+| **User Uploads** | `VITE_BUCKET_ID_UPLOADS` | General file uploads by officers |
+| **Resumes** | `VITE_BUCKET_ID_RESUMES` | Officer resume files |
+| **Schedules** | `VITE_BUCKET_ID_SCHEDULES` | Officer schedule files |
+| **Public Files** | `VITE_BUCKET_PUBLIC_FILES` | Downloadable resources on the landing page |
+| **Highlight Images** | `VITE_BUCKET_ID_HIGHLIGHT_IMAGES` | Cover images for volunteer stories/highlights |
+
+---
+
+## Cloud Function & Teams
+
+| Resource | Env Variable | Purpose |
+| --- | --- | --- |
+| **Cloud Function** | `VITE_FUNCTION_ID` | Server-side account management (promote, demote, deactivate, reactivate) |
+| **Students Team** | `VITE_TEAM_ID_STUDENTS` | Team-based access control for student role |
+| **Officers Team** | `VITE_TEAM_ID_OFFICERS` | Team-based access control for officer role |
