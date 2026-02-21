@@ -23,12 +23,9 @@ const viewModules = {
   students: () => import('./views/students.js'),
   volunteers: () => import('../dashboard-officer/views/volunteers.js'),
   stories: () => import('../dashboard-officer/views/stories.js'),
-  announcements: () => import('./views/announcements.js'),
-  reports: () => import('./views/reports.js'),
   attendance: () => import('./views/attendance.js'),
   finance: () => import('./views/finance.js'),
-  'activity-logs': () => import('./views/activity-logs.js'),
-  settings: () => import('./views/settings.js')
+  settings: () => import('../dashboard-officer/views/settings.js')
 };
 
 const loadedModules = new Map();
@@ -52,9 +49,6 @@ import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
 import personBadgeFill from 'bootstrap-icons/icons/person-badge-fill.svg';
 import personHeartsFill from 'bootstrap-icons/icons/person-hearts.svg';
 import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
-import megaphoneFill from 'bootstrap-icons/icons/megaphone-fill.svg';
-import graphUp from 'bootstrap-icons/icons/graph-up.svg';
-import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import calendarCheckFill from 'bootstrap-icons/icons/calendar-check-fill.svg';
 import cashStack from 'bootstrap-icons/icons/cash-stack.svg';
@@ -157,22 +151,7 @@ export default async function renderDashboardAdmin() {
                 </a>
               </li>
               <li class="nav-item mt-3">
-                <small class="text-muted text-uppercase px-3 fw-bold" style="font-size: 0.75rem;">Admin Tools</small>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="announcements">
-                  <img src="${megaphoneFill}" alt="Announcements" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Announcements
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="reports">
-                  <img src="${graphUp}" alt="Reports" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Reports
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="activity-logs">
-                  <img src="${clockHistory}" alt="Activity Logs" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Activity Logs
-                </a>
+                <small class="text-muted text-uppercase px-3 fw-bold" style="font-size: 0.75rem;">Account</small>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="settings">
@@ -231,11 +210,8 @@ export default async function renderDashboardAdmin() {
       // Fade out current content and show loading spinner
       contentEl.style.opacity = '0.5';
       contentEl.innerHTML = `
-        <div class="d-flex flex-column justify-content-center align-items-center" style="height: 70vh;">
-          <div class="spinner-border text-primary mb-3" style="width: 2.5rem; height: 2.5rem;" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="text-muted small">Loading ${viewName}...</p>
+        <div class="d-flex justify-content-center align-items-center" style="height: 70vh;">
+          <div class="spinner-border text-primary" style="width: 2rem; height: 2rem;" role="status"></div>
         </div>
       `;
       contentEl.style.opacity = '1';
@@ -266,6 +242,7 @@ export default async function renderDashboardAdmin() {
           case "payments":
           case "volunteers":
           case "stories":
+          case "settings":
             view = renderFn(user, profile);
             break;
           default:

@@ -14,7 +14,7 @@ const DEV_BYPASS = IS_DEV && USE_MOCK_DATA;
 
 let reportChart = null;
 
-const CHART_COLORS = ['#0d6b66', '#14b8a6', '#f4a261', '#e76f51', '#264653', '#2a9d8f', '#e9c46a', '#f48c06'];
+const CHART_COLORS = ['#0d6b66', '#149a93', '#2a9d8f', '#3d8b7a', '#5a9e8f', '#74b3a5', '#094d4a', '#264653'];
 
 // --- CSV EXPORT ---
 
@@ -374,10 +374,7 @@ function getReportsHTML() {
         <div class="reports-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">
-                        <img src="${fileText}" alt="Reports" class="me-2" style="width: 2rem; filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);">
-                        Reports Generator
-                    </h1>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Reports Generator</h1>
                     <p class="text-muted mb-0">Create custom reports with advanced filtering</p>
                 </div>
             </header>

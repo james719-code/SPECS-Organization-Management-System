@@ -94,10 +94,8 @@ function getStoriesHTML() {
         <div class="stories-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <div class="officer-page-header mb-0">
-                        <h1 class="page-title mb-1">Story Approval</h1>
-                        <p class="page-subtitle mb-0">Review and approve volunteer posts for public display.</p>
-                    </div>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Story Approval</h1>
+                    <p class="text-muted mb-0">Review and approve volunteer posts for public display.</p>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">

@@ -108,8 +108,8 @@ function createAccountCardHTML(account, showCheckbox = false) {
         statusText = 'Deactivated';
         statusClass = 'status-deactivated';
     } else if (isOfficer) {
-        accentColor = 'var(--bs-info)';
-        avatarBg = 'bg-info';
+        accentColor = '#3d8b7a';
+        avatarBg = 'bg-success';
         statusIcon = 'bi-shield-check';
         statusText = 'Officer';
         statusClass = 'status-officer';
@@ -158,7 +158,7 @@ function createAccountCardHTML(account, showCheckbox = false) {
     }
 
     // View details option
-    actions += `<li><a class="dropdown-item view-details-btn py-2" href="#" data-docid="${account.$id}" data-bs-toggle="modal" data-bs-target="#userDetailsModal">${viewDetailsIconHTML}</a></li>`;
+    actions += `<li><a class="dropdown-item view-details-btn py-2" href="#" data-docid="${account.$id}">${viewDetailsIconHTML}</a></li>`;
     actions += `<li><hr class="dropdown-divider my-1"></li>`;
 
     // Reset password (available for all non-admin accounts)
@@ -201,14 +201,11 @@ function createAccountCardHTML(account, showCheckbox = false) {
                     <!-- Card Header -->
                     <div class="card-header-section p-3 pb-0">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="d-flex align-items-center flex-grow-1 min-width-0 user-info-trigger" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#userDetailsModal">
+                            <div class="d-flex align-items-center flex-grow-1 min-width-0 user-info-trigger" style="cursor: pointer;">
                                 <div class="avatar-wrapper position-relative me-3">
                                     <div class="avatar-placeholder ${avatarBg} text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 52px; height: 52px; font-size: 1.25rem;">
                                         ${displayName.charAt(0).toUpperCase()}
                                     </div>
-                                    <span class="status-indicator position-absolute" title="${statusText}">
-                                        <i class="bi ${statusIcon}"></i>
-                                    </span>
                                 </div>
                                 <div class="user-info min-width-0">
                                     <h6 class="card-title fw-bold mb-1 text-dark text-truncate" title="${displayName}">${displayName}</h6>
@@ -230,7 +227,7 @@ function createAccountCardHTML(account, showCheckbox = false) {
                     </div>
 
                     <!-- Card Body: Metadata -->
-                    <div class="card-meta-section px-3 py-3 user-info-trigger" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#userDetailsModal">
+                    <div class="card-meta-section px-3 py-3 user-info-trigger" style="cursor: pointer;">
                         <div class="meta-grid">
                             ${displayEmail !== 'No email linked' ? `
                             <div class="meta-item">
@@ -298,11 +295,8 @@ function getAccountsHTML() {
             <div class="page-header mb-4">
                 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                     <div>
-                        <h2 class="fw-bold m-0 d-flex align-items-center gap-2">
-                            <img src="${people}" alt="Accounts" style="width: 1.5rem; opacity: 0.7;">
-                            Account Management
-                        </h2>
-                        <p class="text-muted m-0 mt-1">Manage accounts, verifications, and officer roles</p>
+                        <h1 class="display-6 fw-bold text-dark mb-1">Account Management</h1>
+                        <p class="text-muted mb-0">Manage accounts, verifications, and officer roles</p>
                     </div>
                     
                     <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -392,11 +386,6 @@ function getAccountsHTML() {
                             <i class="bi bi-check-all"></i>
                             <span>Accept All Pending</span>
                         </button>
-                        <button id="bulkEmailBtn" class="btn btn-info btn-sm d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm" title="Email selected users" style="display: none;">
-                            <i class="bi bi-envelope"></i>
-                            <span>Email Selected</span>
-                        </button>
-                        
                         <div class="dropdown">
                             <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-2 rounded-pill px-3" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <img src="${funnelFill}" style="width: 0.9em; opacity: 0.7;"> 
@@ -542,10 +531,10 @@ function getAccountsHTML() {
                 justify-content: center;
                 flex-shrink: 0;
             }
-            .stat-total .stat-icon { background: rgba(13, 110, 253, 0.1); }
-            .stat-pending .stat-icon { background: rgba(255, 193, 7, 0.15); }
-            .stat-verified .stat-icon { background: rgba(25, 135, 84, 0.1); }
-            .stat-officers .stat-icon { background: rgba(13, 202, 240, 0.1); }
+            .stat-total .stat-icon { background: rgba(13, 107, 102, 0.1); }
+            .stat-pending .stat-icon { background: rgba(212, 168, 67, 0.15); }
+            .stat-verified .stat-icon { background: rgba(42, 157, 143, 0.1); }
+            .stat-officers .stat-icon { background: rgba(61, 139, 122, 0.1); }
             
             .stat-value {
                 font-size: 1.75rem;
@@ -710,25 +699,6 @@ function getAccountsHTML() {
             .avatar-placeholder {
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             }
-            .status-indicator {
-                position: absolute;
-                bottom: -2px;
-                right: -2px;
-                width: 20px;
-                height: 20px;
-                background: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-                font-size: 0.65rem;
-            }
-            .status-pending .status-indicator { color: var(--bs-warning); }
-            .status-verified .status-indicator { color: var(--bs-success); }
-            .status-officer .status-indicator { color: var(--bs-info); }
-            .status-deactivated .status-indicator { color: var(--bs-secondary); }
-            
             .user-info {
                 min-width: 0;
             }
@@ -773,7 +743,7 @@ function getAccountsHTML() {
             .volunteer-badge {
                 display: inline-flex;
                 align-items: center;
-                background: linear-gradient(135deg, #ffc107, #ff9800);
+                background: linear-gradient(135deg, #2a9d8f, #1f8578);
                 color: white;
                 font-size: 0.7rem;
                 font-weight: 600;
@@ -803,8 +773,8 @@ function getAccountsHTML() {
                 color: #0f5132;
             }
             .status-badge.status-officer {
-                background: rgba(13, 202, 240, 0.15);
-                color: #055160;
+                background: rgba(61, 139, 122, 0.15);
+                color: #2a5e50;
             }
             .status-badge.status-deactivated {
                 background: rgba(108, 117, 125, 0.15);
@@ -1004,7 +974,6 @@ async function attachAccountsListeners() {
     const refreshBtn = document.getElementById('refreshAccountsBtn');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const toggleBulkModeBtn = document.getElementById('toggleBulkModeBtn');
-    const bulkEmailBtn = document.getElementById('bulkEmailBtn');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     const searchResultsCount = document.getElementById('searchResultsCount');
     const bulkSelectInfo = document.getElementById('bulkSelectInfo');
@@ -1014,6 +983,156 @@ async function attachAccountsListeners() {
     const userDetailsModalEl = document.getElementById('userDetailsModal');
     const userDetailsModal = new Modal(userDetailsModalEl);
     const userDetailsModalBody = document.getElementById('userDetailsModalBody');
+
+    userDetailsModalEl.addEventListener('hide.bs.modal', () => {
+        const focused = userDetailsModalEl.querySelector(':focus');
+        if (focused) focused.blur();
+    });
+
+    const showAccountDetails = (account) => {
+        const student = account.students || {};
+        const name = student.name || account.username;
+        const isDeactivated = account.deactivated === true;
+        const isOfficer = account.type === 'officer';
+        const isVerified = account.verified === true;
+        const joinedDate = new Date(account.$createdAt).toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const joinedRelative = getRelativeTime(new Date(account.$createdAt));
+
+        document.getElementById('userDetailsModalLabel').textContent = 'Account Details';
+
+        let statusText, statusIcon, headerGradient;
+        if (isDeactivated) {
+            statusText = 'Deactivated';
+            statusIcon = 'bi-person-slash';
+            headerGradient = 'linear-gradient(135deg, #6c757d, #495057)';
+        } else if (isOfficer) {
+            statusText = 'Officer';
+            statusIcon = 'bi-shield-check';
+            headerGradient = 'linear-gradient(135deg, #3d8b7a, #2a6e5f)';
+        } else if (isVerified) {
+            statusText = 'Verified Student';
+            statusIcon = 'bi-patch-check-fill';
+            headerGradient = 'linear-gradient(135deg, #198754, #157347)';
+        } else {
+            statusText = 'Pending Verification';
+            statusIcon = 'bi-hourglass-split';
+            headerGradient = 'linear-gradient(135deg, #d4a843, #b8922e)';
+        }
+
+        const detailsHTML = `
+            <div class="user-detail-header" style="background: ${headerGradient}; margin: -1.5rem -1.5rem 1.5rem -1.5rem; border-radius: 1rem 1rem 0 0;">
+                <div class="user-detail-avatar">
+                    ${name.charAt(0).toUpperCase()}
+                </div>
+                <h4 class="fw-bold mb-1">${name}</h4>
+                <p class="mb-2 opacity-75">@${account.username}</p>
+                <span class="badge bg-white bg-opacity-25 px-3 py-2 rounded-pill">
+                    <i class="bi ${statusIcon} me-1"></i>${statusText}
+                </span>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 text-center h-100">
+                        <div class="text-muted small mb-1">Role</div>
+                        <div class="fw-bold text-capitalize">${account.type}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 text-center h-100">
+                        <div class="text-muted small mb-1">Year Level</div>
+                        <div class="fw-bold">${student.yearLevel ? 'Year ' + student.yearLevel : 'N/A'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-detail-section">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                    <i class="bi bi-person-lines-fill me-2"></i>Personal Information
+                </h6>
+                <div class="detail-row">
+                    <span class="detail-label">Full Name</span>
+                    <span class="detail-value">${name}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Email Address</span>
+                    <span class="detail-value">${student.email || '<span class="text-muted">Not provided</span>'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Student ID</span>
+                    <span class="detail-value">${student.student_id || '<span class="text-muted">Not provided</span>'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Section</span>
+                    <span class="detail-value">${student.section || '<span class="text-muted">Not assigned</span>'}</span>
+                </div>
+            </div>
+
+            <div class="user-detail-section">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                    <i class="bi bi-gear me-2"></i>Account Information
+                </h6>
+                <div class="detail-row">
+                    <span class="detail-label">Username</span>
+                    <span class="detail-value">@${account.username}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Account Type</span>
+                    <span class="detail-value text-capitalize">${account.type}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Verification Status</span>
+                    <span class="detail-value">
+                        ${isVerified || isOfficer
+                            ? '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>'
+                            : '<span class="text-warning"><i class="bi bi-clock-fill me-1"></i>Pending</span>'}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Account Status</span>
+                    <span class="detail-value">
+                        ${isDeactivated
+                            ? '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Deactivated</span>'
+                            : '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Active</span>'}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Joined</span>
+                    <span class="detail-value">${joinedDate} <small class="text-muted">(${joinedRelative})</small></span>
+                </div>
+            </div>
+
+            ${student.is_volunteer || (student.volunteer_request_status && student.volunteer_request_status !== 'none') ? `
+            <div class="user-detail-section">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                    <i class="bi bi-hand-thumbs-up me-2"></i>Volunteer Information
+                </h6>
+                <div class="detail-row">
+                    <span class="detail-label">Volunteer Status</span>
+                    <span class="detail-value">
+                        ${student.is_volunteer
+                            ? '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Active Volunteer</span>'
+                            : '<span class="text-muted">Not a volunteer</span>'}
+                    </span>
+                </div>
+                ${student.volunteer_request_status && student.volunteer_request_status !== 'none' ? `
+                <div class="detail-row">
+                    <span class="detail-label">Request Status</span>
+                    <span class="detail-value text-capitalize">${student.volunteer_request_status}</span>
+                </div>
+                ` : ''}
+            </div>
+            ` : ''}
+
+            <div class="d-flex gap-2 mt-4 pt-3 border-top justify-content-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+        `;
+
+        userDetailsModalBody.innerHTML = detailsHTML;
+    };
 
     let allAccounts = [];
     let currentSort = 'name_asc';
@@ -1194,10 +1313,6 @@ async function attachAccountsListeners() {
         }
         if (bulkSelectInfo) {
             bulkSelectInfo.classList.toggle('d-none', selectedAccounts.size === 0 || !bulkModeActive);
-        }
-        if (bulkEmailBtn) {
-            const count = selectedAccounts.size;
-            bulkEmailBtn.innerHTML = `<i class="bi bi-envelope"></i><span>Email Selected ${count > 0 ? `(${count})` : ''}</span>`;
         }
     };
 
@@ -1459,13 +1574,11 @@ async function attachAccountsListeners() {
             if (bulkModeActive) {
                 toggleBulkModeBtn.classList.add('active');
                 toggleBulkModeBtn.classList.replace('btn-outline-secondary', 'btn-secondary');
-                if (bulkEmailBtn) bulkEmailBtn.style.display = 'flex';
                 if (bulkSelectInfo) bulkSelectInfo.classList.remove('d-none');
                 toast.info('Bulk selection mode enabled. Click checkboxes to select accounts.', { duration: 2500 });
             } else {
                 toggleBulkModeBtn.classList.remove('active');
                 toggleBulkModeBtn.classList.replace('btn-secondary', 'btn-outline-secondary');
-                if (bulkEmailBtn) bulkEmailBtn.style.display = 'none';
                 if (bulkSelectInfo) bulkSelectInfo.classList.add('d-none');
             }
 
@@ -1512,48 +1625,6 @@ async function attachAccountsListeners() {
             }
         });
     });
-
-    // Bulk email button
-    if (bulkEmailBtn) {
-        bulkEmailBtn.addEventListener('click', async () => {
-            if (selectedAccounts.size === 0) {
-                toast.warning('Please select at least one account');
-                return;
-            }
-
-            const selectedAccountsList = Array.from(selectedAccounts).map(id => {
-                const acc = allAccounts.find(a => a.$id === id);
-                const studentData = acc?.students || {};
-                return {
-                    id: id,
-                    name: studentData.name || acc?.username || 'Unknown',
-                    email: studentData.email || 'No email'
-                };
-            });
-
-            const emailList = selectedAccountsList.map(a => a.email).filter(e => e !== 'No email').join(', ');
-
-            if (!emailList) {
-                toast.error('None of the selected accounts have email addresses');
-                return;
-            }
-
-            // Show compose dialog
-            const message = `Selected ${selectedAccounts.size} account(s):\n\n` +
-                selectedAccountsList.map(a => `- ${a.name} (${a.email})`).join('\n') +
-                `\n\nEmail addresses:\n${emailList}\n\n` +
-                `You can copy these email addresses to your email client.`;
-
-            const shouldCopy = await confirmAction('Copy Email Addresses', `Selected ${selectedAccounts.size} account(s). Copy email addresses to clipboard?`, 'Copy Emails', 'primary');
-            if (shouldCopy) {
-                navigator.clipboard.writeText(emailList).then(() => {
-                    toast.success('Email addresses copied to clipboard!', { title: 'Copied' });
-                }).catch(() => {
-                    toast.error('Failed to copy to clipboard');
-                });
-            }
-        });
-    }
 
     // Handle checkbox selection
     cardsContainer.addEventListener('change', (e) => {
@@ -1726,17 +1797,20 @@ async function attachAccountsListeners() {
 
         if (acceptBtn) {
             e.preventDefault();
-            
+            e.stopPropagation();
+            if (acceptBtn.disabled) return;
+
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
                 console.error('FUNCTION_ID is undefined. Check your .env file.');
                 return;
             }
-            
+
             const docId = acceptBtn.dataset.docid;
             const originalHTML = acceptBtn.innerHTML;
             acceptBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Accepting...`;
             acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
 
             try {
                 const userId = docId;
@@ -1770,13 +1844,17 @@ async function attachAccountsListeners() {
                 toast.error('Failed to accept user: ' + error.message);
                 acceptBtn.innerHTML = originalHTML;
                 acceptBtn.classList.remove('disabled');
+                acceptBtn.disabled = false;
             }
             return;
         }
 
         if (promoteBtn) {
             e.preventDefault();
-            if (!await confirmAction('Promote to Officer', 'This student will gain access to the Officer Dashboard. Are you sure?', 'Promote', 'primary')) return;
+            e.stopPropagation();
+            // If already disabled, it was pre-confirmed by quick action button
+            const preConfirmed = promoteBtn.disabled;
+            if (!preConfirmed && !await confirmAction('Promote to Officer', 'This student will gain access to the Officer Dashboard. Are you sure?', 'Promote', 'primary')) return;
 
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
@@ -1788,6 +1866,7 @@ async function attachAccountsListeners() {
             const originalHTML = promoteBtn.innerHTML;
             promoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Promoting...`;
             promoteBtn.classList.add('disabled');
+            promoteBtn.disabled = true;
 
             try {
                 const userId = docId;
@@ -1817,25 +1896,29 @@ async function attachAccountsListeners() {
                 toast.error('Failed to promote user: ' + error.message);
                 promoteBtn.innerHTML = originalHTML;
                 promoteBtn.classList.remove('disabled');
+                promoteBtn.disabled = false;
             }
             return;
         }
 
         if (deleteBtn) {
             e.preventDefault();
+            e.stopPropagation();
+            if (deleteBtn.disabled) return;
             if (!await confirmAction('Delete User', 'This will permanently delete this user\'s account and profile. This cannot be undone.', 'Delete', 'danger')) return;
-            
+
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
                 console.error('FUNCTION_ID is undefined. Check your .env file.');
                 return;
             }
-            
+
             const docId = deleteBtn.dataset.docid;
             const card = deleteBtn.closest('.col');
             const originalHTML = deleteBtn.innerHTML;
             deleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deleting...`;
             deleteBtn.classList.add('disabled');
+            deleteBtn.disabled = true;
             
             try {
                 // Delete auth account via server function
@@ -1869,6 +1952,7 @@ async function attachAccountsListeners() {
                 toast.error('Failed to delete user account: ' + error.message);
                 deleteBtn.innerHTML = originalHTML;
                 deleteBtn.classList.remove('disabled');
+                deleteBtn.disabled = false;
             }
             return;
         }
@@ -1876,7 +1960,9 @@ async function attachAccountsListeners() {
         // Demote officer to student
         if (demoteBtn) {
             e.preventDefault();
-            if (!await confirmAction('Demote Officer', 'This officer will lose access to the Officer Dashboard. Are you sure?', 'Demote', 'warning')) return;
+            e.stopPropagation();
+            const preConfirmed = demoteBtn.disabled;
+            if (!preConfirmed && !await confirmAction('Demote Officer', 'This officer will lose access to the Officer Dashboard. Are you sure?', 'Demote', 'warning')) return;
 
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
@@ -1888,6 +1974,7 @@ async function attachAccountsListeners() {
             const originalHTML = demoteBtn.innerHTML;
             demoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Demoting...`;
             demoteBtn.classList.add('disabled');
+            demoteBtn.disabled = true;
 
             try {
                 const execution = await functions.createExecution(
@@ -1912,6 +1999,7 @@ async function attachAccountsListeners() {
                 toast.error('Failed to demote officer: ' + error.message);
                 demoteBtn.innerHTML = originalHTML;
                 demoteBtn.classList.remove('disabled');
+                demoteBtn.disabled = false;
             }
             return;
         }
@@ -1919,7 +2007,10 @@ async function attachAccountsListeners() {
         // Deactivate account
         if (deactivateBtn) {
             e.preventDefault();
+            e.stopPropagation();
+            if (deactivateBtn.disabled) return;
             if (!await confirmAction('Deactivate Account', 'The user will not be able to access the system until reactivated.', 'Deactivate', 'warning')) return;
+
 
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
@@ -1931,6 +2022,7 @@ async function attachAccountsListeners() {
             const originalHTML = deactivateBtn.innerHTML;
             deactivateBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Deactivating...`;
             deactivateBtn.classList.add('disabled');
+            deactivateBtn.disabled = true;
 
             try {
                 const execution = await functions.createExecution(
@@ -1952,6 +2044,7 @@ async function attachAccountsListeners() {
                 toast.error('Failed to deactivate account: ' + error.message);
                 deactivateBtn.innerHTML = originalHTML;
                 deactivateBtn.classList.remove('disabled');
+                deactivateBtn.disabled = false;
             }
             return;
         }
@@ -1959,17 +2052,20 @@ async function attachAccountsListeners() {
         // Reactivate account
         if (reactivateBtn) {
             e.preventDefault();
-            
+            e.stopPropagation();
+            if (reactivateBtn.disabled) return;
+
             if (!FUNCTION_ID) {
                 toast.error('Account management function not configured. Please set VITE_FUNCTION_ID in environment.');
                 console.error('FUNCTION_ID is undefined. Check your .env file.');
                 return;
             }
-            
+
             const docId = reactivateBtn.dataset.docid;
             const originalHTML = reactivateBtn.innerHTML;
             reactivateBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Reactivating...`;
             reactivateBtn.classList.add('disabled');
+            reactivateBtn.disabled = true;
 
             try {
                 const execution = await functions.createExecution(
@@ -1991,6 +2087,7 @@ async function attachAccountsListeners() {
                 toast.error('Failed to reactivate account: ' + error.message);
                 reactivateBtn.innerHTML = originalHTML;
                 reactivateBtn.classList.remove('disabled');
+                reactivateBtn.disabled = false;
             }
             return;
         }
@@ -1998,6 +2095,8 @@ async function attachAccountsListeners() {
         // Reset password
         if (resetPasswordBtn) {
             e.preventDefault();
+            e.stopPropagation();
+            if (resetPasswordBtn.disabled) return;
             const docId = resetPasswordBtn.dataset.docid;
             const acc = allAccounts.find(u => u.$id === docId);
             const student = acc?.students || {};
@@ -2019,6 +2118,7 @@ async function attachAccountsListeners() {
             const originalHTML = resetPasswordBtn.innerHTML;
             resetPasswordBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Sending...`;
             resetPasswordBtn.classList.add('disabled');
+            resetPasswordBtn.disabled = true;
 
             try {
                 const execution = await functions.createExecution(
@@ -2036,6 +2136,20 @@ async function attachAccountsListeners() {
             } finally {
                 resetPasswordBtn.innerHTML = originalHTML;
                 resetPasswordBtn.classList.remove('disabled');
+                resetPasswordBtn.disabled = false;
+            }
+            return;
+        }
+
+        const viewDetailsBtn = target.closest('.view-details-btn');
+        if (viewDetailsBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const docId = viewDetailsBtn.dataset.docid;
+            const account = allAccounts.find(u => u.$id === docId);
+            if (account) {
+                showAccountDetails(account);
+                userDetailsModal.show();
             }
             return;
         }
@@ -2044,155 +2158,14 @@ async function attachAccountsListeners() {
             return;
         }
 
-        if (card) {
+        // Only open modal when clicking the user info area, not the footer/buttons
+        const infoTrigger = target.closest('.user-info-trigger');
+        if (infoTrigger && card) {
             const docId = card.dataset.docid;
             const account = allAccounts.find(u => u.$id === docId);
             if (!account) return;
-
-            const student = account.students || {};
-            const name = student.name || account.username;
-            const isDeactivated = account.deactivated === true;
-            const isOfficer = account.type === 'officer';
-            const isVerified = account.verified === true;
-            const joinedDate = new Date(account.$createdAt).toLocaleDateString('en-US', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-            });
-            const joinedRelative = getRelativeTime(new Date(account.$createdAt));
-
-            document.getElementById('userDetailsModalLabel').textContent = 'Account Details';
-
-            // Determine status info
-            let statusText, statusIcon, headerGradient;
-            if (isDeactivated) {
-                statusText = 'Deactivated';
-                statusIcon = 'bi-person-slash';
-                headerGradient = 'linear-gradient(135deg, #6c757d, #495057)';
-            } else if (isOfficer) {
-                statusText = 'Officer';
-                statusIcon = 'bi-shield-check';
-                headerGradient = 'linear-gradient(135deg, #0dcaf0, #0aa2c0)';
-            } else if (isVerified) {
-                statusText = 'Verified Student';
-                statusIcon = 'bi-patch-check-fill';
-                headerGradient = 'linear-gradient(135deg, #198754, #157347)';
-            } else {
-                statusText = 'Pending Verification';
-                statusIcon = 'bi-hourglass-split';
-                headerGradient = 'linear-gradient(135deg, #ffc107, #e0a800)';
-            }
-
-            // Build enhanced modal content
-            let detailsHTML = `
-                <div class="user-detail-header" style="background: ${headerGradient}; margin: -1.5rem -1.5rem 1.5rem -1.5rem; border-radius: 1rem 1rem 0 0;">
-                    <div class="user-detail-avatar">
-                        ${name.charAt(0).toUpperCase()}
-                    </div>
-                    <h4 class="fw-bold mb-1">${name}</h4>
-                    <p class="mb-2 opacity-75">@${account.username}</p>
-                    <span class="badge bg-white bg-opacity-25 px-3 py-2 rounded-pill">
-                        <i class="bi ${statusIcon} me-1"></i>${statusText}
-                    </span>
-                </div>
-                
-                <div class="row g-3 mb-4">
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded-3 text-center h-100">
-                            <div class="text-muted small mb-1">Role</div>
-                            <div class="fw-bold text-capitalize">${account.type}</div>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded-3 text-center h-100">
-                            <div class="text-muted small mb-1">Year Level</div>
-                            <div class="fw-bold">${student.yearLevel ? 'Year ' + student.yearLevel : 'N/A'}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="user-detail-section">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">
-                        <i class="bi bi-person-lines-fill me-2"></i>Personal Information
-                    </h6>
-                    <div class="detail-row">
-                        <span class="detail-label">Full Name</span>
-                        <span class="detail-value">${name}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Email Address</span>
-                        <span class="detail-value">${student.email || '<span class="text-muted">Not provided</span>'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Student ID</span>
-                        <span class="detail-value">${student.student_id || '<span class="text-muted">Not provided</span>'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Section</span>
-                        <span class="detail-value">${student.section || '<span class="text-muted">Not assigned</span>'}</span>
-                    </div>
-                </div>
-                
-                <div class="user-detail-section">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">
-                        <i class="bi bi-gear me-2"></i>Account Information
-                    </h6>
-                    <div class="detail-row">
-                        <span class="detail-label">Username</span>
-                        <span class="detail-value">@${account.username}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Account Type</span>
-                        <span class="detail-value text-capitalize">${account.type}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Verification Status</span>
-                        <span class="detail-value">
-                            ${isVerified || isOfficer 
-                                ? '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>' 
-                                : '<span class="text-warning"><i class="bi bi-clock-fill me-1"></i>Pending</span>'}
-                        </span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Account Status</span>
-                        <span class="detail-value">
-                            ${isDeactivated 
-                                ? '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Deactivated</span>' 
-                                : '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Active</span>'}
-                        </span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Joined</span>
-                        <span class="detail-value">${joinedDate} <small class="text-muted">(${joinedRelative})</small></span>
-                    </div>
-                </div>
-                
-                ${student.is_volunteer || (student.volunteer_request_status && student.volunteer_request_status !== 'none') ? `
-                <div class="user-detail-section">
-                    <h6 class="text-muted text-uppercase small fw-bold mb-3">
-                        <i class="bi bi-hand-thumbs-up me-2"></i>Volunteer Information
-                    </h6>
-                    <div class="detail-row">
-                        <span class="detail-label">Volunteer Status</span>
-                        <span class="detail-value">
-                            ${student.is_volunteer 
-                                ? '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Active Volunteer</span>' 
-                                : '<span class="text-muted">Not a volunteer</span>'}
-                        </span>
-                    </div>
-                    ${student.volunteer_request_status && student.volunteer_request_status !== 'none' ? `
-                    <div class="detail-row">
-                        <span class="detail-label">Request Status</span>
-                        <span class="detail-value text-capitalize">${student.volunteer_request_status}</span>
-                    </div>
-                    ` : ''}
-                </div>
-                ` : ''}
-                
-                <div class="d-flex gap-2 mt-4 pt-3 border-top justify-content-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Close</button>
-                </div>
-            `;
-
-            userDetailsModalBody.innerHTML = detailsHTML;
+            showAccountDetails(account);
+            userDetailsModal.show();
         }
     });
 
@@ -2206,34 +2179,61 @@ async function attachAccountsListeners() {
         if (quickAcceptBtn) {
             e.preventDefault();
             e.stopPropagation();
+            if (quickAcceptBtn.disabled) return;
+            quickAcceptBtn.disabled = true;
+            quickAcceptBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Accepting...`;
             const docId = quickAcceptBtn.dataset.docid;
-            // Trigger the accept action
             const acceptBtn = document.querySelector(`.accept-btn[data-docid="${docId}"]`);
             if (acceptBtn) acceptBtn.click();
+            return;
         }
-        
+
         if (quickPromoteBtn) {
             e.preventDefault();
             e.stopPropagation();
+            if (quickPromoteBtn.disabled) return;
             const docId = quickPromoteBtn.dataset.docid;
+            const origHTML = quickPromoteBtn.innerHTML;
+            // Confirm first, then show loading
+            if (!await confirmAction('Promote to Officer', 'This student will gain access to the Officer Dashboard. Are you sure?', 'Promote', 'primary')) return;
+            quickPromoteBtn.disabled = true;
+            quickPromoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Promoting...`;
             const promoteBtn = document.querySelector(`.promote-btn[data-docid="${docId}"]`);
-            if (promoteBtn) promoteBtn.click();
+            if (promoteBtn) {
+                // Skip confirm in dropdown handler by directly triggering the action
+                promoteBtn.disabled = true;
+                promoteBtn.click();
+            }
+            return;
         }
-        
+
         if (quickDemoteBtn) {
             e.preventDefault();
             e.stopPropagation();
+            if (quickDemoteBtn.disabled) return;
             const docId = quickDemoteBtn.dataset.docid;
+            const origHTML = quickDemoteBtn.innerHTML;
+            if (!await confirmAction('Demote Officer', 'This officer will lose access to the Officer Dashboard. Are you sure?', 'Demote', 'warning')) return;
+            quickDemoteBtn.disabled = true;
+            quickDemoteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Demoting...`;
             const demoteBtn = document.querySelector(`.demote-btn[data-docid="${docId}"]`);
-            if (demoteBtn) demoteBtn.click();
+            if (demoteBtn) {
+                demoteBtn.disabled = true;
+                demoteBtn.click();
+            }
+            return;
         }
         
         if (quickReactivateBtn) {
             e.preventDefault();
             e.stopPropagation();
+            if (quickReactivateBtn.disabled) return;
+            quickReactivateBtn.disabled = true;
+            quickReactivateBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Reactivating...`;
             const docId = quickReactivateBtn.dataset.docid;
             const reactivateBtn = document.querySelector(`.reactivate-btn[data-docid="${docId}"]`);
             if (reactivateBtn) reactivateBtn.click();
+            return;
         }
     });
 }

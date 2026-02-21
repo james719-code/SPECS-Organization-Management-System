@@ -87,10 +87,8 @@ function getFilesHTML(fileList) {
     <div class="files-view-container container-fluid py-4 px-md-5">
         <header class="row align-items-center mb-5 gy-4">
             <div class="col-12 col-lg-7">
-                <div class="officer-page-header mb-0">
-                    <h1 class="page-title mb-1">Shared Files</h1>
-                    <p class="page-subtitle mb-0">Browse, search, and manage organization documents.</p>
-                </div>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Shared Files</h1>
+                    <p class="text-muted mb-0">Browse, search, and manage organization documents.</p>
             </div>
             <div class="col-12 col-lg-5">
                 <div class="officer-search-bar d-flex align-items-center">
@@ -180,7 +178,7 @@ function attachEventListeners(currentUser, userLookup, initialData) {
     const loadFiles = async (searchTerm = '') => {
         // Show loading spinner
         updateGridLayout(true); // Center the spinner
-        grid.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div>`;
+        grid.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;"></div>`;
 
         try {
             const queries = [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)];

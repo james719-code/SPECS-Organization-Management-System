@@ -19,7 +19,7 @@ import arrowRight from 'bootstrap-icons/icons/arrow-right.svg';
 import walletFill from 'bootstrap-icons/icons/wallet-fill.svg';
 
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
+const COLLECTION_ID_ACCOUNTS = import.meta.env.VITE_COLLECTION_ID_ACCOUNTS;
 const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
 const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
@@ -37,11 +37,11 @@ let _dashboardProfile = null;
 const CHART_COLORS = {
     primary: '#0d6b66',
     primaryLight: '#149a93',
-    secondary: '#f4a261',
+    secondary: '#5a9e8f',
     success: '#2a9d8f',
-    warning: '#e9c46a',
-    danger: '#e76f51',
-    info: '#60a5fa',
+    warning: '#d4a843',
+    danger: '#c0392b',
+    info: '#3d8b7a',
     gray: '#64748b',
     gradientStart: 'rgba(13, 107, 102, 0.2)',
     gradientEnd: 'rgba(13, 107, 102, 0.0)',
@@ -55,8 +55,8 @@ function getDashboardHTML(user, profile) {
         <div class="admin-dashboard-container animate-fade-in-up">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
                 <div class="mb-2 mb-md-0">
-                    <h2 class="fw-bold m-0 text-primary">Dashboard Overview</h2>
-                    <p class="text-muted m-0 small">Welcome back, ${adminName}</p>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Dashboard Overview</h1>
+                    <p class="text-muted mb-0">Welcome back, ${adminName}</p>
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     <button id="refreshDashboardBtn" class="btn btn-light btn-sm d-flex align-items-center gap-2 rounded-pill shadow-sm px-3" title="Refresh data">
@@ -274,22 +274,7 @@ function getDashboardHTML(user, profile) {
                 </div>
             </div>
 
-            <!-- Recent Activity -->
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-                            <h6 class="m-0 fw-bold text-primary">Recent Activity</h6>
-                            <a href="#" class="small text-primary text-decoration-none fw-medium" data-quick-action="activity-logs">View All</a>
-                        </div>
-                        <div class="card-body p-0" id="recentActivityList">
-                            <div class="text-center py-4 text-muted small">No recent activity</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="text-center mt-3">
+            <div class="text-center mt-4">
                 <small class="text-muted" id="last-updated-time">Last updated: Just now</small>
             </div>
         </div>
@@ -397,7 +382,7 @@ async function attachDashboardListeners() {
                 console.log('[DEV] Using mock dashboard data');
             } else {
                 const [usersResponse, eventsResponse, filesResponse, revenueResponse, expensesResponse] = await Promise.all([
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)]),
                     databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', new Date().toISOString())]),
                     databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)]),
                     databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.limit(1000)]),
@@ -654,49 +639,6 @@ async function attachDashboardListeners() {
         }
     };
 
-    // Load recent activity from localStorage
-    const loadRecentActivity = () => {
-        const activityList = document.getElementById('recentActivityList');
-        if (!activityList) return;
-
-        try {
-            const stored = localStorage.getItem('admin_activity_logs');
-            const logs = stored ? JSON.parse(stored) : [];
-            const recent = logs.slice(0, 5);
-
-            if (recent.length === 0) {
-                activityList.innerHTML = '<div class="text-center py-4 text-muted small">No recent activity</div>';
-                return;
-            }
-
-            const ACTIVITY_COLORS = {
-                account_created: 'success', account_verified: 'success', account_promoted: 'info',
-                account_demoted: 'warning', account_deactivated: 'secondary', account_reactivated: 'success',
-                account_deleted: 'danger', event_created: 'primary', event_deleted: 'danger',
-                file_uploaded: 'primary', file_deleted: 'danger', payment_created: 'success',
-                payment_marked_paid: 'success', bulk_action: 'info', login: 'primary',
-                logout: 'secondary', export_data: 'info'
-            };
-
-            activityList.innerHTML = recent.map(log => {
-                const color = ACTIVITY_COLORS[log.type] || 'secondary';
-                const timeAgo = getTimeAgo(new Date(log.timestamp));
-                return `
-                    <div class="activity-item d-flex align-items-center gap-3 px-4 py-3">
-                        <div class="bg-${color}-subtle text-${color} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;">
-                            <i class="bi bi-circle-fill" style="font-size:0.4rem;"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="small text-dark">${log.description}</div>
-                        </div>
-                        <span class="text-muted small flex-shrink-0">${timeAgo}</span>
-                    </div>
-                `;
-            }).join('');
-        } catch (e) {
-            activityList.innerHTML = '<div class="text-center py-4 text-muted small">No recent activity</div>';
-        }
-    };
 
     function getTimeAgo(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
@@ -729,7 +671,6 @@ async function attachDashboardListeners() {
 
     // Initial load
     await loadDashboardData();
-    loadRecentActivity();
 
     // Refresh button handler
     if (refreshBtn) {

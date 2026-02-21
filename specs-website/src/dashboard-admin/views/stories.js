@@ -17,8 +17,8 @@ export default function renderStoriesView() {
     <div class="admin-stories-container animate-fade-in-up">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
              <div class="mb-2 mb-md-0">
-                <h2 class="fw-bold m-0 text-primary">Manage Stories</h2>
-                <p class="text-muted m-0 small">Approve, edit, and manage all stories.</p>
+                <h1 class="display-6 fw-bold text-dark mb-1">Manage Stories</h1>
+                <p class="text-muted mb-0">Approve, edit, and manage all stories.</p>
             </div>
             <div class="d-flex flex-column flex-sm-row gap-3 align-items-start align-items-sm-center">
                 <select id="adminStoryFilter" class="form-select border-0 shadow-sm bg-white py-2 ps-3" style="max-width: 200px; cursor: pointer;">

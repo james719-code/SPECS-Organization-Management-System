@@ -76,10 +76,7 @@ function getSettingsHTML() {
         <div class="settings-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">
-                        <img src="${gearFill}" alt="Settings" class="me-2" style="width: 2rem; filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);">
-                        System Settings
-                    </h1>
+                    <h1 class="display-6 fw-bold text-dark mb-1">System Settings</h1>
                     <p class="text-muted mb-0">Configure system preferences and options</p>
                 </div>
                 <div class="col-12 col-lg-6">

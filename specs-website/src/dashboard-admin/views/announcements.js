@@ -103,10 +103,7 @@ function getAnnouncementsHTML() {
         <div class="announcements-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">
-                        <img src="${megaphone}" alt="Announcements" class="me-2" style="width: 2rem; filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);">
-                        Compose & Share
-                    </h1>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Compose & Share</h1>
                     <p class="text-muted mb-0">Draft announcements, copy to clipboard, or open in your email client</p>
                 </div>
                 <div class="col-12 col-lg-6">

@@ -595,9 +595,9 @@ export default async function renderFinanceView(userLookup, currentUser) {
         container.innerHTML = `
             <div class="finance-overview animate-fade-in-up">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 gap-3">
-                    <div class="officer-page-header mb-0">
-                        <h1 class="page-title mb-1">Financial Overview</h1>
-                        <p class="page-subtitle m-0">Performance summary from ${start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} to ${end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
+                    <div>
+                        <h1 class="display-6 fw-bold text-dark mb-1">Financial Overview</h1>
+                        <p class="text-muted mb-0">Performance summary from ${start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} to ${end.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</p>
                     </div>
                     <div class="d-flex gap-2">
                         <div class="officer-search-bar d-flex align-items-center" style="width: 250px;">

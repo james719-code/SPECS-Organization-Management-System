@@ -117,8 +117,8 @@ function getStudentHTML() {
         <div class="student-directory-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-4 gy-3">
                 <div class="col-12 col-lg-4">
-                    <h1 class="fw-bold text-dark mb-1" style="font-size: 1.65rem; letter-spacing: -0.5px;">Student Directory</h1>
-                    <p class="text-muted mb-0 small">Browse and manage student records</p>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Student Directory</h1>
+                    <p class="text-muted mb-0">Browse and manage student records</p>
                 </div>
                 <div class="col-12 col-lg-8">
                     <div class="d-flex flex-column flex-sm-row gap-2 justify-content-lg-end flex-wrap align-items-sm-center">
@@ -479,7 +479,7 @@ async function attachEventListeners() {
         let filtered = allStudents;
 
         if (yearFilter !== 'all') {
-            filtered = filtered.filter(s => s.yearLevel === yearFilter);
+            filtered = filtered.filter(s => String(s.yearLevel) === yearFilter);
         }
 
         if (searchTerm) {

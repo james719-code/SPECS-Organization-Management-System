@@ -10,6 +10,7 @@
 @import "bootstrap/scss/forms";
 @import "bootstrap/scss/tables";
 @import "bootstrap/scss/pagination";
+@import "bootstrap/scss/close";
 
 // =====================================================
 // ADMIN DASHBOARD - ENHANCED MINIMALIST THEME
@@ -147,15 +148,16 @@
   margin-bottom: $space-5;
   
   .page-title {
-    font-size: 1.5rem;
+    font-size: 2.5rem;
     font-weight: 700;
-    color: $primary;
-    margin-bottom: $space-1;
+    color: #212529;
+    margin-bottom: 0.25rem;
+    line-height: 1.2;
   }
-  
+
   .page-subtitle {
-    font-size: 0.875rem;
-    color: var(--admin-text-secondary);
+    font-size: 1rem;
+    color: #6c757d;
     margin: 0;
   }
   

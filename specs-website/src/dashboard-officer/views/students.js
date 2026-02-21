@@ -100,10 +100,8 @@ function getStudentHTML() {
         <div class="student-directory-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <div class="officer-page-header mb-0">
-                        <h1 class="page-title mb-1">Student Directory</h1>
-                        <p class="page-subtitle mb-0">View student records and accept pending signups.</p>
-                    </div>
+                        <h1 class="display-6 fw-bold text-dark mb-1">Student Directory</h1>
+                        <p class="text-muted mb-0">View student records and accept pending signups.</p>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">

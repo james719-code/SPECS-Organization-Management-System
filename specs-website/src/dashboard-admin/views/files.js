@@ -181,7 +181,7 @@ async function attachFilesListeners() {
         }
 
         updateGridLayout(true);
-        grid.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div>`;
+        grid.innerHTML = `<div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;"></div>`;
 
         try {
             const queries = [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)];

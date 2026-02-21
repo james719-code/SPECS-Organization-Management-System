@@ -213,9 +213,8 @@ export default async function renderDashboard() {
       contentEl.style.opacity = '0';
       contentEl.style.transition = 'opacity 0.15s ease';
       contentEl.innerHTML = `
-        <div class="officer-loading">
-          <div class="spinner-ring"></div>
-          <span class="loading-text">Loading ${viewName}...</span>
+        <div class="d-flex justify-content-center align-items-center" style="height: 70vh;">
+          <div class="spinner-border text-primary" style="width: 2rem; height: 2rem;" role="status"></div>
         </div>
       `;
       contentEl.style.opacity = '1';

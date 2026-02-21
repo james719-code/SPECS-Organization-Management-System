@@ -30,70 +30,77 @@ function createVolunteerRequestCardHTML(student) {
         day: 'numeric'
     });
 
-    const isBackoutRequest = student.volunteer_request_status === 'backout_pending';
-    const badgeClass = isBackoutRequest ? 'bg-info-subtle text-info border-info-subtle' : 'bg-warning-subtle text-warning border-warning-subtle';
-    const badgeText = isBackoutRequest ? 'Backout Request' : 'Pending';
+    const status = student.volunteer_request_status || 'none';
+    let badgeClass, badgeText, actionButtons = '';
 
-    const actionButtons = isBackoutRequest ? `
-        <button class="btn btn-sm btn-danger flex-fill approve-backout-btn" data-student-id="${student.$id}">
-            <img src="${checkCircleFill}" width="14" class="me-1" style="filter: brightness(0) invert(1);">
-            Approve Leave
-        </button>
-        <button class="btn btn-sm btn-outline-secondary flex-fill reject-backout-btn" data-student-id="${student.$id}">
-            <img src="${xCircleFill}" width="14" class="me-1">
-            Deny Leave
-        </button>
-    ` : `
-        <button class="btn btn-sm btn-success flex-fill approve-volunteer-btn" data-student-id="${student.$id}">
-            <img src="${checkCircleFill}" width="14" class="me-1" style="filter: brightness(0) invert(1);">
-            Approve
-        </button>
-        <button class="btn btn-sm btn-outline-danger flex-fill reject-volunteer-btn" data-student-id="${student.$id}">
-            <img src="${xCircleFill}" width="14" class="me-1">
-            Reject
-        </button>
-    `;
+    switch (status) {
+        case 'backout_pending':
+            badgeClass = 'bg-info-subtle text-info border-info-subtle';
+            badgeText = 'Backout Request';
+            actionButtons = `
+                <button class="btn btn-sm btn-danger approve-backout-btn px-3" data-student-id="${student.$id}">
+                    <img src="${checkCircleFill}" width="13" class="me-1" style="filter: brightness(0) invert(1);">
+                    Approve Leave
+                </button>
+                <button class="btn btn-sm btn-outline-secondary reject-backout-btn px-3" data-student-id="${student.$id}">
+                    <img src="${xCircleFill}" width="13" class="me-1">
+                    Deny
+                </button>`;
+            break;
+        case 'pending':
+            badgeClass = 'bg-warning-subtle text-warning border-warning-subtle';
+            badgeText = 'Pending';
+            actionButtons = `
+                <button class="btn btn-sm btn-success approve-volunteer-btn px-3" data-student-id="${student.$id}">
+                    <img src="${checkCircleFill}" width="13" class="me-1" style="filter: brightness(0) invert(1);">
+                    Approve
+                </button>
+                <button class="btn btn-sm btn-outline-danger reject-volunteer-btn px-3" data-student-id="${student.$id}">
+                    <img src="${xCircleFill}" width="13" class="me-1">
+                    Reject
+                </button>`;
+            break;
+        case 'approved':
+            badgeClass = 'bg-success-subtle text-success border-success-subtle';
+            badgeText = 'Active Volunteer';
+            break;
+        case 'rejected':
+            badgeClass = 'bg-danger-subtle text-danger border-danger-subtle';
+            badgeText = 'Rejected';
+            break;
+        default:
+            badgeClass = 'bg-light text-secondary border-secondary-subtle';
+            badgeText = 'No Request';
+            break;
+    }
 
     return `
-        <div class="col">
-            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm volunteer-card">
-                <div class="card-body p-4 position-relative">
-                    <div class="position-absolute top-0 end-0 m-3">
-                        <span class="badge ${badgeClass} border px-2 py-1">
-                            ${badgeText}
-                        </span>
-                    </div>
-                    
-                    <div class="d-flex align-items-center mb-4">
-                        <div class="file-icon-wrapper bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 56px; height: 56px; font-weight: 700; font-size: 1.2rem;">
-                            ${initials}
-                        </div>
-                        <div style="max-width: calc(100% - 80px);">
-                            <h6 class="fw-bold text-dark mb-1 text-truncate" title="${student.name}">${student.name}</h6>
-                            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.75rem;">${student.section || 'No Section'}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex flex-column gap-2 border-top border-light pt-3">
-                        <div class="d-flex align-items-center gap-2 text-secondary" title="${student.email}">
-                            <img src="${envelopeIcon}" width="14" style="opacity: 0.6;">
-                            <span class="small text-truncate">${student.email || 'No email'}</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 text-secondary">
-                            <img src="${mortarboardIcon}" width="14" style="opacity: 0.6;">
-                            <span class="small">Year ${student.yearLevel || 'N/A'}</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 text-secondary">
-                            <img src="${calendarIcon}" width="14" style="opacity: 0.6;">
-                            <span class="small">Requested: ${formattedDate}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2 mt-4">
-                        ${actionButtons}
-                    </div>
+        <div class="volunteer-list-item d-flex align-items-center gap-3 p-3 border-bottom">
+            <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold" style="width: 42px; height: 42px; font-size: 0.9rem;">
+                ${initials}
+            </div>
+            <div class="flex-grow-1 min-width-0">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <span class="fw-semibold text-dark text-truncate">${student.name}</span>
+                    <span class="badge ${badgeClass} border px-2" style="font-size: 0.7rem;">${badgeText}</span>
+                    <span class="badge bg-light text-secondary border px-2" style="font-size: 0.7rem;">${student.section || 'No Section'}</span>
+                </div>
+                <div class="d-flex align-items-center gap-3 text-secondary small flex-wrap">
+                    <span class="d-flex align-items-center gap-1 text-truncate" title="${student.email}">
+                        <img src="${envelopeIcon}" width="12" style="opacity: 0.5;">
+                        ${student.email || 'No email'}
+                    </span>
+                    <span class="d-flex align-items-center gap-1">
+                        <img src="${mortarboardIcon}" width="12" style="opacity: 0.5;">
+                        Year ${student.yearLevel || 'N/A'}
+                    </span>
+                    <span class="d-flex align-items-center gap-1">
+                        <img src="${calendarIcon}" width="12" style="opacity: 0.5;">
+                        ${formattedDate}
+                    </span>
                 </div>
             </div>
+            ${actionButtons ? `<div class="d-flex gap-2 flex-shrink-0">${actionButtons}</div>` : ''}
         </div>`;
 }
 
@@ -102,10 +109,8 @@ function getVolunteersHTML() {
         <div class="volunteers-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <div class="officer-page-header mb-0">
-                        <h1 class="page-title mb-1">Volunteer Requests</h1>
-                        <p class="page-subtitle mb-0">Review and manage student volunteer applications.</p>
-                    </div>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Volunteer Requests</h1>
+                    <p class="text-muted mb-0">Review and manage student volunteer applications.</p>
                 </div>
                 <div class="col-12 col-lg-6">
                     <div class="d-flex flex-column flex-sm-row gap-3 justify-content-lg-end">
@@ -170,8 +175,10 @@ function getVolunteersHTML() {
                 </div>
             </div>
             
-            <div id="volunteer-cards-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5" style="min-height: 300px;">
-                <div class="col-12 text-center p-5"><div class="spinner-border text-primary" role="status"></div></div>
+            <div class="card border-0 shadow-sm overflow-hidden">
+                <div id="volunteer-cards-container" style="min-height: 200px;">
+                    <div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
             </div>
         </div>
     `;
@@ -199,16 +206,16 @@ async function attachEventListeners(currentUser, profile) {
 
     const updateGridState = (data) => {
         if (data.length === 0) {
-            cardsContainer.className = "d-flex flex-column align-items-center justify-content-center py-5 text-center";
             cardsContainer.innerHTML = `
-                <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
-                    <img src="${personHearts}" style="width: 40px; opacity: 0.2;">
+                <div class="d-flex flex-column align-items-center justify-content-center py-5 text-center">
+                    <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                        <img src="${personHearts}" style="width: 40px; opacity: 0.2;">
+                    </div>
+                    <h4 class="fw-bold text-dark">No volunteer requests</h4>
+                    <p class="text-muted">There are no pending volunteer requests at this time.</p>
                 </div>
-                <h4 class="fw-bold text-dark">No volunteer requests</h4>
-                <p class="text-muted">There are no pending volunteer requests at this time.</p>
             `;
         } else {
-            cardsContainer.className = "row row-cols-1 row-cols-md-2 row-cols-xl-3 row-cols-xxl-4 g-4 pb-5";
             cardsContainer.innerHTML = data.map(createVolunteerRequestCardHTML).join('');
         }
     };
@@ -228,6 +235,8 @@ async function attachEventListeners(currentUser, profile) {
             filtered = filtered.filter(s => s.is_volunteer === true);
         } else if (filterVal === 'rejected') {
             filtered = filtered.filter(s => s.volunteer_request_status === 'rejected');
+        } else if (filterVal === 'all') {
+            filtered = filtered.filter(s => s.volunteer_request_status && s.volunteer_request_status !== 'none');
         }
 
         // Search Filter
@@ -246,14 +255,18 @@ async function attachEventListeners(currentUser, profile) {
         try {
             if (DEV_BYPASS) {
                 const { mockStudents } = await import('../../shared/mock/mockData.js');
-                allStudents = [...mockStudents];
+                allStudents = mockStudents.filter(s =>
+                    s.volunteer_request_status && s.volunteer_request_status !== 'none'
+                );
             } else {
                 const res = await databases.listDocuments(
                     DATABASE_ID,
                     COLLECTION_ID_STUDENTS,
                     [Query.limit(500), Query.orderDesc('$updatedAt')]
                 );
-                allStudents = res.documents;
+                allStudents = res.documents.filter(s =>
+                    s.volunteer_request_status && s.volunteer_request_status !== 'none'
+                );
             }
             updateStats();
             applyFilters();

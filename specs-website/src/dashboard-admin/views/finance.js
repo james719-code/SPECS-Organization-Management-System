@@ -27,10 +27,7 @@ function getFinanceHTML() {
         <div class="finance-container container-fluid py-4 px-md-5">
             <header class="row align-items-center mb-5 gy-4">
                 <div class="col-12 col-lg-6">
-                    <h1 class="display-6 fw-bold text-dark mb-1">
-                        <img src="${cashStackIcon}" alt="Finance" class="me-2" style="width: 2rem; filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);">
-                        Finance Overview
-                    </h1>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Finance Overview</h1>
                     <p class="text-muted mb-0">Track revenue and expenses for the organization</p>
                 </div>
                 <div class="col-12 col-lg-6">

@@ -77,9 +77,9 @@ function getSettingsHTML(user, profile) {
 
     return `
     <div class="settings-container container-fluid py-4 px-md-5 animate-fade-in-up">
-        <header class="officer-page-header mb-5">
-            <h1 class="page-title mb-1">Settings</h1>
-            <p class="page-subtitle">Manage your profile details and security preferences.</p>
+        <header class="mb-5">
+            <h1 class="display-6 fw-bold text-dark mb-1">Settings</h1>
+            <p class="text-muted mb-0">Manage your profile details and security preferences.</p>
         </header>
 
         <div class="row g-4">

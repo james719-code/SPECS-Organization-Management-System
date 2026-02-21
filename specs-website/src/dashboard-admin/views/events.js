@@ -86,8 +86,8 @@ function getEventsHTML() {
         <div class="admin-events-container animate-fade-in-up">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="fw-bold m-0 text-primary">Events Timeline</h2>
-                    <p class="text-muted m-0 small">Manage upcoming and past events</p>
+                    <h1 class="display-6 fw-bold text-dark mb-1">Events Timeline</h1>
+                    <p class="text-muted mb-0">Manage upcoming and past events</p>
                 </div>
                 <div class="d-flex gap-2">
                     <div class="btn-group btn-group-sm" id="eventFilterGroup">

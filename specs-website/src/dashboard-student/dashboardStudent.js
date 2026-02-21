@@ -327,11 +327,8 @@ async function handleRoute() {
     const mainContent = document.getElementById(MAIN_CONTENT_ID);
 
     mainContent.innerHTML = `
-        <div class="d-flex flex-column align-items-center justify-content-center p-5 mt-5">
-            <div class="spinner-border text-primary mb-3" role="status" style="width: 2rem; height: 2rem;">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="text-muted small">Loading...</p>
+        <div class="d-flex justify-content-center align-items-center" style="height: 70vh;">
+            <div class="spinner-border text-primary" style="width: 2rem; height: 2rem;" role="status"></div>
         </div>
     `;
 
