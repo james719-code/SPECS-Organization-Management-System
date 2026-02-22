@@ -76,14 +76,14 @@ function createVolunteerRequestCardHTML(student) {
 
     return `
         <div class="volunteer-list-item d-flex align-items-center gap-3 p-3 border-bottom">
-            <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold" style="width: 42px; height: 42px; font-size: 0.9rem;">
+            <div class="volunteer-avatar bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold">
                 ${initials}
             </div>
             <div class="flex-grow-1 min-width-0">
                 <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                     <span class="fw-semibold text-dark text-truncate">${student.name}</span>
-                    <span class="badge ${badgeClass} border px-2" style="font-size: 0.7rem;">${badgeText}</span>
-                    <span class="badge bg-light text-secondary border px-2" style="font-size: 0.7rem;">${student.section || 'No Section'}</span>
+                    <span class="badge ${badgeClass} border px-2" >${badgeText}</span>
+                    <span class="badge bg-light text-secondary border px-2" >${student.section || 'No Section'}</span>
                 </div>
                 <div class="d-flex align-items-center gap-3 text-secondary small flex-wrap">
                     <span class="d-flex align-items-center gap-1 text-truncate" title="${student.email}">
@@ -194,7 +194,7 @@ async function attachEventListeners(currentUser, profile) {
     const updateStats = () => {
         const pending = allStudents.filter(s => s.volunteer_request_status === 'pending').length;
         const backoutPending = allStudents.filter(s => s.volunteer_request_status === 'backout_pending').length;
-        const approved = allStudents.filter(s => s.is_volunteer === true).length;
+        const approved = allStudents.filter(s => s.volunteer_request_status === 'approved' || s.is_volunteer === true).length;
         const rejected = allStudents.filter(s => s.volunteer_request_status === 'rejected').length;
 
         document.getElementById('stat-pending').textContent = pending;
@@ -232,7 +232,7 @@ async function attachEventListeners(currentUser, profile) {
         } else if (filterVal === 'backout_pending') {
             filtered = filtered.filter(s => s.volunteer_request_status === 'backout_pending');
         } else if (filterVal === 'approved') {
-            filtered = filtered.filter(s => s.is_volunteer === true);
+            filtered = filtered.filter(s => s.volunteer_request_status === 'approved' || s.is_volunteer === true);
         } else if (filterVal === 'rejected') {
             filtered = filtered.filter(s => s.volunteer_request_status === 'rejected');
         } else if (filterVal === 'all') {

@@ -45,7 +45,12 @@ function resolvePaymentForName(payment) {
 
 /** Build a sanitised JSON string safe for embedding in data-attributes */
 function safePaymentData(payment) {
-    return JSON.stringify(payment).replace(/'/g, "\\'");
+    return JSON.stringify(payment)
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +577,7 @@ async function attachEventListeners(currentUser, profile) {
 
             const editBtn = e.target.closest('.edit-payment-btn');
             if (editBtn) {
-                const payment = JSON.parse(editBtn.dataset.payment.replace(/\\'/g, "'"));
+                const payment = JSON.parse(editBtn.dataset.payment);
                 const form = document.getElementById('editPaymentForm');
                 form.querySelector('#editPaymentId').value = payment.$id;
                 form.querySelector('#editItemName').value = payment.item_name;
@@ -596,7 +601,7 @@ async function attachEventListeners(currentUser, profile) {
             // --- Mark Paid (with loading state) ---
             const paidBtn = e.target.closest('.paid-payment-btn');
             if (paidBtn) {
-                const payment = JSON.parse(paidBtn.dataset.payment.replace(/\\'/g, "'"));
+                const payment = JSON.parse(paidBtn.dataset.payment);
                 const confirmed = await confirmAction('Mark as Paid', `Mark "${payment.item_name}" as Paid?`, 'Mark Paid', 'success');
                 if (confirmed) {
                     paidBtn.disabled = true;
@@ -606,6 +611,7 @@ async function attachEventListeners(currentUser, profile) {
                         const sName = sData.name || currentStudent.username;
 
                         await api.payments.markPaid(payment, currentUser.$id, sName);
+                        api.cache.clearAll();
                         showToast(`"${payment.item_name}" marked as paid`, 'success');
                         await refreshDataAndRender();
                     } catch (error) {
@@ -625,6 +631,7 @@ async function attachEventListeners(currentUser, profile) {
                     deleteBtn.disabled = true;
                     try {
                         await api.payments.delete(deleteBtn.dataset.paymentId);
+                        api.cache.clearAll();
                         showToast('Payment deleted', 'success');
                         await refreshDataAndRender();
                     } catch (error) {
@@ -660,6 +667,7 @@ async function attachEventListeners(currentUser, profile) {
                             await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
                             showToast(`Cleared ${paidPayments.length} paid record${paidPayments.length !== 1 ? 's' : ''}`, 'success');
                         }
+                        api.cache.clearAll();
                         await refreshDataAndRender();
                     } catch (error) {
                         showToast(`Error: ${error.message}`, 'error');
@@ -692,6 +700,7 @@ async function attachEventListeners(currentUser, profile) {
                             await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
                             showToast(`Cleared ${paidPayments.length} record${paidPayments.length !== 1 ? 's' : ''} for ${studentName}`, 'success');
                         }
+                        api.cache.clearAll();
                         const paymentsRes = await api.payments.list();
                         allPayments = paymentsRes.documents;
                         refreshSummaryCards();
@@ -792,6 +801,7 @@ async function attachEventListeners(currentUser, profile) {
                     showToast('Payment updated', 'success');
                     editPaymentModalInstance.hide();
                 }
+                api.cache.clearAll();
                 await refreshDataAndRender();
             } catch (err) {
                 showToast(err.message, 'error');

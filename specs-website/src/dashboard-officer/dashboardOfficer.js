@@ -48,10 +48,10 @@ const FILES_PAGE_LIMIT = 10;
 
 function closeSidebar(sidebarEl) {
   if (!sidebarEl) return;
-  if (!sidebarEl.classList.contains('show')) return;
+  if (window.innerWidth >= 992) return;
 
-  const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-  if (closeBtn) closeBtn.click();
+  const instance = Offcanvas.getInstance(sidebarEl);
+  if (instance) instance.hide();
 }
 
 export default async function renderDashboard() {
@@ -206,7 +206,8 @@ export default async function renderDashboard() {
     const viewLinks = document.querySelectorAll('#sidebar [data-view]');
     const sidebar = document.getElementById('sidebar');
 
-
+    // Track which views have been rendered to avoid serving stale prefetched data
+    const renderedViews = new Set();
 
     const renderContent = async (viewName) => {
       // Fade out current content and show loading spinner
@@ -247,16 +248,22 @@ export default async function renderDashboard() {
           case "finance":
             await renderFn(userLookup, user);
             break;
-          case "files":
-            view = renderFn(initialFilesData, userLookup, user);
+          case "files": {
+            const filesData = renderedViews.has('files') ? { files: [], total: 0 } : initialFilesData;
+            view = renderFn(filesData, userLookup, user);
             contentEl.innerHTML = view.html;
             view.afterRender();
+            renderedViews.add('files');
             break;
-          case "events":
-            view = renderFn(initialEventsData, user, userLookup);
+          }
+          case "events": {
+            const eventsData = renderedViews.has('events') ? [] : initialEventsData;
+            view = renderFn(eventsData, user, userLookup);
             contentEl.innerHTML = view.html;
             view.afterRender();
+            renderedViews.add('events');
             break;
+          }
           case "students":
             view = renderFn(user, profile);
             contentEl.innerHTML = view.html;
@@ -313,10 +320,7 @@ export default async function renderDashboard() {
         e.preventDefault();
         const view = e.currentTarget.dataset.view;
         renderContent(view);
-        // Close sidebar on mobile
-        if (window.innerWidth < 992) {
-          closeSidebar(sidebar);
-        }
+        closeSidebar(sidebar);
       });
     });
 

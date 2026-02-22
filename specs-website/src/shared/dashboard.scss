@@ -53,6 +53,28 @@
   font-size: 0.7rem;
 }
 
+// --- HOVER EFFECTS ---
+.hover-lift {
+  transition: all $transition-bounce;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.hover-scale {
+  transition: transform $transition-fast;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
 // --- STATUS BADGES (Enhanced) ---
 .status-badge {
   padding: $space-1 $space-3;
@@ -428,24 +450,20 @@ aside.offcanvas-lg.offcanvas-start {
   // GPU acceleration to prevent flickering/glitching
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
   will-change: transform;
-  
+
   // Smooth scrolling for iOS
   -webkit-overflow-scrolling: touch;
-  
-  // Prevent visual artifacts during animation
+
+  // Slide animation with GPU acceleration combined
   &.offcanvas-start {
-    transform: translateX(-100%);
-    
+    transform: translate3d(-100%, 0, 0);
+    transition: transform 0.3s ease-in-out !important;
+
     &.show, &.showing {
-      transform: translateX(0);
+      transform: translate3d(0, 0, 0);
     }
   }
-  
-  // Smooth transition
-  transition: transform 0.3s ease-in-out !important;
 }
 
 // Backdrop stability
@@ -945,13 +963,7 @@ aside.offcanvas-lg.offcanvas-start {
   .offcanvas-start {
     width: 280px !important;
     max-width: 85vw;
-    
-    // Ensure smooth animation without glitches
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-    -webkit-transform-style: preserve-3d;
-    transform-style: preserve-3d;
-    
+
     // Stable positioning
     position: fixed !important;
     top: 0 !important;
@@ -959,13 +971,22 @@ aside.offcanvas-lg.offcanvas-start {
     left: 0 !important;
     height: 100vh !important;
     height: 100dvh !important; // Dynamic viewport height for mobile browsers
-    
+
     // Prevent content jumping
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
   }
-  
+
+  // Fix z-index stacking for mobile
+  .offcanvas {
+    z-index: 1055 !important;
+  }
+
+  .offcanvas-backdrop {
+    z-index: 1050 !important;
+  }
+
   // Ensure body doesn't scroll when offcanvas is open
   body.offcanvas-open {
     overflow: hidden !important;
@@ -982,7 +1003,7 @@ aside.offcanvas-lg.offcanvas-start {
   color: $gray-400;
   font-size: 0.75rem;
   display: none;
-  
+
   @include media-breakpoint-down(md) {
     display: block;
   }
@@ -994,29 +1015,9 @@ aside.offcanvas-lg.offcanvas-start {
     #dashboard-content {
       padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
     }
-    
+
     .position-fixed.bottom-0 {
       margin-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
     }
-  }
-}
-
-// --- RESPONSIVE ---
-@include media-breakpoint-down(lg) {
-  .offcanvas-start {
-    width: 260px !important;
-    
-    // Ensure stable rendering
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-  }
-  
-  // Fix z-index stacking for mobile
-  .offcanvas {
-    z-index: 1055 !important;
-  }
-  
-  .offcanvas-backdrop {
-    z-index: 1050 !important;
   }
 }

@@ -17,6 +17,7 @@ import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
  */
 
 const ANNOUNCEMENTS_STORAGE_KEY = 'admin_announcements_drafts';
+const MAX_DRAFTS = 50;
 
 function getDrafts() {
     try {
@@ -37,6 +38,11 @@ function saveDraft(announcement) {
             drafts[existingIndex] = announcement;
         } else {
             drafts.unshift(announcement);
+        }
+
+        // Keep only the latest MAX_DRAFTS entries
+        if (drafts.length > MAX_DRAFTS) {
+            drafts.splice(MAX_DRAFTS);
         }
 
         localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(drafts));
@@ -250,21 +256,6 @@ function getAnnouncementsHTML() {
             </div>
         </div>
 
-        <style>
-            .hover-lift {
-                transition: all 0.2s ease;
-            }
-            .hover-lift:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
-            }
-            .line-clamp-2 {
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-            }
-        </style>
     `;
 }
 

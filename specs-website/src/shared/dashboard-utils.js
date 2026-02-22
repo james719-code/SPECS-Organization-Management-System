@@ -10,10 +10,12 @@
  */
 export function closeSidebar(sidebarEl) {
     if (!sidebarEl) return;
-    if (!sidebarEl.classList.contains('show')) return;
+    if (window.innerWidth >= 992) return;
 
-    const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-    if (closeBtn) closeBtn.click();
+    import('bootstrap').then(({ Offcanvas }) => {
+        const instance = Offcanvas.getInstance(sidebarEl);
+        if (instance) instance.hide();
+    });
 }
 
 /**

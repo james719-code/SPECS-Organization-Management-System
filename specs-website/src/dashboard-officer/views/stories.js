@@ -397,10 +397,10 @@ async function attachEventListeners(currentUser, profile) {
                     );
                 }
 
-                // Update local state - officer approval sends to admin queue
+                // Update local state
                 const story = allStories.find(s => s.$id === storyId);
                 if (story) {
-                    story.officerApproval = true;
+                    story.isAccepted = true;
                 }
                 updateStats();
                 applyFilters();

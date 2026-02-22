@@ -20,10 +20,11 @@ import calendarWeek from 'bootstrap-icons/icons/calendar-week.svg';
 function getSettingsHTML(user, profile) {
     const isStudent = profile.type === 'student';
 
+    const currentYearLevel = (profile.students && profile.students.yearLevel) || profile.yearLevel;
     const yearLevelOptions = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B']
         .map(section => {
             const value = `BSCS ${section}`;
-            const selected = profile.yearLevel === value ? 'selected' : '';
+            const selected = currentYearLevel === value ? 'selected' : '';
             return `<option value="${value}" ${selected}>${value}</option>`;
         }).join('');
 
@@ -177,10 +178,6 @@ function getSettingsHTML(user, profile) {
                 </div>
             </div>
         </div>
-        <style>
-            .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; opacity: 0; transform: translateY(20px); }
-            @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
-        </style>
     </div>
     `;
 }
@@ -234,9 +231,10 @@ function attachEventListeners(user, profile) {
         if (profile.type === 'student') {
             // Students collection: map 'fullname' form field → 'name' attribute
             const studentData = {};
-            if (data.fullname) studentData.name = data.fullname;
+            if (data.name) studentData.name = data.name;
             if (data.yearLevel) studentData.yearLevel = data.yearLevel;
-            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id, studentData);
+            const studentDocId = (profile.students && profile.students.$id) ? profile.students.$id : user.$id;
+            await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentDocId, studentData);
             // Also update username on accounts
             if (data.username) {
                 await databases.updateDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id, { username: data.username });
@@ -270,7 +268,8 @@ function attachEventListeners(user, profile) {
         }
 
         const uploaded = await storage.createFile(BUCKET_ID_SCHEDULES, ID.unique(), file);
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id, {
+        const studentDocId = (profile.students && profile.students.$id) ? profile.students.$id : user.$id;
+        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentDocId, {
             haveSchedule: true,
             scheduleId: uploaded.$id
         });

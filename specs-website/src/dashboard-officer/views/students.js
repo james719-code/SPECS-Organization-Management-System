@@ -31,8 +31,8 @@ function createStudentCardHTML(account) {
     const requestedDate = new Date(account.$createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     const statusBadge = isVerified
-        ? '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.7rem;">Verified</span>'
-        : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size: 0.7rem;">Pending</span>';
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 extra-small">Verified</span>'
+        : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 extra-small">Pending</span>';
 
     const actionButtons = !isVerified
         ? `<div class="d-flex gap-2 mt-auto pt-3 border-top border-light">
@@ -54,19 +54,19 @@ function createStudentCardHTML(account) {
 
     return `
         <div class="col">
-            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-card" style="border-radius: 12px; overflow: hidden;">
+            <div class="card dashboard-card h-100 transition-all border-0 shadow-sm student-card overflow-hidden">
                 <div class="card-body p-0 d-flex flex-column">
                     <!-- Header -->
                     <div class="d-flex align-items-center gap-3 p-3 pb-0">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="width: 48px; height: 48px; font-weight: 700; font-size: 1.1rem; background: ${isVerified ? '#d1fae5' : '#fef3c7'}; color: ${isVerified ? '#059669' : '#d97706'};">
+                        <div class="student-initials-avatar rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm ${isVerified ? 'verified' : 'pending'}">
                             ${initials}
                         </div>
                         <div class="min-width-0 flex-grow-1">
                             <div class="d-flex align-items-center gap-2 mb-1">
-                                <h6 class="fw-bold text-dark mb-0 text-truncate" style="font-size: 0.95rem;" title="${name}">${name}</h6>
+                                <h6 class="fw-bold text-dark mb-0 text-truncate student-name-text" title="${name}">${name}</h6>
                                 ${statusBadge}
                             </div>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.7rem;">${section}</span>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 extra-small">${section}</span>
                         </div>
                     </div>
                     
@@ -235,6 +235,7 @@ async function attachEventListeners(currentUser, profile) {
                 acceptBtn.disabled = false;
                 acceptBtn.innerHTML = `<img src="${checkCircle}" width="14" style="filter: brightness(0) invert(1);"> <span>Approve</span>`;
             }
+            return;
         }
 
         // Reject Button Action

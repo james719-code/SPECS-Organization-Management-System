@@ -119,11 +119,10 @@ async function init() {
 function closeSidebar() {
     const sidebarEl = document.getElementById('sidebarMenu');
     if (!sidebarEl) return;
+    if (window.innerWidth >= 992) return;
 
-    if (!sidebarEl.classList.contains('show')) return;
-
-    const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-    if (closeBtn) closeBtn.click();
+    const instance = Offcanvas.getInstance(sidebarEl);
+    if (instance) instance.hide();
 }
 
 function cleanupBootstrapEffects() {

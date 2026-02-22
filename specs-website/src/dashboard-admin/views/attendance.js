@@ -116,10 +116,6 @@ function getAttendanceHTML() {
             </div>
         </div>
 
-        <style>
-            #refreshAttendanceBtn.refreshing img { animation: spin 1s linear infinite; }
-            @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        </style>
     `;
 }
 
@@ -290,6 +286,7 @@ async function attachAttendanceListeners() {
 
         try {
             await api.attendance.create(currentEventId, selectedStudentId, null, attendanceName);
+            api.cache.clearAll();
             toast.success('Attendance recorded');
             logActivity('other', `Added attendance for event`);
 
@@ -320,6 +317,7 @@ async function attachAttendanceListeners() {
 
         try {
             await api.attendance.delete(recordId);
+            api.cache.clearAll();
             toast.success('Attendance record removed');
             await loadAttendance(currentEventId);
         } catch (error) {

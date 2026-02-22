@@ -480,6 +480,7 @@ async function attachEventListeners(currentUser, profile) {
 
                     await api.payments.markPaid(payment, currentUser.$id, sName);
                     logActivity('payment_marked_paid', `Marked "${payment.item_name}" as paid for ${sName}`);
+                    api.cache.clearAll();
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
                 return;
@@ -490,7 +491,8 @@ async function attachEventListeners(currentUser, profile) {
                 if (!await confirmAction('Delete Payment', `Delete "${deleteBtn.dataset.paymentName}"? This action cannot be undone.`, 'Delete', 'danger')) return;
                 try {
                     await api.payments.delete(deleteBtn.dataset.paymentId);
-                    logActivity('payment_created', `Deleted payment "${deleteBtn.dataset.paymentName}"`);
+                    logActivity('payment_deleted', `Deleted payment "${deleteBtn.dataset.paymentName}"`);
+                    api.cache.clearAll();
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
             }
@@ -560,6 +562,7 @@ async function attachEventListeners(currentUser, profile) {
                     });
                     editPaymentModalInstance.hide();
                 }
+                api.cache.clearAll();
                 await refreshDataAndRender();
             } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
         });

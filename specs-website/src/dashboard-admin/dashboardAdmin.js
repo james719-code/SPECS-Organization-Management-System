@@ -55,10 +55,10 @@ import cashStack from 'bootstrap-icons/icons/cash-stack.svg';
 
 function closeSidebar(sidebarEl) {
   if (!sidebarEl) return;
-  if (!sidebarEl.classList.contains('show')) return;
+  if (window.innerWidth >= 992) return;
 
-  const closeBtn = sidebarEl.querySelector('[data-bs-dismiss="offcanvas"]');
-  if (closeBtn) closeBtn.click();
+  const instance = Offcanvas.getInstance(sidebarEl);
+  if (instance) instance.hide();
 }
 
 export default async function renderDashboardAdmin() {
@@ -295,10 +295,7 @@ export default async function renderDashboardAdmin() {
         e.preventDefault();
         const view = e.currentTarget.dataset.view;
         renderContent(view);
-        // Close sidebar on mobile
-        if (window.innerWidth < 992) {
-          closeSidebar(sidebar);
-        }
+        closeSidebar(sidebar);
       });
     });
 

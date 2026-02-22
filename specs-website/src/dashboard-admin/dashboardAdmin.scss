@@ -799,19 +799,8 @@
     width: 280px !important;
     max-width: 85vw;
     z-index: 1055 !important;
-    
-    // GPU acceleration for smooth animations
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-    will-change: transform;
-    
-    // Smooth transitions
-    transition: transform 0.3s ease-in-out !important;
-    
+
     // Prevent content jumping
-    -webkit-overflow-scrolling: touch;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
@@ -1102,11 +1091,91 @@
   
   .mobile-admin-item {
     padding: 0.85rem;
-    
+
     .item-avatar {
       width: 36px;
       height: 36px;
       font-size: 0.85rem;
+    }
+  }
+}
+
+// =====================================================
+// ADMIN-SPECIFIC VIEW STYLES
+// =====================================================
+
+// --- ATTENDANCE VIEW ---
+.attendance-container {
+  #refreshAttendanceBtn.refreshing img {
+    animation: spin 1s linear infinite;
+  }
+}
+
+@include media-breakpoint-down(md) {
+  .attendance-container {
+    padding: 0 !important;
+
+    #addAttendanceCard .row.g-3 {
+      .col-md-5,
+      .col-md-2 {
+        flex: 0 0 100%;
+        max-width: 100%;
+      }
+    }
+  }
+}
+
+// --- ANNOUNCEMENTS VIEW ---
+.announcements-container {
+  .draft-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      border-color: $gray-300;
+    }
+  }
+}
+
+@include media-breakpoint-down(md) {
+  .announcements-container {
+    padding: 0 !important;
+
+    .card[role="button"] .card-body {
+      padding: $space-3 !important;
+
+      .d-inline-flex[style*="width: 60px"] {
+        width: 48px !important;
+        height: 48px !important;
+      }
+    }
+  }
+}
+
+// --- SETTINGS VIEW ---
+.settings-container {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@include media-breakpoint-down(md) {
+  .settings-container {
+    padding: 0 !important;
+
+    .card .card-header {
+      padding: $space-3 !important;
+
+      h5 {
+        font-size: 0.95rem;
+      }
+    }
+
+    .card .card-body {
+      padding: $space-3 !important;
     }
   }
 }
