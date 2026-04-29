@@ -4,6 +4,7 @@ import { Modal } from 'bootstrap';
 import Chart from 'chart.js/auto';
 import { showToast } from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
+import { api, cachedApi, CacheTags } from '../../shared/api.js';
 import {
     DATABASE_ID,
     COLLECTION_ID_REVENUE,
@@ -350,7 +351,7 @@ function attachDetailViewListeners(user, userLookup) {
             if (btn.classList.contains('delete-btn')) {
                 const confirmed = await confirmAction('Delete Transaction', 'Are you sure you want to permanently delete this item?', 'Delete', 'danger');
                 if (confirmed) {
-                    try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); mobileCard.remove(); showToast('Transaction deleted', 'success'); }
+                    try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]); mobileCard.remove(); showToast('Transaction deleted', 'success'); }
                     catch (err) { showToast('Delete failed', 'error'); }
                 }
             } else if (btn.classList.contains('edit-btn')) {
@@ -368,7 +369,7 @@ function attachDetailViewListeners(user, userLookup) {
         if (btn.classList.contains('delete-btn')) {
             const confirmed = await confirmAction('Delete Transaction', 'Are you sure you want to permanently delete this item?', 'Delete', 'danger');
             if (confirmed) {
-                try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); row.remove(); showToast('Transaction deleted', 'success'); }
+                try { await databases.deleteDocument(DATABASE_ID, collectionId, docId); api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]); row.remove(); showToast('Transaction deleted', 'success'); }
                 catch (err) { showToast('Delete failed', 'error'); }
             }
         } else if (btn.classList.contains('edit-btn')) {
@@ -403,6 +404,7 @@ function attachDetailViewListeners(user, userLookup) {
             });
             try {
                 await databases.updateDocument(DATABASE_ID, collectionId, docId, updates);
+                api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 Object.entries(updates).forEach(([k, v]) => {
                     const f = k === 'date_earned' || k === 'date_buy' ? 'date' : k;
                     const cell = row.querySelector(`td[data-field="${f}"]`);
@@ -530,6 +532,7 @@ function attachMainListeners(currentUser, userLookup, data) {
             };
 
             await databases.createDocument(DATABASE_ID, formData.get('type') === 'revenue' ? COLLECTION_ID_REVENUE : COLLECTION_ID_EXPENSES, ID.unique(), payload);
+            api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
             addModal.hide();
             showToast('Transaction created', 'success');
             renderFinanceView(userLookup, currentUser);
@@ -579,11 +582,10 @@ export default async function renderFinanceView(userLookup, currentUser) {
         const start = new Date(startYear, startMonth, 1);
         const end = new Date(endYear, endMonth + 1, 0, 23, 59, 59);
 
-        const [rRes, eRes, evRes] = await Promise.all([
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.greaterThanEqual('date_earned', start.toISOString()), Query.lessThanEqual('date_earned', end.toISOString()), Query.limit(5000)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.greaterThanEqual('date_buy', start.toISOString()), Query.lessThanEqual('date_buy', end.toISOString()), Query.limit(5000)]),
-            databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(500)])
-        ]);
+        const summary = await cachedApi.finance.getRangeSummary({ start, end });
+        const rRes = { documents: summary.revenue };
+        const eRes = { documents: summary.expenses };
+        const evRes = { documents: summary.events };
 
         const eventLookup = evRes.documents.reduce((a, e) => ({ ...a, [e.$id]: e.event_name }), {});
         const acts = groupTransactions(rRes.documents, eRes.documents, eventLookup);

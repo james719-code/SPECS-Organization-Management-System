@@ -3,10 +3,10 @@ import './dashboardOfficer.scss';
 import '../guard/auth.js';
 
 import { account, databases } from "../shared/appwrite.js";
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_EVENTS, COLLECTION_ID_FILES } from "../shared/constants.js";
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from "../shared/constants.js";
 import { cache } from "../shared/cache.js";
+import { cachedApi } from "../shared/api.js";
 import { prefetchModule } from "../shared/lazyLoadHelper.js";
-import { Query } from "appwrite";
 import { Offcanvas } from 'bootstrap';
 import { setCurrentUser } from '../dashboard-admin/views/activity-logs.js';
 
@@ -80,9 +80,9 @@ export default async function renderDashboard() {
       profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
       const [filesResponse, eventsResponse, accountsResponse] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.orderDesc('$createdAt'), Query.limit(FILES_PAGE_LIMIT)]),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.orderDesc('date_to_held')]),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)])
+        cachedApi.files.listDocuments({ limit: FILES_PAGE_LIMIT }),
+        cachedApi.events.list({ limit: 500, orderDesc: true }),
+        cachedApi.users.listAllAccounts({}, 5 * 60 * 1000)
       ]);
 
       initialFilesData = { files: filesResponse.documents, total: filesResponse.total };

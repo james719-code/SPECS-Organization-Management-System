@@ -4,6 +4,7 @@ import { Modal } from 'bootstrap';
 import toast from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
 import { logActivity } from './activity-logs.js';
+import { cachedApi, api, CacheTags } from '../../shared/api.js';
 
 import fileEarmarkText from 'bootstrap-icons/icons/file-earmark-text.svg';
 import downloadIcon from 'bootstrap-icons/icons/download.svg';
@@ -18,7 +19,6 @@ import arrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg';
 
 const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
 const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
-const COLLECTION_ID_ACCOUNTS = import.meta.env.VITE_COLLECTION_ID_ACCOUNTS;
 const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS;
 const FILES_PAGE_LIMIT = 24;
 
@@ -140,7 +140,7 @@ async function attachFilesListeners() {
 
     // Load user lookup for uploader names
     try {
-        const accountsRes = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)]);
+        const accountsRes = await cachedApi.users.listAllAccounts({}, 5 * 60 * 1000);
         userLookup = accountsRes.documents.reduce((map, acc) => {
             const name = (acc.students && acc.students.name) ? acc.students.name : acc.username;
             map[acc.$id] = name;
@@ -189,7 +189,9 @@ async function attachFilesListeners() {
                 queries.push(Query.search('fileName', searchTerm));
             }
 
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, queries);
+            const res = searchTerm
+                ? await databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, queries)
+                : await cachedApi.files.listDocuments({ limit: FILES_PAGE_LIMIT }, isRefresh ? 0 : 2 * 60 * 1000);
             allFiles = res.documents;
             renderGrid(allFiles);
             
@@ -254,6 +256,7 @@ async function attachFilesListeners() {
             try {
                 await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_FILES, delBtn.dataset.docId);
                 await storage.deleteFile(BUCKET_ID_UPLOADS, delBtn.dataset.fileId);
+                api.cache.clearTags([CacheTags.FILES, CacheTags.DASHBOARD]);
 
                 // Animate card removal
                 if (card) {
@@ -303,6 +306,7 @@ async function attachFilesListeners() {
                 uploader: currentUser.$id,
                 fileID: uploaded.$id,
             });
+            api.cache.clearTags([CacheTags.FILES, CacheTags.DASHBOARD]);
             uploadModal.hide();
             e.target.reset();
             await loadFiles(searchInput.value.trim());

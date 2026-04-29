@@ -1,9 +1,9 @@
 import { databases } from '../../shared/appwrite.js';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS } from '../../shared/constants.js';
-import { Query } from 'appwrite';
 import { Modal } from 'bootstrap';
 import toast from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
+import { cachedApi, api, CacheTags } from '../../shared/api.js';
 
 import funnelIcon from 'bootstrap-icons/icons/funnel.svg';
 import searchIcon from 'bootstrap-icons/icons/search.svg';
@@ -340,6 +340,7 @@ async function attachEventListeners() {
     // ----- Delete helpers -----
     const deleteStudent = async (studentId) => {
         await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId);
+        api.cache.clearTags([CacheTags.STUDENTS, CacheTags.ACCOUNTS, CacheTags.DASHBOARD]);
     };
 
     const handleSingleDelete = async (studentId, studentName) => {
@@ -508,11 +509,7 @@ async function attachEventListeners() {
         }
 
         try {
-            const res = await databases.listDocuments(
-                DATABASE_ID,
-                COLLECTION_ID_STUDENTS,
-                [Query.limit(5000), Query.orderDesc('$createdAt')]
-            );
+            const res = await cachedApi.students.listAllProfiles({ orderDesc: '$createdAt' }, isRefresh ? 0 : 2 * 60 * 1000);
             allStudents = res.documents;
             clearSelection();
             applyFilters();

@@ -1,4 +1,4 @@
-import { api } from '../../shared/api.js';
+import { api, CacheTags } from '../../shared/api.js';
 import { ID } from 'appwrite';
 import { Modal } from 'bootstrap';
 import { showToast } from '../../shared/toast.js';
@@ -249,7 +249,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
     const loadAllEvents = async () => {
         const wrapper = document.getElementById('events-list-wrapper');
         try {
-            const response = await api.events.list({ limit: 5000 });
+            const response = await api.events.list({ limit: 500 });
             allEventsCache = response.documents;
             const upcoming = allEventsCache.filter(e => !e.event_ended);
             const ended = allEventsCache.filter(e => e.event_ended);
@@ -349,7 +349,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
             const confirmed = await confirmAction('End Event', 'Are you sure you want to mark this event as ended?', 'End Event', 'warning');
             if (confirmed) {
                 await api.events.markEnded(markEndedBtn.dataset.docId);
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 showToast('Event marked as ended', 'success');
                 loadAllEvents();
             }
@@ -360,7 +360,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
             if (confirmed) {
                 await api.events.delete(deleteBtn.dataset.docId);
                 await api.files.deleteEventImage(deleteBtn.dataset.fileId);
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.EVENTS, CacheTags.ATTENDANCE, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 showToast('Event deleted', 'success');
                 loadAllEvents();
             }
@@ -401,7 +401,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
         if (confirmed) {
             try {
                 await api.attendance.create(currentAttendanceEventId, sId, currentUserId, "Present");
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 attSearch.value = '';
                 attResults.style.display = 'none';
                 refreshAttendanceList(currentAttendanceEventId);
@@ -416,7 +416,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
             const confirmed = await confirmAction('Remove Attendance', 'Remove this attendance record?', 'Remove', 'danger');
             if (confirmed) {
                 await api.attendance.delete(btn.dataset.id);
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 refreshAttendanceList(currentAttendanceEventId);
                 showToast('Attendance record removed', 'success');
             }
@@ -439,7 +439,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
                 collab: Array.from(document.querySelectorAll('#collaborators-list .collaborator-input')).map(i => i.value.trim()).filter(Boolean),
                 event_ended: false
             });
-            addEventModal.hide(); e.target.reset(); api.cache.clearAll(); await loadAllEvents();
+            addEventModal.hide(); e.target.reset(); api.cache.clearTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]); await loadAllEvents();
             showToast('Event created successfully', 'success');
         } catch (error) { showToast('Failed to create event', 'error'); } finally { submitBtn.disabled = false; }
     });
@@ -462,7 +462,7 @@ function attachEventListeners(currentUser, userLookup, initialEvents) {
                 await api.files.deleteEventImage(document.getElementById('editEventFileId').value);
             }
             await api.events.update(document.getElementById('editEventId').value, data);
-            editEventModal.hide(); api.cache.clearAll(); await loadAllEvents();
+            editEventModal.hide(); api.cache.clearTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]); await loadAllEvents();
             showToast('Event updated successfully', 'success');
         } catch (error) { showToast('Update failed', 'error'); } finally { submitBtn.disabled = false; }
     });

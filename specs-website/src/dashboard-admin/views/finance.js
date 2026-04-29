@@ -5,6 +5,7 @@ import toast from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
 import { logActivity } from './activity-logs.js';
 import { formatCurrency, formatDate } from '../../shared/formatters.js';
+import { api, CacheTags } from '../../shared/api.js';
 
 import cashStackIcon from 'bootstrap-icons/icons/cash-stack.svg';
 import arrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg';
@@ -238,7 +239,7 @@ async function attachFinanceListeners() {
                 ]),
                 databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
                     Query.equal('is_paid', false),
-                    Query.limit(1000)
+                    Query.limit(500)
                 ])
             ]);
 
@@ -387,6 +388,7 @@ async function attachFinanceListeners() {
                 price,
                 date_spent: new Date(dateSpent).toISOString()
             });
+            api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
 
             toast.success('Expense added');
             logActivity('expense_created', `Added expense: ${name} (${formatCurrency(price * quantity)})`);
@@ -417,6 +419,7 @@ async function attachFinanceListeners() {
 
         try {
             await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseId);
+            api.cache.clearTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
             toast.success('Expense deleted');
             logActivity('expense_deleted', `Deleted expense record`);
             await loadData();

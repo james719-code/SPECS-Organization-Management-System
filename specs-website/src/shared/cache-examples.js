@@ -90,11 +90,11 @@ export async function getEventStatistics(eventId) {
             const [attendance, payments] = await Promise.all([
                 databases.listDocuments(DATABASE_ID, 'attendance', [
                     Query.equal('events', eventId),
-                    Query.limit(1000)
+                    Query.limit(500)
                 ]),
                 databases.listDocuments(DATABASE_ID, 'payments', [
                     Query.equal('events', eventId),
-                    Query.limit(1000)
+                    Query.limit(500)
                 ])
             ]);
 
@@ -160,7 +160,7 @@ export async function deleteEvent(eventId, fileId) {
         }
         
         // Clear all event-related data caches
-        api.cache.clearAll();
+        api.cache.clearByPattern('events_.*');
         
         console.log('Event deleted and all caches cleared');
     } catch (error) {

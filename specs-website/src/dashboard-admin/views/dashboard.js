@@ -1,10 +1,9 @@
-import { databases, storage } from '../../shared/appwrite.js';
-import { Query } from 'appwrite';
 import Chart from 'chart.js/auto';
 import toast from '../../shared/toast.js';
 import { formatCurrency } from '../../shared/formatters.js';
 import { chartManager, debounce, formatRelativeTime } from '../../shared/utils.js';
 import { errorState } from '../../shared/components/emptyState.js';
+import { cachedApi } from '../../shared/api.js';
 
 import peopleFill from 'bootstrap-icons/icons/people-fill.svg';
 import personExclamation from 'bootstrap-icons/icons/person-exclamation.svg';
@@ -17,13 +16,6 @@ import creditCardFill from 'bootstrap-icons/icons/credit-card-fill.svg';
 import personHeartsFill from 'bootstrap-icons/icons/person-hearts.svg';
 import arrowRight from 'bootstrap-icons/icons/arrow-right.svg';
 import walletFill from 'bootstrap-icons/icons/wallet-fill.svg';
-
-const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-const COLLECTION_ID_ACCOUNTS = import.meta.env.VITE_COLLECTION_ID_ACCOUNTS;
-const COLLECTION_ID_EVENTS = import.meta.env.VITE_COLLECTION_ID_EVENTS;
-const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES;
-const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE;
-const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES;
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -381,20 +373,12 @@ async function attachDashboardListeners() {
                 totalExpenses = stats.totalExpenses || 0;
                 console.log('[DEV] Using mock dashboard data');
             } else {
-                const [usersResponse, eventsResponse, filesResponse, revenueResponse, expensesResponse] = await Promise.all([
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', new Date().toISOString())]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [Query.limit(1)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [Query.limit(1000)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [Query.limit(1000)])
-                ]);
-                allAccounts = usersResponse.documents;
-                upcomingEventsCount = eventsResponse.total;
-                filesCount = filesResponse.total;
-                
-                // Calculate finance totals
-                totalRevenue = revenueResponse.documents.reduce((sum, r) => sum + ((r.price || 0) * (r.quantity || 1)), 0);
-                totalExpenses = expensesResponse.documents.reduce((sum, e) => sum + ((e.price || 0) * (e.quantity || 1)), 0);
+                const stats = await cachedApi.dashboard.getStats(isRefresh ? 0 : 2 * 60 * 1000);
+                allAccounts = stats.accounts;
+                upcomingEventsCount = stats.upcomingEventsCount;
+                filesCount = stats.filesCount;
+                totalRevenue = stats.totalRevenue;
+                totalExpenses = stats.totalExpenses;
             }
 
             const netBalance = totalRevenue - totalExpenses;

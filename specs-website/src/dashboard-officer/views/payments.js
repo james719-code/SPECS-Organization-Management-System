@@ -1,4 +1,4 @@
-import { api } from '../../shared/api.js';
+import { api, cachedApi, CacheTags } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 import { formatCurrency } from '../../shared/formatters.js';
 import { createStudentPaymentCardHTML } from '../../shared/components/paymentCard.js';
@@ -475,9 +475,9 @@ async function attachEventListeners(currentUser, profile) {
     wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
         const [paymentsRes, eventsRes, accountsRes] = await Promise.all([
-            api.payments.list(),
-            api.events.list({ limit: 500, orderDesc: false }),
-            api.users.listStudents()
+            cachedApi.payments.list(),
+            cachedApi.events.list({ limit: 500, orderDesc: false }),
+            cachedApi.users.listStudents()
         ]);
         allPayments = paymentsRes.documents;
         events = eventsRes.documents.filter(e => !e.event_ended);
@@ -611,7 +611,7 @@ async function attachEventListeners(currentUser, profile) {
                         const sName = sData.name || currentStudent.username;
 
                         await api.payments.markPaid(payment, currentUser.$id, sName);
-                        api.cache.clearAll();
+                        api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                         showToast(`"${payment.item_name}" marked as paid`, 'success');
                         await refreshDataAndRender();
                     } catch (error) {
@@ -631,7 +631,7 @@ async function attachEventListeners(currentUser, profile) {
                     deleteBtn.disabled = true;
                     try {
                         await api.payments.delete(deleteBtn.dataset.paymentId);
-                        api.cache.clearAll();
+                        api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                         showToast('Payment deleted', 'success');
                         await refreshDataAndRender();
                     } catch (error) {
@@ -667,7 +667,7 @@ async function attachEventListeners(currentUser, profile) {
                             await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
                             showToast(`Cleared ${paidPayments.length} paid record${paidPayments.length !== 1 ? 's' : ''}`, 'success');
                         }
-                        api.cache.clearAll();
+                        api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                         await refreshDataAndRender();
                     } catch (error) {
                         showToast(`Error: ${error.message}`, 'error');
@@ -700,7 +700,7 @@ async function attachEventListeners(currentUser, profile) {
                             await Promise.all(paidPayments.map(p => api.payments.delete(p.$id)));
                             showToast(`Cleared ${paidPayments.length} record${paidPayments.length !== 1 ? 's' : ''} for ${studentName}`, 'success');
                         }
-                        api.cache.clearAll();
+                        api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                         const paymentsRes = await api.payments.list();
                         allPayments = paymentsRes.documents;
                         refreshSummaryCards();
@@ -801,7 +801,7 @@ async function attachEventListeners(currentUser, profile) {
                     showToast('Payment updated', 'success');
                     editPaymentModalInstance.hide();
                 }
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 await refreshDataAndRender();
             } catch (err) {
                 showToast(err.message, 'error');

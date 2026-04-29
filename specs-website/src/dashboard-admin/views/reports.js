@@ -1,8 +1,6 @@
-import { databases } from '../../shared/appwrite.js';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, COLLECTION_ID_PAYMENTS, COLLECTION_ID_EVENTS } from '../../shared/constants.js';
-import { Query } from 'appwrite';
 import toast from '../../shared/toast.js';
 import Chart from 'chart.js/auto';
+import { cachedApi } from '../../shared/api.js';
 
 import fileText from 'bootstrap-icons/icons/file-text.svg';
 import download from 'bootstrap-icons/icons/download.svg';
@@ -95,7 +93,7 @@ async function generateAccountsReport(filters) {
         const { mockUsers } = await import('../../shared/mock/mockData.js');
         accounts = mockUsers;
     } else {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [Query.limit(5000)]);
+        const response = await cachedApi.users.listAllAccounts({}, 2 * 60 * 1000);
         accounts = response.documents;
     }
 
@@ -157,7 +155,7 @@ async function generateStudentsReport(filters) {
         const { mockStudents } = await import('../../shared/mock/mockData.js');
         students = mockStudents || [];
     } else {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [Query.limit(5000)]);
+        const response = await cachedApi.students.listAllProfiles({}, 2 * 60 * 1000);
         students = response.documents;
     }
 
@@ -201,7 +199,7 @@ async function generatePaymentsReport(filters) {
         const { mockPayments } = await import('../../shared/mock/mockData.js');
         payments = mockPayments || [];
     } else {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [Query.limit(5000)]);
+        const response = await cachedApi.payments.listAll({}, 60 * 1000);
         payments = response.documents;
     }
 
@@ -245,7 +243,7 @@ async function generateEventsReport(filters) {
         const { mockEvents } = await import('../../shared/mock/mockData.js');
         events = mockEvents || [];
     } else {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [Query.limit(5000)]);
+        const response = await cachedApi.events.listAll({}, 2 * 60 * 1000);
         events = response.documents;
     }
 

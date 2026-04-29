@@ -1,4 +1,4 @@
-import { api } from '../../shared/api.js';
+import { api, CacheTags } from '../../shared/api.js';
 import toast from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
 import { logActivity } from './activity-logs.js';
@@ -286,7 +286,7 @@ async function attachAttendanceListeners() {
 
         try {
             await api.attendance.create(currentEventId, selectedStudentId, null, attendanceName);
-            api.cache.clearAll();
+            api.cache.clearTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
             toast.success('Attendance recorded');
             logActivity('other', `Added attendance for event`);
 
@@ -317,7 +317,7 @@ async function attachAttendanceListeners() {
 
         try {
             await api.attendance.delete(recordId);
-            api.cache.clearAll();
+            api.cache.clearTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
             toast.success('Attendance record removed');
             await loadAttendance(currentEventId);
         } catch (error) {

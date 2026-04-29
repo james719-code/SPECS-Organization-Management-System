@@ -1,12 +1,10 @@
-import { databases, functions, account } from '../../shared/appwrite.js';
+import { functions } from '../../shared/appwrite.js';
 import {
-    DATABASE_ID,
-    COLLECTION_ID_ACCOUNTS,
     FUNCTION_ID
 } from '../../shared/constants.js';
-import { Query } from 'appwrite';
 import { showToast } from '../../shared/toast.js';
 import { confirmAction } from '../../shared/confirmModal.js';
+import { cachedApi, api, CacheTags } from '../../shared/api.js';
 
 import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
 import xCircle from 'bootstrap-icons/icons/x-circle.svg';
@@ -181,11 +179,7 @@ async function attachEventListeners(currentUser, profile) {
 
     const loadData = async () => {
         try {
-            const res = await databases.listDocuments(
-                DATABASE_ID,
-                COLLECTION_ID_ACCOUNTS,
-                [Query.limit(5000), Query.orderDesc('$createdAt')]
-            );
+            const res = await cachedApi.users.listAllAccounts({ orderDesc: '$createdAt' }, 2 * 60 * 1000);
             allAccounts = res.documents;
             applyFilters();
         } catch (err) {
@@ -223,6 +217,7 @@ async function attachEventListeners(currentUser, profile) {
                     // Optimistic update
                     const acc = allAccounts.find(a => a.$id === docId);
                     if (acc) acc.verified = true;
+                    api.cache.clearTags([CacheTags.ACCOUNTS, CacheTags.STUDENTS, CacheTags.DASHBOARD]);
                     applyFilters();
                     showToast('Student approved!', 'success');
                 } else {
@@ -266,6 +261,7 @@ async function attachEventListeners(currentUser, profile) {
                 );
 
                 allAccounts = allAccounts.filter(a => a.$id !== docId);
+                api.cache.clearTags([CacheTags.ACCOUNTS, CacheTags.STUDENTS, CacheTags.DASHBOARD]);
                 applyFilters();
                 showToast('Student request rejected.', 'warning');
             } catch (err) {

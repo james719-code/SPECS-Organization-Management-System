@@ -12,17 +12,23 @@ vi.mock('../../shared/appwrite.js', () => ({
     databases: {
         listDocuments: vi.fn(),
         getDocument: vi.fn()
+    },
+    storage: {
+        getFilePreview: vi.fn(() => 'preview-url')
     }
 }));
 
 describe('Cache Utility', () => {
     let cache;
+    let dataCache;
 
     beforeEach(async () => {
         localStorage.clear();
         // Dynamically import to get fresh instance
         const module = await import('../../shared/cache.js');
         cache = module.cache;
+        dataCache = module.dataCache;
+        dataCache.resetStats();
         cache.init();
     });
 
@@ -102,6 +108,70 @@ describe('Cache Utility', () => {
             expect(cache.get('key1')).toBeNull();
             expect(cache.get('key2')).toBeNull();
             expect(cache.get('key3')).toBeNull();
+        });
+    });
+
+    describe('stale-while-revalidate', () => {
+        it('should return stale data and refresh in the background', async () => {
+            cache.set('stale-key', 'old-value', { ttl: 0, staleTtl: 5000, tags: ['events'] });
+            const fetchFn = vi.fn().mockResolvedValue('new-value');
+
+            const result = await dataCache.getOrFetch('stale-key', fetchFn, { ttl: 5000, staleTtl: 5000, tags: ['events'] });
+            await Promise.resolve();
+
+            expect(result).toBe('old-value');
+            expect(fetchFn).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('request de-duplication', () => {
+        it('should share an in-flight request for the same key', async () => {
+            const fetchFn = vi.fn().mockResolvedValue({ value: 1 });
+
+            const [first, second] = await Promise.all([
+                dataCache.getOrFetch('dedupe-key', fetchFn, { ttl: 5000 }),
+                dataCache.getOrFetch('dedupe-key', fetchFn, { ttl: 5000 })
+            ]);
+
+            expect(first).toEqual({ value: 1 });
+            expect(second).toEqual({ value: 1 });
+            expect(fetchFn).toHaveBeenCalledTimes(1);
+            expect(dataCache.getStats().deduped).toBe(1);
+        });
+    });
+
+    describe('tag invalidation', () => {
+        it('should clear only entries with matching tags', () => {
+            cache.set('events-key', 'event-data', { ttl: 5000, tags: ['events'] });
+            cache.set('payments-key', 'payment-data', { ttl: 5000, tags: ['payments'] });
+
+            const removed = dataCache.invalidateTags(['events']);
+
+            expect(removed).toBe(1);
+            expect(cache.get('events-key')).toBeNull();
+            expect(cache.get('payments-key')).toBe('payment-data');
+        });
+    });
+
+    describe('bounded cleanup', () => {
+        it('should evict entries when localStorage write fails', () => {
+            cache.set('old-key', 'old-value', { ttl: 5000 });
+            localStorage.setItem.mockImplementationOnce(() => {
+                throw new Error('quota exceeded');
+            });
+
+            cache.set('new-key', 'new-value', { ttl: 5000 });
+
+            expect(dataCache.getStats().evictions).toBeGreaterThan(0);
+        });
+    });
+
+    describe('corrupted localStorage recovery', () => {
+        it('should recover from invalid stored JSON', () => {
+            localStorage.getItem.mockReturnValueOnce('{bad json');
+
+            expect(cache.get('bad-key')).toBeNull();
+            expect(() => cache.init()).not.toThrow();
         });
     });
 });

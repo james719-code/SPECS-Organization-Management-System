@@ -1,4 +1,4 @@
-import { api } from '../../shared/api.js';
+import { api, cachedApi, CacheTags } from '../../shared/api.js';
 import { Modal } from 'bootstrap';
 import { formatCurrency } from '../../shared/formatters.js';
 import { createStudentPaymentCardHTML } from '../../shared/components/paymentCard.js';
@@ -386,9 +386,9 @@ async function attachEventListeners(currentUser, profile) {
     wrapper.innerHTML = `<div class="d-flex justify-content-center align-items-center vh-50 p-5"><div class="spinner-border text-primary"></div></div>`;
     try {
         const [paymentsRes, eventsRes, accountsRes] = await Promise.all([
-            api.payments.list(),
-            api.events.list(5000, false),
-            api.users.listStudents()
+            cachedApi.payments.list(),
+            cachedApi.events.list({ limit: 500, orderDesc: false }),
+            cachedApi.users.listStudents()
         ]);
         allPayments = paymentsRes.documents;
         events = eventsRes.documents.filter(e => !e.event_ended);
@@ -480,7 +480,7 @@ async function attachEventListeners(currentUser, profile) {
 
                     await api.payments.markPaid(payment, currentUser.$id, sName);
                     logActivity('payment_marked_paid', `Marked "${payment.item_name}" as paid for ${sName}`);
-                    api.cache.clearAll();
+                    api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
                 return;
@@ -492,7 +492,7 @@ async function attachEventListeners(currentUser, profile) {
                 try {
                     await api.payments.delete(deleteBtn.dataset.paymentId);
                     logActivity('payment_deleted', `Deleted payment "${deleteBtn.dataset.paymentName}"`);
-                    api.cache.clearAll();
+                    api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                     await refreshDataAndRender();
                 } catch (error) { alert(`Error: ${error.message}`); }
             }
@@ -562,7 +562,7 @@ async function attachEventListeners(currentUser, profile) {
                     });
                     editPaymentModalInstance.hide();
                 }
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 await refreshDataAndRender();
             } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerHTML = 'Save'; }
         });

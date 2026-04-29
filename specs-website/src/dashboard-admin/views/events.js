@@ -1,5 +1,5 @@
 // views/renderAdmin/events.js
-import { api } from '../../shared/api.js';
+import { api, CacheTags } from '../../shared/api.js';
 import { imageCache } from '../../shared/cache.js';
 import { BUCKET_ID_EVENT_IMAGES } from '../../shared/constants.js';
 import toast from '../../shared/toast.js';
@@ -356,7 +356,7 @@ async function attachEventsListeners() {
                 logActivity('event_created', `Created event "${document.getElementById('createEventName').value.trim()}"`);
 
                 // Clear cache and reload
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 await loadEvents();
             } catch (error) {
                 console.error('Failed to create event:', error);
@@ -381,7 +381,7 @@ async function attachEventsListeners() {
 
             try {
                 await api.events.markEnded(docId);
-                api.cache.clearAll();
+                api.cache.clearTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 toast.success('Event marked as ended');
                 logActivity('event_deleted', `Marked event as ended`);
                 await loadEvents();
@@ -410,7 +410,7 @@ async function attachEventsListeners() {
         try {
             await api.events.delete(docId);
             await api.files.deleteEventImage(fileId);
-            api.cache.clearAll();
+            api.cache.clearTags([CacheTags.EVENTS, CacheTags.ATTENDANCE, CacheTags.DASHBOARD, CacheTags.LANDING]);
 
             const item = deleteBtn.closest('.timeline-item');
             item.style.transition = 'all 0.3s ease';
