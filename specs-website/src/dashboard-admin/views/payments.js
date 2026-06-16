@@ -143,6 +143,8 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
 
     const studentData = student.students || {};
     const displayName = studentData.name || student.username;
+    const roleName = student.type ? (student.type.charAt(0).toUpperCase() + student.type.slice(1)) : 'Student';
+    const displayMeta = studentData.yearLevel ? 'Year ' + studentData.yearLevel : roleName;
 
     const createMobilePaymentCard = (p, isPending = true) => {
         const paymentData = JSON.stringify(p).replace(/'/g, "\\'");
@@ -198,7 +200,7 @@ function getStudentDetailsPageHTML(student, paymentsForStudent) {
                 </button>
                 <div>
                      <h2 class="h3 fw-bold m-0 text-dark">${displayName}</h2>
-                     <p class="text-muted m-0 small">${studentData.yearLevel ? 'Year ' + studentData.yearLevel : 'Student'}</p>
+                     <p class="text-muted m-0 small">${displayMeta}</p>
                 </div>
             </div>
 

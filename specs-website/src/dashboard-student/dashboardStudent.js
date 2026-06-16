@@ -75,7 +75,7 @@ async function init() {
             accountDoc = await api.users.getAccount(currentUser.$id);
 
             // Security Check
-            if (accountDoc.type !== 'student' || !accountDoc.verified) {
+            if (accountDoc.type !== 'student' || !accountDoc.verified || accountDoc.deactivated === true) {
                 window.location.replace('/landing/#pending-verification');
                 return;
             }

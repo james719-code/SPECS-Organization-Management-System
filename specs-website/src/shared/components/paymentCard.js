@@ -28,7 +28,8 @@ export function createStudentPaymentCardHTML(student, paymentsForStudent, option
     const studentData = student.students || {};
     const displayName = studentData.name || student.username;
     const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    const displayMeta = studentData.yearLevel ? `Year ${studentData.yearLevel}` : 'Student';
+    const roleName = student.type ? (student.type.charAt(0).toUpperCase() + student.type.slice(1)) : 'Student';
+    const displayMeta = studentData.yearLevel ? `Year ${studentData.yearLevel}` : roleName;
 
     const clearButton = (!hasDues && hasPaidRecords && eraserIcon) ? `
         <button class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-3 clear-student-records-btn" 

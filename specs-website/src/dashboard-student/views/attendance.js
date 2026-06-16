@@ -46,7 +46,20 @@ async function attachAttendanceListeners(studentDoc) {
              return;
         }
 
-        const response = await api.attendance.listForStudent(studentDoc.$id);
+        const [response, eventsRes] = await Promise.all([
+            api.attendance.listForStudent(studentDoc.$id),
+            api.events.list({ limit: 500 }).catch(err => {
+                console.error("Failed to load events list", err);
+                return { documents: [] };
+            })
+        ]);
+
+        const eventMap = {};
+        if (eventsRes && eventsRes.documents) {
+            eventsRes.documents.forEach(e => {
+                eventMap[e.$id] = e.event_name;
+            });
+        }
 
         if (response.documents.length === 0) {
              tbody.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">No attendance records found.</td></tr>';
@@ -66,8 +79,14 @@ async function attachAttendanceListeners(studentDoc) {
             
             let eventName = 'Unknown Event';
             if (record.events) {
-                if (record.events.event_name) eventName = record.events.event_name;
-                else eventName = 'Event ID: ' + record.events;
+                const eventId = typeof record.events === 'object' ? record.events.$id : record.events;
+                if (record.events.event_name) {
+                    eventName = record.events.event_name;
+                } else if (eventMap[eventId]) {
+                    eventName = eventMap[eventId];
+                } else {
+                    eventName = 'Event ID: ' + eventId;
+                }
             }
 
             return `
@@ -87,8 +106,14 @@ async function attachAttendanceListeners(studentDoc) {
             
             let eventName = 'Unknown Event';
             if (record.events) {
-                if (record.events.event_name) eventName = record.events.event_name;
-                else eventName = 'Event ID: ' + record.events;
+                const eventId = typeof record.events === 'object' ? record.events.$id : record.events;
+                if (record.events.event_name) {
+                    eventName = record.events.event_name;
+                } else if (eventMap[eventId]) {
+                    eventName = eventMap[eventId];
+                } else {
+                    eventName = 'Event ID: ' + eventId;
+                }
             }
 
             return `

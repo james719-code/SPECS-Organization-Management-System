@@ -97,6 +97,12 @@ export default async function renderDashboard() {
     // Initialize the current user context for activity logging
     setCurrentUser(user, profile);
 
+    if (profile.type !== 'officer' || !profile.verified || profile.deactivated === true) {
+      console.error("Access Denied: User is not an active officer.");
+      window.location.href = "/landing/#login";
+      return;
+    }
+
     const displayName = profile.username || profile.fullname || 'Officer';
     const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 

@@ -26,25 +26,46 @@ function createTimelineItemHTML(eventDoc, userLookup) {
     const formattedDate = eventDate.toLocaleDateString('en-US', {
         year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit'
     });
-    const imageUrl = imageCache.get(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 150, 100);
-    const trashIconHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; pointer-events: none;">`;
+    const imageUrl = eventDoc.image_file ? imageCache.get(BUCKET_ID_EVENT_IMAGES, eventDoc.image_file, 150, 100) : null;
+    const trashIconHTML = `<img src="${trash}" alt="Delete" style="width: 1em; height: 1em; pointer-events: none; filter: invert(27%) sepia(52%) saturate(5458%) hue-rotate(341deg) brightness(89%) contrast(97%);">`;
 
     const now = new Date();
     const isEnded = eventDoc.event_ended;
     const isPast = eventDate < now;
     let statusBadge;
     if (isEnded) {
-        statusBadge = `<span class="badge bg-secondary-subtle text-secondary rounded-pill">Ended</span>`;
+        statusBadge = `<span class="badge bg-secondary-subtle text-secondary rounded-pill fw-semibold">Ended</span>`;
     } else if (isPast) {
-        statusBadge = `<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">Past - Not Ended</span>`;
+        statusBadge = `<span class="badge bg-warning-subtle text-warning-emphasis rounded-pill fw-semibold">Past - Not Ended</span>`;
     } else {
-        statusBadge = `<span class="badge bg-success-subtle text-success rounded-pill">Upcoming</span>`;
+        statusBadge = `<span class="badge bg-success-subtle text-success rounded-pill fw-semibold">Upcoming</span>`;
     }
 
     const markEndedBtn = (!isEnded) ? `
-        <button class="btn btn-sm btn-outline-secondary mark-ended-btn rounded-pill px-2 py-1 d-flex align-items-center gap-1" data-doc-id="${eventDoc.$id}" title="Mark as Ended">
-            <img src="${checkCircle}" style="width: 0.85em; opacity: 0.6;"> <span class="d-none d-md-inline small">End</span>
+        <button class="btn btn-sm btn-action btn-action-success mark-ended-btn rounded-pill px-2.5 py-1 d-flex align-items-center gap-1" data-doc-id="${eventDoc.$id}" title="Mark as Ended">
+            <span class="small">End</span>
         </button>` : '';
+
+    let imageHTML;
+    if (imageUrl) {
+        imageHTML = `<img src="${imageUrl}" alt="${eventDoc.event_name}" class="rounded me-3 mb-3 mb-sm-0 object-fit-cover shadow-sm" style="width: 100px; height: 75px; min-width: 100px; border: 1px solid rgba(0,0,0,0.05);">`;
+    } else {
+        let bgClass = 'bg-primary-subtle text-primary';
+        let filterStyle = 'filter: invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%);';
+        if (isEnded) {
+            bgClass = 'bg-secondary-subtle text-secondary';
+            filterStyle = 'filter: invert(50%) sepia(0%) saturate(0%) brightness(85%) contrast(90%);';
+        } else if (isPast) {
+            bgClass = 'bg-warning-subtle text-warning-emphasis';
+            filterStyle = 'filter: invert(45%) sepia(48%) saturate(958%) hue-rotate(15deg) brightness(94%) contrast(98%);';
+        }
+        imageHTML = `
+            <div class="rounded me-3 mb-3 mb-sm-0 d-flex flex-column align-items-center justify-content-center ${bgClass} shadow-sm border border-light-subtle" style="width: 100px; height: 75px; min-width: 100px; gap: 4px;">
+                <img src="${calendarEvent}" alt="No Image" style="width: 1.5rem; height: 1.5rem; ${filterStyle} opacity: 0.75;">
+                <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">SPECS</span>
+            </div>
+        `;
+    }
 
     return `
         <li class="timeline-item animate-fade-in-up" data-event-ended="${isEnded}" data-event-past="${isPast}">
@@ -54,23 +75,23 @@ function createTimelineItemHTML(eventDoc, userLookup) {
             <div class="card shadow-sm border-0 hover-lift ${isEnded ? 'opacity-75' : ''}">
                 <div class="card-body p-3">
                     <div class="d-flex flex-column flex-sm-row align-items-start">
-                        <img src="${imageUrl}" alt="${eventDoc.event_name}" class="rounded me-3 mb-3 mb-sm-0 object-fit-cover shadow-sm" style="width: 100px; height: 75px; min-width: 100px;">
+                        ${imageHTML}
                         <div class="flex-grow-1 w-100">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <div class="d-flex align-items-center gap-2 min-w-0">
-                                    <h5 class="card-title fw-bold mb-0 text-truncate" style="max-width: 200px;">${eventDoc.event_name}</h5>
+                                    <h5 class="card-title fw-bold mb-0 text-truncate text-dark" style="max-width: 380px;">${eventDoc.event_name}</h5>
                                     ${statusBadge}
                                 </div>
                                 <div class="d-flex gap-1 flex-shrink-0">
                                     ${markEndedBtn}
-                                    <button class="btn btn-sm btn-outline-danger delete-event-btn rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}" title="Delete Event">
+                                    <button class="btn btn-sm btn-action btn-action-danger delete-event-btn rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" data-doc-id="${eventDoc.$id}" data-file-id="${eventDoc.image_file}" title="Delete Event">
                                         ${trashIconHTML}
                                     </button>
                                 </div>
                             </div>
                             <div class="small text-muted mb-2 d-flex flex-wrap gap-2">
-                                <span class="badge bg-light text-dark border"><img src="${clock}" class="me-1" style="width: 0.9em; filter: invert(0.5);">${formattedDate}</span>
-                                <span class="badge bg-light text-dark border"><img src="${person}" class="me-1" style="width: 0.9em; filter: invert(0.5);">${creatorName}</span>
+                                <span class="badge-custom"><img src="${clock}" class="me-1" style="width: 0.95em; opacity: 0.6; filter: grayscale(1);">${formattedDate}</span>
+                                <span class="badge-custom"><img src="${person}" class="me-1" style="width: 0.95em; opacity: 0.6; filter: grayscale(1);">${creatorName}</span>
                             </div>
                             <p class="card-text small text-secondary mb-0 text-truncate-2">${eventDoc.description || 'No description provided.'}</p>
                         </div>
@@ -104,9 +125,9 @@ function getEventsHTML() {
                 </div>
             </div>
 
-            <div class="timeline-wrapper position-relative ps-4 py-2">
-                 <div class="timeline-line position-absolute top-0 bottom-0 start-0 border-start border-2 border-primary-subtle ms-4" style="z-index: 0;"></div>
-                 <ul class="timeline list-unstyled position-relative" id="events-timeline-container" style="z-index: 1;">
+            <div class="timeline-wrapper">
+                 <div class="timeline-line"></div>
+                 <ul class="timeline" id="events-timeline-container">
                     <div class="text-center p-5">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden"></span>
@@ -162,8 +183,11 @@ function getEventsHTML() {
 
         <style>
              .text-truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-             .timeline-item { position: relative; padding-bottom: 2rem; padding-left: 2rem; }
-             .timeline-icon { position: absolute; left: -1.25rem; top: 0; width: 2.5rem; height: 2.5rem; z-index: 2; border: 4px solid #fff; }
+             .timeline-wrapper { position: relative; padding-left: 2rem; }
+             .timeline-line { position: absolute; top: 0; bottom: 0; left: 1rem; width: 2px; background-color: #e5e7eb; z-index: 0; }
+             .timeline { list-style: none; padding: 0; margin: 0; position: relative; z-index: 1; }
+             .timeline-item { position: relative; padding-bottom: 2rem; padding-left: 1.5rem; }
+             .timeline-icon { position: absolute; left: -2.125rem; top: 0.25rem; width: 2.25rem; height: 2.25rem; z-index: 2; border: 4px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
              .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
              .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1) !important; }
              .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; opacity: 0; transform: translateY(20px); }
@@ -171,6 +195,57 @@ function getEventsHTML() {
              #refreshEventsBtn.refreshing img { animation: spin 1s linear infinite; }
              @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
              .timeline-item.filtered-out { display: none; }
+             
+             /* Custom visual styles for a premium dashboard look */
+             .badge-custom {
+                 display: inline-flex;
+                 align-items: center;
+                 padding: 0.25rem 0.625rem;
+                 font-size: 0.75rem;
+                 font-weight: 500;
+                 color: #4b5563;
+                 background-color: #f3f4f6;
+                 border-radius: 50rem;
+                 line-height: 1.25;
+             }
+             .btn-action {
+                 background: transparent;
+                 border: 1px solid #e5e7eb;
+                 border-radius: 50rem;
+                 padding: 0.25rem 0.75rem;
+                 font-size: 0.75rem;
+                 font-weight: 600;
+                 color: #4b5563;
+                 display: inline-flex;
+                 align-items: center;
+                 gap: 0.25rem;
+                 transition: all 0.15s ease;
+             }
+             .btn-action:hover {
+                 background-color: #f3f4f6;
+                 color: #1f2937;
+                 border-color: #d1d5db;
+             }
+             .btn-action-success {
+                 color: #0d6b66;
+                 border-color: #d1e7dd;
+                 background-color: #f1f8f5;
+             }
+             .btn-action-success:hover {
+                 background-color: #d1e7dd;
+                 color: #094d4a;
+                 border-color: #a3cfbb;
+             }
+             .btn-action-danger {
+                 color: #dc2626;
+                 border-color: #fee2e2;
+                 background-color: #fef2f2;
+             }
+             .btn-action-danger:hover {
+                 background-color: #fee2e2;
+                 color: #b91c1c;
+                 border-color: #fca5a5;
+             }
         </style>
     `;
 }

@@ -130,6 +130,16 @@ function handleSessionExpiry(reason = 'session_expired') {
 
         const type = profile.type;
         const isVerified = profile.verified;
+        const isDeactivated = profile.deactivated === true;
+
+        // RULE 0: Deactivated Users
+        if (isDeactivated && type !== 'admin') {
+            if (currentPath.includes('dashboard')) {
+                window.location.replace(ROUTES.LOGIN_PAGE);
+                return;
+            }
+            return;
+        }
 
         // RULE 1: Unverified Users
         if (!isVerified && type !== 'admin') {

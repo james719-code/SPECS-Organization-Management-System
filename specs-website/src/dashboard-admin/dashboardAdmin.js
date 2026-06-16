@@ -25,7 +25,11 @@ const viewModules = {
   stories: () => import('../dashboard-officer/views/stories.js'),
   attendance: () => import('./views/attendance.js'),
   finance: () => import('./views/finance.js'),
-  settings: () => import('../dashboard-officer/views/settings.js')
+  announcements: () => import('./views/announcements.js'),
+  reports: () => import('./views/reports.js'),
+  activityLogs: () => import('./views/activity-logs.js'),
+  systemSettings: () => import('./views/settings.js'),
+  profileSettings: () => import('../dashboard-officer/views/settings.js')
 };
 
 const loadedModules = new Map();
@@ -52,6 +56,11 @@ import fileTextFill from 'bootstrap-icons/icons/file-text-fill.svg';
 import gearFill from 'bootstrap-icons/icons/gear-fill.svg';
 import calendarCheckFill from 'bootstrap-icons/icons/calendar-check-fill.svg';
 import cashStack from 'bootstrap-icons/icons/cash-stack.svg';
+import megaphoneFill from 'bootstrap-icons/icons/megaphone-fill.svg';
+import barChartFill from 'bootstrap-icons/icons/bar-chart-fill.svg';
+import clockHistory from 'bootstrap-icons/icons/clock-history.svg';
+import sliders from 'bootstrap-icons/icons/sliders.svg';
+import personGear from 'bootstrap-icons/icons/person-gear.svg';
 
 function closeSidebar(sidebarEl) {
   if (!sidebarEl) return;
@@ -99,63 +108,104 @@ export default async function renderDashboardAdmin() {
           </a>
           <hr class="my-2" style="border-color: #e5e7eb; flex-shrink: 0;">
           <div class="sidebar-nav-scroll" style="flex: 1 1 0%; min-height: 0; overflow-y: auto;">
-            <ul class="nav nav-pills flex-column">
+            <ul class="nav nav-pills flex-column gap-1">
+              <!-- General Category -->
+              <li class="nav-item">
+                <small class="sidebar-category-header text-muted text-uppercase px-3 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Core</small>
+              </li>
               <li class="nav-item">
                 <a href="#" class="nav-link" data-view="dashboard">
-                  <img src="${grid1x2Fill}" alt="Dashboard" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Dashboard
+                  <img src="${grid1x2Fill}" alt="Dashboard" class="nav-icon me-2">Dashboard
                 </a>
+              </li>
+              
+              <!-- Management Category -->
+              <li class="nav-item mt-2">
+                <small class="sidebar-category-header text-muted text-uppercase px-3 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Management</small>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="accounts">
-                  <img src="${peopleFill}" alt="Accounts" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Accounts
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="events">
-                  <img src="${calendarEventFill}" alt="Events" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Events
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="attendance">
-                  <img src="${calendarCheckFill}" alt="Attendance" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Attendance
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="payments">
-                  <img src="${creditCardFill}" alt="Payments" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Payments
-                </a>
-              </li>
-              <li>
-                <a href="#" class="nav-link" data-view="finance">
-                  <img src="${cashStack}" alt="Finance" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Finance
+                  <img src="${peopleFill}" alt="Accounts" class="nav-icon me-2">Accounts
                 </a>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="students">
-                  <img src="${personBadgeFill}" alt="Students" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Students
+                  <img src="${personBadgeFill}" alt="Students" class="nav-icon me-2">Students
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="events">
+                  <img src="${calendarEventFill}" alt="Events" class="nav-icon me-2">Events
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="attendance">
+                  <img src="${calendarCheckFill}" alt="Attendance" class="nav-icon me-2">Attendance
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="payments">
+                  <img src="${creditCardFill}" alt="Payments" class="nav-icon me-2">Payments
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="finance">
+                  <img src="${cashStack}" alt="Finance" class="nav-icon me-2">Finance
                 </a>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="files">
-                  <img src="${folderFill}" alt="Files" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Files
+                  <img src="${folderFill}" alt="Files" class="nav-icon me-2">Files
                 </a>
+              </li>
+              
+              <!-- Engagement Category -->
+              <li class="nav-item mt-2">
+                <small class="sidebar-category-header text-muted text-uppercase px-3 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Engagement</small>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="volunteers">
-                  <img src="${personHeartsFill}" alt="Volunteers" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Volunteers
+                  <img src="${personHeartsFill}" alt="Volunteers" class="nav-icon me-2">Volunteers
                 </a>
               </li>
               <li>
                 <a href="#" class="nav-link" data-view="stories">
-                  <img src="${fileTextFill}" alt="Stories" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Stories
+                  <img src="${fileTextFill}" alt="Stories" class="nav-icon me-2">Stories
                 </a>
               </li>
-              <li class="nav-item mt-3">
-                <small class="text-muted text-uppercase px-3 fw-bold" style="font-size: 0.75rem;">Account</small>
+              <li>
+                <a href="#" class="nav-link" data-view="announcements">
+                  <img src="${megaphoneFill}" alt="Announcements" class="nav-icon me-2">Announcements
+                </a>
+              </li>
+              
+              <!-- System & Logs Category -->
+              <li class="nav-item mt-2">
+                <small class="sidebar-category-header text-muted text-uppercase px-3 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">System & Analytics</small>
               </li>
               <li>
-                <a href="#" class="nav-link" data-view="settings">
-                  <img src="${gearFill}" alt="Settings" class="me-2" style="width: 1.1em; height: 1.1em; opacity: 0.6;">Settings
+                <a href="#" class="nav-link" data-view="reports">
+                  <img src="${barChartFill}" alt="Reports" class="nav-icon me-2">Reports
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="activityLogs">
+                  <img src="${clockHistory}" alt="Activity Logs" class="nav-icon me-2">Activity Logs
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="systemSettings">
+                  <img src="${sliders}" alt="System Settings" class="nav-icon me-2">System Settings
+                </a>
+              </li>
+              
+              <!-- Account Category -->
+              <li class="nav-item mt-2">
+                <small class="sidebar-category-header text-muted text-uppercase px-3 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Account</small>
+              </li>
+              <li>
+                <a href="#" class="nav-link" data-view="profileSettings">
+                  <img src="${personGear}" alt="Profile Settings" class="nav-icon me-2">Profile Settings
                 </a>
               </li>
             </ul>
@@ -242,7 +292,7 @@ export default async function renderDashboardAdmin() {
           case "payments":
           case "volunteers":
           case "stories":
-          case "settings":
+          case "profileSettings":
             view = renderFn(user, profile);
             break;
           default:

@@ -38,12 +38,41 @@ function getAttendanceHTML() {
                         <option value="">-- Choose an event --</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-6" id="attendanceStatsCol" style="display: none;">
-                    <div class="d-flex gap-3 h-100 align-items-end">
-                        <div class="card border-0 shadow-sm flex-fill">
-                            <div class="card-body p-3 text-center">
-                                <div class="text-muted small fw-bold">ATTENDEES</div>
-                                <div class="h4 fw-bold text-primary mb-0" id="attendeeCount">0</div>
+            </div>
+
+            <!-- Attendance Metrics Grid -->
+            <div class="row g-3 mb-4" id="attendanceMetricsGrid" style="display: none;">
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">TOTAL STUDENTS</div>
+                            <div class="h4 fw-bold text-dark mb-0" id="metricTotalStudents">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">PRESENT</div>
+                            <div class="h4 fw-bold text-success mb-0" id="metricPresent">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">ABSENT</div>
+                            <div class="h4 fw-bold text-danger mb-0" id="metricAbsent">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-3">
+                            <div class="text-muted small fw-bold mb-1">ATTENDANCE RATE</div>
+                            <div class="h4 fw-bold text-primary mb-0" id="metricRate">0%</div>
+                            <div class="progress mt-1" style="height: 4px;">
+                                <div class="progress-bar bg-primary" id="metricRateProgress" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
@@ -121,8 +150,7 @@ function getAttendanceHTML() {
 
 async function attachAttendanceListeners() {
     const eventSelector = document.getElementById('eventSelector');
-    const attendanceStatsCol = document.getElementById('attendanceStatsCol');
-    const attendeeCount = document.getElementById('attendeeCount');
+    const attendanceMetricsGrid = document.getElementById('attendanceMetricsGrid');
     const addAttendanceCard = document.getElementById('addAttendanceCard');
     const attendanceListContainer = document.getElementById('attendanceListContainer');
     const attendanceEmptyState = document.getElementById('attendanceEmptyState');
@@ -170,7 +198,7 @@ async function attachAttendanceListeners() {
 
     const loadAttendance = async (eventId) => {
         if (!eventId) {
-            attendanceStatsCol.style.display = 'none';
+            attendanceMetricsGrid.style.display = 'none';
             addAttendanceCard.style.display = 'none';
             attendanceListContainer.style.display = 'none';
             attendanceEmptyState.style.display = 'block';
@@ -178,7 +206,7 @@ async function attachAttendanceListeners() {
         }
 
         attendanceEmptyState.style.display = 'none';
-        attendanceStatsCol.style.display = 'block';
+        attendanceMetricsGrid.style.display = 'flex';
         addAttendanceCard.style.display = 'block';
         attendanceListContainer.style.display = 'block';
 
@@ -187,7 +215,24 @@ async function attachAttendanceListeners() {
         try {
             const res = await api.attendance.listForEvent(eventId, { limit: 500 });
             currentAttendance = res.documents;
-            attendeeCount.textContent = currentAttendance.length;
+
+            // Compute metrics
+            const totalStudents = allStudents.length;
+            const uniquePresent = new Set(currentAttendance.map(r => {
+                if (!r.students) return null;
+                return typeof r.students === 'object' ? r.students.$id : r.students;
+            }).filter(Boolean));
+            const presentCount = uniquePresent.size;
+            const absentCount = Math.max(0, totalStudents - presentCount);
+            const rate = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+
+            // Render metrics
+            document.getElementById('metricTotalStudents').textContent = totalStudents;
+            document.getElementById('metricPresent').textContent = presentCount;
+            document.getElementById('metricAbsent').textContent = absentCount;
+            document.getElementById('metricRate').textContent = `${rate}%`;
+            document.getElementById('metricRateProgress').style.width = `${rate}%`;
+
             renderAttendanceTable(currentAttendance);
         } catch (error) {
             console.error('Failed to load attendance:', error);

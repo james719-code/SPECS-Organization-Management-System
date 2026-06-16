@@ -45,27 +45,29 @@
 
 <script type="module">
     import { account, databases } from './shared/appwrite.js';
+    import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants.js';
+
     const ROUTES = {
         ADMIN_DASHBOARD: '/dashboard-admin/',
-        USER_DASHBOARD: '/dashboard-user/',
+        OFFICER_DASHBOARD: '/dashboard-officer/',
+        STUDENT_DASHBOARD: '/dashboard-student/',
         LANDING_PAGE: '/landing/'
     };
-
-    const DATABASE_ID = import.meta.env.VITE_DATABASE_ID;
-    const COLLECTION_ID_STUDENTS = import.meta.env.VITE_COLLECTION_ID_STUDENTS;
 
     (async () => {
         try {
             const user = await account.get();
-            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, user.$id);
+            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
 
             if (profile.type === 'admin') {
                 window.location.replace(ROUTES.ADMIN_DASHBOARD);
-            } else if (profile.type === 'student' && profile.verified) {
-                window.location.replace(ROUTES.USER_DASHBOARD);
-            } else {
-                window.location.replace(ROUTES.LANDING_PAGE);
+            } else if (profile.type === 'officer' && profile.verified && !profile.deactivated) {
+                window.location.replace(ROUTES.OFFICER_DASHBOARD);
+            } else if (profile.type === 'student' && profile.verified && !profile.deactivated) {
+                window.location.replace(ROUTES.STUDENT_DASHBOARD);
             }
+
+            window.location.replace(ROUTES.LANDING_PAGE);
         } catch (error) {
             window.location.replace(ROUTES.LANDING_PAGE);
         }

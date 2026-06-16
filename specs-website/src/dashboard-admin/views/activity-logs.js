@@ -9,6 +9,25 @@ import downloadIcon from 'bootstrap-icons/icons/download.svg';
 import trashIcon from 'bootstrap-icons/icons/trash.svg';
 import infoCircle from 'bootstrap-icons/icons/info-circle.svg';
 
+// Custom icons for Activity Logs types
+import personPlus from 'bootstrap-icons/icons/person-plus.svg';
+import checkCircle from 'bootstrap-icons/icons/check-circle.svg';
+import arrowUpCircle from 'bootstrap-icons/icons/arrow-up-circle.svg';
+import arrowDownCircle from 'bootstrap-icons/icons/arrow-down-circle.svg';
+import personSlash from 'bootstrap-icons/icons/person-slash.svg';
+import personCheck from 'bootstrap-icons/icons/person-check.svg';
+import keyIcon from 'bootstrap-icons/icons/key.svg';
+import calendarPlus from 'bootstrap-icons/icons/calendar-plus.svg';
+import calendarX from 'bootstrap-icons/icons/calendar-x.svg';
+import fileEarmarkArrowUp from 'bootstrap-icons/icons/file-earmark-arrow-up.svg';
+import fileEarmarkMinus from 'bootstrap-icons/icons/file-earmark-minus.svg';
+import cashCoin from 'bootstrap-icons/icons/cash-coin.svg';
+import check2Square from 'bootstrap-icons/icons/check2-square.svg';
+import collection from 'bootstrap-icons/icons/collection.svg';
+import boxArrowInRight from 'bootstrap-icons/icons/box-arrow-in-right.svg';
+import boxArrowRight from 'bootstrap-icons/icons/box-arrow-right.svg';
+import activity from 'bootstrap-icons/icons/activity.svg';
+
 /**
  * Activity Logs View - Frontend tracking of admin actions
  * Stores logs in localStorage for demonstration purposes
@@ -41,25 +60,25 @@ function getCurrentUserName() {
 
 // Activity types with icons and colors
 const ACTIVITY_TYPES = {
-    account_created: { icon: 'bi-person-plus', color: 'success', label: 'Account Created' },
-    account_verified: { icon: 'bi-check-circle', color: 'success', label: 'Account Verified' },
-    account_promoted: { icon: 'bi-arrow-up-circle', color: 'info', label: 'Promoted to Officer' },
-    account_demoted: { icon: 'bi-arrow-down-circle', color: 'warning', label: 'Demoted to Student' },
-    account_deactivated: { icon: 'bi-person-slash', color: 'secondary', label: 'Account Deactivated' },
-    account_reactivated: { icon: 'bi-person-check', color: 'success', label: 'Account Reactivated' },
-    account_deleted: { icon: 'bi-trash', color: 'danger', label: 'Account Deleted' },
-    password_reset: { icon: 'bi-key', color: 'warning', label: 'Password Reset' },
-    event_created: { icon: 'bi-calendar-plus', color: 'primary', label: 'Event Created' },
-    event_deleted: { icon: 'bi-calendar-x', color: 'danger', label: 'Event Deleted' },
-    file_uploaded: { icon: 'bi-file-arrow-up', color: 'primary', label: 'File Uploaded' },
-    file_deleted: { icon: 'bi-file-minus', color: 'danger', label: 'File Deleted' },
-    payment_created: { icon: 'bi-cash-coin', color: 'success', label: 'Payment Created' },
-    payment_marked_paid: { icon: 'bi-check2-square', color: 'success', label: 'Payment Marked Paid' },
-    bulk_action: { icon: 'bi-collection', color: 'info', label: 'Bulk Action' },
-    login: { icon: 'bi-box-arrow-in-right', color: 'primary', label: 'Login' },
-    logout: { icon: 'bi-box-arrow-right', color: 'secondary', label: 'Logout' },
-    export_data: { icon: 'bi-download', color: 'info', label: 'Data Exported' },
-    other: { icon: 'bi-activity', color: 'secondary', label: 'Other Activity' }
+    account_created: { icon: personPlus, color: 'success', label: 'Account Created' },
+    account_verified: { icon: checkCircle, color: 'success', label: 'Account Verified' },
+    account_promoted: { icon: arrowUpCircle, color: 'info', label: 'Promoted to Officer' },
+    account_demoted: { icon: arrowDownCircle, color: 'warning', label: 'Demoted to Student' },
+    account_deactivated: { icon: personSlash, color: 'secondary', label: 'Account Deactivated' },
+    account_reactivated: { icon: personCheck, color: 'success', label: 'Account Reactivated' },
+    account_deleted: { icon: trashIcon, color: 'danger', label: 'Account Deleted' },
+    password_reset: { icon: keyIcon, color: 'warning', label: 'Password Reset' },
+    event_created: { icon: calendarPlus, color: 'primary', label: 'Event Created' },
+    event_deleted: { icon: calendarX, color: 'danger', label: 'Event Deleted' },
+    file_uploaded: { icon: fileEarmarkArrowUp, color: 'primary', label: 'File Uploaded' },
+    file_deleted: { icon: fileEarmarkMinus, color: 'danger', label: 'File Deleted' },
+    payment_created: { icon: cashCoin, color: 'success', label: 'Payment Created' },
+    payment_marked_paid: { icon: check2Square, color: 'success', label: 'Payment Marked Paid' },
+    bulk_action: { icon: collection, color: 'info', label: 'Bulk Action' },
+    login: { icon: boxArrowInRight, color: 'primary', label: 'Login' },
+    logout: { icon: boxArrowRight, color: 'secondary', label: 'Logout' },
+    export_data: { icon: downloadIcon, color: 'info', label: 'Data Exported' },
+    other: { icon: activity, color: 'secondary', label: 'Other Activity' }
 };
 
 /**
@@ -141,6 +160,24 @@ function exportLogsToCSV(logs) {
 /**
  * Create log entry HTML
  */
+function getFilterForColor(color) {
+    switch (color) {
+        case 'success':
+            return 'invert(42%) sepia(93%) saturate(1352%) hue-rotate(87deg) brightness(119%) contrast(119%)';
+        case 'info':
+            return 'invert(29%) sepia(98%) saturate(1679%) hue-rotate(199deg) brightness(97%) contrast(101%)';
+        case 'warning':
+            return 'invert(50%) sepia(98%) saturate(456%) hue-rotate(346deg) brightness(91%) contrast(95%)';
+        case 'danger':
+            return 'invert(21%) sepia(30%) saturate(7469%) hue-rotate(348deg) brightness(98%) contrast(92%)';
+        case 'primary':
+            return 'invert(31%) sepia(19%) saturate(2256%) hue-rotate(128deg) brightness(96%) contrast(89%)';
+        case 'secondary':
+        default:
+            return 'invert(45%) sepia(8%) saturate(12%) hue-rotate(316deg) brightness(95%) contrast(91%)';
+    }
+}
+
 function createLogEntryHTML(log) {
     const activityType = ACTIVITY_TYPES[log.type] || ACTIVITY_TYPES.other;
     const timeAgo = getTimeAgo(new Date(log.timestamp));
@@ -150,8 +187,8 @@ function createLogEntryHTML(log) {
         <div class="log-entry card border-0 shadow-sm mb-3 hover-shadow" data-log-id="${log.id}">
             <div class="card-body p-3">
                 <div class="d-flex align-items-start gap-3">
-                    <div class="log-icon bg-${activityType.color}-subtle text-${activityType.color} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
-                        <i class="bi ${activityType.icon}" style="font-size: 1.1rem;"></i>
+                    <div class="log-icon bg-${activityType.color}-subtle rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                        <img src="${activityType.icon}" alt="${activityType.label}" style="width: 1.1rem; height: 1.1rem; filter: ${getFilterForColor(activityType.color)};">
                     </div>
                     <div class="flex-grow-1">
                         <div class="d-flex justify-content-between align-items-start mb-1">
@@ -160,8 +197,8 @@ function createLogEntryHTML(log) {
                         </div>
                         <p class="mb-2 text-secondary small">${log.description}</p>
                         <div class="d-flex align-items-center gap-3 text-muted small">
-                            <span><i class="bi bi-person me-1"></i>${log.user}</span>
-                            <span title="${fullDate}"><i class="bi bi-clock me-1"></i>${fullDate}</span>
+                            <span><img src="${personFill}" style="width: 0.85rem; height: 0.85rem; opacity: 0.5; vertical-align: -0.125em; margin-right: 0.25rem;">${log.user}</span>
+                            <span title="${fullDate}"><img src="${clockHistory}" style="width: 0.85rem; height: 0.85rem; opacity: 0.5; vertical-align: -0.125em; margin-right: 0.25rem;">${fullDate}</span>
                         </div>
                     </div>
                 </div>
