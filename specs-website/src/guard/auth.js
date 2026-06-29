@@ -133,7 +133,7 @@ function handleSessionExpiry(reason = 'session_expired') {
         const isDeactivated = profile.deactivated === true;
 
         // RULE 0: Deactivated Users
-        if (isDeactivated && type !== 'admin') {
+        if (isDeactivated) {
             if (currentPath.includes('dashboard')) {
                 window.location.replace(ROUTES.LOGIN_PAGE);
                 return;

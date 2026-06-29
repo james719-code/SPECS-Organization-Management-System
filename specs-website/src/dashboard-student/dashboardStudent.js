@@ -5,6 +5,7 @@ import { prefetchModule } from '../shared/lazyLoadHelper.js';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import { Offcanvas, Tooltip } from 'bootstrap';
 import './dashboardStudent.scss';
+import '../guard/auth.js';
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';

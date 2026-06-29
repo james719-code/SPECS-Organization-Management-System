@@ -262,7 +262,11 @@ async function attachEventListeners(currentUser, profile) {
                 const res = await databases.listDocuments(
                     DATABASE_ID,
                     COLLECTION_ID_STUDENTS,
-                    [Query.limit(500), Query.orderDesc('$updatedAt')]
+                    [
+                        Query.notEqual('volunteer_request_status', 'none'),
+                        Query.limit(500),
+                        Query.orderDesc('$updatedAt')
+                    ]
                 );
                 allStudents = res.documents.filter(s =>
                     s.volunteer_request_status && s.volunteer_request_status !== 'none'

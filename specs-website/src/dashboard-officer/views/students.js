@@ -179,7 +179,7 @@ async function attachEventListeners(currentUser, profile) {
 
     const loadData = async () => {
         try {
-            const res = await cachedApi.users.listAllAccounts({ orderDesc: '$createdAt' }, 2 * 60 * 1000);
+            const res = await cachedApi.users.listAllAccounts({ type: 'student', orderDesc: '$createdAt' }, 2 * 60 * 1000);
             allAccounts = res.documents;
             applyFilters();
         } catch (err) {
