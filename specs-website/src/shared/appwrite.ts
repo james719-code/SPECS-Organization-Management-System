@@ -1,6 +1,7 @@
 import { Client, Account, Databases, Storage, Query, ID, Functions } from "appwrite";
 // @ts-ignore
 import { mockApi } from './mock/mockApiService.js';
+import { dataCache } from './cache.js';
 
 const IS_DEV = import.meta.env.DEV;
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -22,7 +23,11 @@ if (DEV_BYPASS) {
     account = {
         get: () => mockApi.getCurrentUser(),
         createEmailPasswordSession: (email: string, password: string) => mockApi.login(email, password),
-        deleteSession: () => mockApi.logout(),
+        deleteSession: async (sessionId = 'current') => {
+            const res = await mockApi.logout(sessionId);
+            dataCache.clear();
+            return res;
+        },
         createRecovery: (email: string, _url: string) => mockApi.sendPasswordResetEmail(email),
         updateRecovery: (_userId: string, _secret: string, _password: string) => Promise.resolve({ success: true }),
         create: (_userId: string, email: string, password: string, name: string) => mockApi.register(email, password, name),
@@ -58,7 +63,19 @@ if (DEV_BYPASS) {
         .setEndpoint(ENDPOINT)
         .setProject(PROJECT_ID);
 
-    account = new Account(client);
+    const rawAccount = new Account(client);
+    account = new Proxy(rawAccount, {
+        get(target, prop, receiver) {
+            if (prop === 'deleteSession') {
+                return async (sessionId = 'current') => {
+                    const res = await target.deleteSession(sessionId);
+                    dataCache.clear();
+                    return res;
+                };
+            }
+            return Reflect.get(target, prop, receiver);
+        }
+    });
     databases = new Databases(client);
     storage = new Storage(client);
     functions = new Functions(client);

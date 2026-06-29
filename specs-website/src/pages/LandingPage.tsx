@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../shared/api';
 import { storage } from '../shared/appwrite';
 import { 
-  Terminal, Code2, Users, Calendar, ArrowRight, Award, Sparkles, Lightbulb,
+  Terminal, Code2, Users, Calendar, ArrowRight, Award, Sparkles, Lightbulb, Check,
   MapPin, Clock, Menu, X, ChevronRight, Mail, Phone, Compass, ShieldCheck, ExternalLink, Sun, Moon 
 } from 'lucide-react';
 import { COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
@@ -129,9 +129,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       {/* 1. HEADER (Glassmorphic) */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-all duration-300">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0d6b66] to-[#0ba8a0] text-white font-bold text-xl shadow-md shadow-teal-700/10 dark:shadow-teal-900/30">
-            S
-          </div>
+          <img src="/logo.webp" alt="SPECS Logo" className="h-10 w-10 object-contain rounded-xl shadow-md" />
           <div className="flex flex-col">
             <span className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-none">SPECS Portal</span>
             <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase mt-0.5">Partido State University</span>
@@ -212,28 +210,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       )}
 
       {/* 2. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#053230] to-[#041a19] text-white py-24 px-6 sm:px-12 md:px-20 lg:py-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-teal-50/50 via-emerald-50/30 to-cyan-50/40 dark:from-slate-950 dark:via-[#053230] dark:to-[#041a19] text-slate-800 dark:text-white py-24 px-6 sm:px-12 md:px-20 lg:py-32 transition-colors duration-300">
         {/* Background Decorative Blobs */}
-        <div className="absolute top-1/4 left-1/4 h-[300px] w-[300px] rounded-full bg-emerald-500/10 blur-[100px] pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/4 h-[250px] w-[250px] rounded-full bg-teal-500/10 blur-[90px] pointer-events-none"></div>
+        <div className="absolute top-1/4 left-1/4 h-[300px] w-[300px] rounded-full bg-emerald-400/15 dark:bg-emerald-500/10 blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-1/4 right-1/4 h-[250px] w-[250px] rounded-full bg-teal-400/15 dark:bg-teal-500/10 blur-[90px] pointer-events-none"></div>
         
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
           {/* Hero Left Content */}
           <div className="lg:col-span-7 flex flex-col items-start text-left">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-400/10 text-teal-300 border border-teal-400/20 mb-6 shadow-inner tracking-wider uppercase">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#0d6b66]/10 dark:bg-teal-400/10 text-[#0d6b66] dark:text-teal-300 border border-[#0d6b66]/20 dark:border-teal-400/20 mb-6 shadow-inner tracking-wider uppercase">
               <Sparkles className="h-3.5 w-3.5" /> Partido State University
             </span>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-6">
-              Society of Programmers and <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-emerald-300 to-cyan-300">Enthusiasts</span> in Computer Science
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1] mb-6">
+              Society of Programmers and <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0d6b66] via-teal-600 to-cyan-600 dark:from-teal-400 dark:via-emerald-300 dark:to-cyan-300">Enthusiasts</span> in Computer Science
             </h1>
-            <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed mb-10">
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed mb-10">
               Welcome to the official SPECS Portal. A dedicated digital platform engineered for PSU computing students to manage member profiles, check attendance, settle dues, and showcase software portfolios.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <Link to="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-955 text-slate-950 font-bold px-8 py-4 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/35 hover:-translate-y-0.5 transition-all w-full sm:w-auto">
+              <Link to="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d6b66] hover:bg-[#094d4a] text-white dark:bg-teal-500 dark:hover:bg-teal-400 dark:text-slate-955 dark:text-slate-955 dark:text-slate-950 font-bold px-8 py-4 shadow-lg shadow-teal-700/10 dark:shadow-teal-500/20 hover:shadow-teal-900/20 dark:hover:shadow-teal-500/35 hover:-translate-y-0.5 transition-all w-full sm:w-auto">
                 Enter Portal <ArrowRight className="h-5 w-5" />
               </Link>
-              <a href="#about" className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold px-8 py-4 hover:-translate-y-0.5 transition-all w-full sm:w-auto">
+              <a href="#about" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white font-bold px-8 py-4 hover:-translate-y-0.5 transition-all w-full sm:w-auto shadow-sm dark:shadow-none">
                 Learn More
               </a>
             </div>
@@ -241,60 +239,60 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
           {/* Hero Right Mockup */}
           <div className="lg:col-span-5 flex justify-center w-full relative">
-            <div className="w-full max-w-[420px] rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-2xl backdrop-blur-md transform hover:scale-[1.02] transition-transform duration-300 relative overflow-hidden group">
+            <div className="w-full max-w-[420px] rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-955/70 dark:bg-slate-950/70 p-5 shadow-xl dark:shadow-2xl backdrop-blur-md transform hover:scale-[1.02] transition-transform duration-300 relative overflow-hidden group">
               {/* Mockup Topbar */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-4 mb-4">
                 <div className="flex gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-red-500/80"></div>
                   <div className="h-3 w-3 rounded-full bg-yellow-500/80"></div>
                   <div className="h-3 w-3 rounded-full bg-green-500/80"></div>
                 </div>
-                <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase">SPECS PORTAL SECURE</span>
-                <div className="h-1.5 w-12 rounded bg-white/10"></div>
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">SPECS PORTAL SECURE</span>
+                <div className="h-1.5 w-12 rounded bg-slate-100 dark:bg-white/10"></div>
               </div>
 
               {/* Mockup Dashboard Cards */}
               <div className="space-y-3.5">
                 {/* Profile Widget */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex items-center justify-between">
+                <div className="rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-[#0d6b66] text-white flex items-center justify-center text-xs font-bold shadow-inner">
+                    <div className="h-9 w-9 rounded-full bg-[#0d6b66] text-white flex items-center justify-center text-xs font-bold shadow-sm">
                       JD
                     </div>
                     <div>
-                      <span className="text-xs font-bold block text-white">John Doe</span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">BSCS - 3rd Year</span>
+                      <span className="text-xs font-bold block text-slate-800 dark:text-white">John Doe</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">BSCS - 3rd Year</span>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded-full">
-                    <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#0d6b66] dark:text-teal-400 bg-[#0d6b66]/10 dark:bg-teal-400/10 px-2 py-0.5 rounded-full">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#0d6b66] dark:bg-teal-400 animate-pulse"></span>
                     Volunteer
                   </span>
                 </div>
 
                 {/* Progress Widget */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
-                    <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Attendance Rate</span>
-                    <span className="text-lg font-extrabold text-white mt-1 block">88.5%</span>
-                    <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
-                      <div className="bg-teal-400 h-full rounded-full" style={{ width: '88.5%' }}></div>
+                  <div className="rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-3">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-medium uppercase tracking-wider">Attendance Rate</span>
+                    <span className="text-lg font-extrabold text-slate-800 dark:text-white mt-1 block">88.5%</span>
+                    <div className="w-full bg-slate-250 bg-slate-200 dark:bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-[#0d6b66] dark:bg-teal-450 dark:bg-teal-400 h-full rounded-full" style={{ width: '88.5%' }}></div>
                     </div>
                   </div>
-                  <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
-                    <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">Active Events</span>
-                    <span className="text-lg font-extrabold text-white mt-1 block">2 Upcoming</span>
-                    <span className="text-[9px] text-teal-400 block font-bold mt-1.5">Next: Feb 15, 2026</span>
+                  <div className="rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-3">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-medium uppercase tracking-wider">Active Events</span>
+                    <span className="text-lg font-extrabold text-slate-800 dark:text-white mt-1 block">2 Upcoming</span>
+                    <span className="text-[9px] text-[#0d6b66] dark:text-teal-400 block font-bold mt-1.5">Next: Feb 15, 2026</span>
                   </div>
                 </div>
 
                 {/* Payment Widget */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex items-center justify-between">
+                <div className="rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-300">Membership Fee Q1</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-350">Membership Fee Q1</span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
-                    Paid ✅
+                  <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-400/10 px-2 py-1 rounded-lg flex items-center gap-1">
+                    Paid <Check className="h-3 w-3" />
                   </span>
                 </div>
 
@@ -597,7 +595,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             </div>
           ) : filteredEvents.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-850 p-12 text-center bg-slate-50 dark:bg-slate-900/20 max-w-md mx-auto">
-              <span className="text-2xl mb-2 block">📅</span>
+              <Calendar className="h-8 w-8 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
               <h4 className="font-bold text-slate-900 dark:text-white">No events found</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">There are no events listed under this category at the moment. Check back soon!</p>
             </div>
@@ -636,8 +634,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
                           {/* Collaboration badges */}
                           {event.collab && event.collab.map((col: string, idx: number) => (
-                            <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                              🤝 {col}
+                            <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
+                              <Users className="h-2.5 w-2.5" /> {col}
                             </span>
                           ))}
                         </div>
@@ -745,10 +743,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                         "{story.post_description || 'No description provided.'}"
                       </p>
 
-                      {/* Main details */}
-                      <p className={`text-sm leading-relaxed mb-6 ${isAward ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                        {story.post_details || 'No details provided.'}
+                      {/* Main details (truncated preview) */}
+                      <p className={`text-sm leading-relaxed mb-3 ${isAward ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                        {story.post_details && story.post_details.length > 160
+                          ? `${story.post_details.substring(0, 160)}...`
+                          : story.post_details || 'No details provided.'}
                       </p>
+
+                      <Link
+                        to={`/story/${story.$id}`}
+                        className={`text-xs font-bold inline-flex items-center gap-1 hover:underline mb-6 ${
+                          isAward ? 'text-teal-300 hover:text-teal-200' : 'text-[#0d6b66] dark:text-teal-400 hover:text-[#0b5c58]'
+                        }`}
+                      >
+                        Read Full Story <ChevronRight className="h-3 w-3" />
+                      </Link>
                     </div>
 
                     {/* Footer */}
@@ -843,7 +852,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500 text-slate-950 font-bold text-lg">S</div>
+              <img src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg" />
               <span className="text-lg font-bold text-white tracking-tight">SPECS Portal</span>
             </div>
             <p className="text-xs text-slate-550 leading-relaxed text-slate-500">

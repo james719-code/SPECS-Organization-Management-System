@@ -78,14 +78,17 @@ class MockApiService {
 
     async login(email, password) {
         await delay(MOCK_DELAY);
-        const user = mockUsers.find(u => u.email === email);
+        const searchEmail = (email || '').toLowerCase().trim();
+        const user = mockUsers.find(u => (u.email || '').toLowerCase().trim() === searchEmail);
 
         if (!user) {
             throw new Error('Invalid credentials - user not found');
         }
 
         // Validate password against mock credentials
-        const expectedPassword = mockCredentials[email];
+        // Use case-insensitive lookup for credentials key
+        const credKey = Object.keys(mockCredentials).find(k => k.toLowerCase().trim() === searchEmail);
+        const expectedPassword = credKey ? mockCredentials[credKey] : null;
         if (!expectedPassword || password !== expectedPassword) {
             throw new Error('Invalid credentials - wrong password');
         }
@@ -97,7 +100,7 @@ class MockApiService {
             expire: new Date(Date.now() + 86400000).toISOString()
         };
         // Persist session for page navigation
-        this._saveSession(email);
+        this._saveSession(user.email);
         return this.currentSession;
     }
 
@@ -168,6 +171,32 @@ class MockApiService {
      */
     _parseQuery(queryStr) {
         const str = typeof queryStr === 'string' ? queryStr : String(queryStr);
+        
+        // Handle JSON format (e.g. from newer Appwrite SDKs where toString returns JSON)
+        if (str.trim().startsWith('{')) {
+            try {
+                const parsed = JSON.parse(str);
+                if (parsed.method) {
+                    const args = [];
+                    if (parsed.attribute) args.push(parsed.attribute);
+                    if (parsed.values !== undefined) {
+                        if (Array.isArray(parsed.values)) {
+                            // For simple equals with 1 value, unpack it
+                            if (parsed.values.length === 1 && parsed.method === 'equal') {
+                                args.push(parsed.values[0]);
+                            } else {
+                                args.push(parsed.values);
+                            }
+                        } else {
+                            args.push(parsed.values);
+                        }
+                    }
+                    return { method: parsed.method, args };
+                }
+            } catch (e) {
+                console.warn('[Mock] Failed to parse JSON query:', e);
+            }
+        }
         
         // Match: method("field", value) or method("field", [values]) or method(value)
         const match = str.match(/^(\w+)\((.+)\)$/);

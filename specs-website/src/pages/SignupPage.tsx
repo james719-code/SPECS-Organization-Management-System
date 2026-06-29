@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { account, databases, ID } from '../shared/appwrite';
-import { Mail, Lock, User, Sun, Moon } from 'lucide-react';
+import { Mail, Lock, User, Sun, Moon, AlertCircle } from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
 
 interface SignupPageProps {
@@ -113,8 +113,11 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
             Your SPECS account was created. A verification link has been sent to <span className="font-bold text-slate-900 dark:text-white">{email}</span>.
           </p>
-          <div className="bg-amber-50 dark:bg-amber-955/10 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 mb-6 text-left text-xs text-amber-800 dark:text-amber-400">
-            ⚠️ <span className="font-bold">Next Step:</span> After verifying, your account needs to be cleared and approved by a class representative or SPECS officer before you can log in.
+          <div className="bg-amber-50 dark:bg-amber-955/10 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 mb-6 text-left text-xs text-amber-800 dark:text-amber-400 flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div>
+              <span className="font-bold">Next Step:</span> After verifying, your account needs to be cleared and approved by a class representative or SPECS officer before you can log in.
+            </div>
           </div>
           <Link 
             to="/login"
@@ -143,16 +146,17 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
         </button>
 
         <div className="flex flex-col items-center mb-6">
-          <Link to="/" className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0d6b66] to-[#0ba8a0] text-white font-extrabold text-xl mb-3">
-            S
+          <Link to="/">
+            <img src="/logo.webp" alt="SPECS Logo" className="h-10 w-10 object-contain rounded-xl shadow-md mb-3" />
           </Link>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Register Student</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Join the SPECS organization community portal</p>
         </div>
 
         {error && (
-          <div className="mb-5 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-left">
-            ⚠️ {error}
+          <div className="mb-5 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-left flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-550 dark:text-red-400" />
+            <span>{error}</span>
           </div>
         )}
 

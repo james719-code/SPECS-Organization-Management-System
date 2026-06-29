@@ -192,12 +192,12 @@ export function initDevLoginPanel() {
 
                 // Redirect to appropriate dashboard
                 const redirectMap = {
-                    admin: '/dashboard-admin/',
-                    officer: '/dashboard-officer/',
-                    student: '/dashboard-student/'
+                    admin: '/dashboard/admin',
+                    officer: '/dashboard/officer',
+                    student: '/dashboard/student'
                 };
 
-                window.location.href = redirectMap[userType] || '/landing/';
+                window.location.href = redirectMap[userType] || '/';
             } catch (error) {
                 console.error('Dev login failed:', error);
                 alert('Dev login failed: ' + error.message);

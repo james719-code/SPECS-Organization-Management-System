@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { account } from '../shared/appwrite';
-import { Mail, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
   theme: 'light' | 'dark';
@@ -15,6 +15,29 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      try {
+        const user = await account.get();
+        if (user) {
+          const profile = await apiGetAccountProfile(user.$id);
+          if (profile.deactivated) {
+            await account.deleteSession('current');
+            return;
+          }
+          if (!profile.verified && profile.type !== 'admin') {
+            navigate('/pending');
+          } else {
+            navigate(`/dashboard/${profile.type}`);
+          }
+        }
+      } catch (err) {
+        // No active session, ignore
+      }
+    };
+    checkActiveSession();
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,16 +90,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
         </button>
 
         <div className="flex flex-col items-center mb-8">
-          <Link to="/" className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0d6b66] to-[#0ba8a0] text-white font-black text-2xl mb-4 shadow-md shadow-teal-700/10">
-            S
+          <Link to="/">
+            <img src="/logo.webp" alt="SPECS Logo" className="h-12 w-12 object-contain rounded-xl shadow-md mb-4" />
           </Link>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome Back</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 text-center">Sign in to your SPECS student or officer dashboard</p>
         </div>
 
         {error && (
-          <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30">
-            ⚠️ {error}
+          <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-450" />
+            <span>{error}</span>
           </div>
         )}
 

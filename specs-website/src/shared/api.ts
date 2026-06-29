@@ -491,6 +491,13 @@ export const api = {
             } catch (error) {
                 throw createApiError(error, 'Failed to list stories');
             }
+        },
+        async get(storyId: string): Promise<StoryDoc> {
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId);
+            } catch (error) {
+                throw createApiError(error, `Failed to get story ${storyId}`);
+            }
         }
     },
 
@@ -619,6 +626,14 @@ export const cachedApi = {
                 tags: [CacheTags.ACCOUNTS]
             });
         },
+        async getAccount(accountId: string, ttl = 5 * 60 * 1000): Promise<AccountDoc> {
+            const cacheKey = generateCacheKey('account', { accountId });
+            return dataCache.getOrFetch(cacheKey, () => api.users.getAccount(accountId), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.ACCOUNTS]
+            });
+        },
         async getStudentProfile(studentId: string, ttl = 5 * 60 * 1000): Promise<StudentDoc> {
             const cacheKey = generateCacheKey('student_profile', { studentId });
             return dataCache.getOrFetch(cacheKey, () => api.users.getStudentProfile(studentId), {
@@ -714,6 +729,14 @@ export const cachedApi = {
                 ttl,
                 staleTtl: 5 * 60 * 1000,
                 tags: [CacheTags.STORIES, CacheTags.LANDING]
+            });
+        },
+        async get(storyId: string, ttl = 5 * 60 * 1000): Promise<StoryDoc> {
+            const cacheKey = generateCacheKey('story', { storyId });
+            return dataCache.getOrFetch(cacheKey, () => api.stories.get(storyId), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.STORIES]
             });
         }
     }

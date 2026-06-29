@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { account } from '../shared/appwrite';
+import { AlertTriangle } from 'lucide-react';
 
 const PendingVerificationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,8 +18,8 @@ const PendingVerificationPage: React.FC = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 transition-colors duration-300">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 p-8 text-center shadow-xl">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 mx-auto mb-4 border border-amber-100 dark:border-amber-900/30">
-          ⚠️
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-400 mx-auto mb-4 border border-amber-100 dark:border-amber-900/30">
+          <AlertTriangle className="h-6 w-6" />
         </div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Verification Pending</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">

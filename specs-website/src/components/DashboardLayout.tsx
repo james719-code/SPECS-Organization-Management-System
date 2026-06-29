@@ -1,15 +1,27 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { account } from '../shared/appwrite';
+
+interface LinkItem {
+  to: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+interface LinkGroup {
+  groupName: string;
+  items: LinkItem[];
+}
 
 interface DashboardLayoutProps {
   title: string;
   role: string;
-  links: { to: string; label: string }[];
+  links: LinkGroup[];
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links }) => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -23,52 +35,105 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r bg-white flex flex-col justify-between">
-        <div>
-          <div className="border-b px-6 py-4 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0d6b66] text-white font-bold">S</div>
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64 border-r bg-white flex flex-col justify-between transform transition-transform duration-200 ease-in-out
+        lg:relative lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Brand */}
+          <div className="border-b px-6 py-4 flex items-center gap-3 flex-shrink-0">
+            <img src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg shadow-xs" />
             <div>
               <span className="font-bold block tracking-tight leading-none text-slate-900">SPECS Portal</span>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-1 block">{role} Panel</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5 block">{role} Panel</span>
             </div>
           </div>
-          <nav className="p-4 space-y-1">
-            {links.map((link, idx) => (
-              <Link 
-                key={idx}
-                to={link.to} 
-                className="flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-[#0d6b66] transition-colors"
-              >
-                {link.label}
-              </Link>
+
+          {/* Nav links */}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+            {links.map((group, groupIdx) => (
+              <div key={groupIdx} className="space-y-1">
+                {group.groupName && (
+                  <h4 className="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                    {group.groupName}
+                  </h4>
+                )}
+                <div className="space-y-0.5">
+                  {group.items.map((link, linkIdx) => (
+                    <NavLink
+                      key={linkIdx}
+                      to={link.to}
+                      end={link.to === `/dashboard/${role.toLowerCase()}`}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-[#0d6b66]/10 text-[#0d6b66] shadow-xs'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`
+                      }
+                    >
+                      {link.icon && <span className="flex-shrink-0 text-slate-400">{link.icon}</span>}
+                      <span>{link.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </div>
-        <div className="p-4 border-t">
-          <button 
+
+        {/* Logout */}
+        <div className="p-3 border-t flex-shrink-0">
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:border-red-100 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
           >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
             Log Out
           </button>
         </div>
       </aside>
 
-      {/* Main Panel Content */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="border-b bg-white px-8 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>
+      {/* Main Panel */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top header */}
+        <header className="border-b bg-white px-4 sm:px-8 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-[#0d6b66] text-white flex items-center justify-center text-xs font-semibold uppercase">U</div>
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">{title}</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0d6b66] to-[#149a93] text-white flex items-center justify-center text-xs font-semibold uppercase shadow-sm">
+              U
+            </div>
           </div>
         </header>
-        <div className="p-8">
-          <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center bg-white">
-            <h3 className="text-lg font-bold text-slate-900">Dashboard Workspace</h3>
-            <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-              This is the barebones workspace for your shadcn react implementation. Start editing <code className="bg-slate-100 px-1 py-0.5 rounded text-[#0d6b66]">src/App.tsx</code> to customize this view.
-            </p>
+
+        {/* Page content via Outlet */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <Outlet />
           </div>
         </div>
       </main>
