@@ -201,7 +201,9 @@ export const mockEvents = [
         event_ended: false,
         collab: ['GDSC', 'AWS Cloud Club'],
         related_links: ['https://techsummit.specs.org'],
-        meaning: ['Tech Summit', 'Technology Conference']
+        meaning: ['Tech Summit', 'Technology Conference'],
+        location: 'PSU Gymnasium',
+        rating_links: 'https://specs.org/feedback/summit'
     },
     {
         $id: 'event-2',
@@ -215,7 +217,9 @@ export const mockEvents = [
         event_ended: false,
         collab: [],
         related_links: [],
-        meaning: []
+        meaning: [],
+        location: 'Computing Lab 1',
+        rating_links: 'https://specs.org/feedback/bootcamp'
     },
     {
         $id: 'event-3',
@@ -229,7 +233,9 @@ export const mockEvents = [
         event_ended: true,
         collab: [],
         related_links: [],
-        meaning: []
+        meaning: [],
+        location: 'PSU Auditorium',
+        rating_links: 'https://specs.org/feedback/ga4'
     }
 ];
 

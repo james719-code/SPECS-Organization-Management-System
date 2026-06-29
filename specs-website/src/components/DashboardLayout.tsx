@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { account } from '../shared/appwrite';
+import { Sun, Moon, Menu, LogOut } from 'lucide-react';
 
 interface LinkItem {
   to: string;
@@ -17,9 +18,11 @@ interface DashboardLayoutProps {
   title: string;
   role: string;
   links: LinkGroup[];
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links }) => {
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, theme, toggleTheme }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -34,7 +37,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-300">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -45,17 +48,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-64 border-r bg-white flex flex-col justify-between transform transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-40 w-64 border-r dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col justify-between transform transition-transform duration-200 ease-in-out
         lg:relative lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Brand */}
-          <div className="border-b px-6 py-4 flex items-center gap-3 flex-shrink-0">
+          <div className="border-b dark:border-slate-800 px-6 py-4 flex items-center gap-3 flex-shrink-0">
             <img src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg shadow-xs" />
             <div>
-              <span className="font-bold block tracking-tight leading-none text-slate-900">SPECS Portal</span>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5 block">{role} Panel</span>
+              <span className="font-bold block tracking-tight leading-none text-slate-900 dark:text-white">SPECS Portal</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold mt-0.5 block">{role} Panel</span>
             </div>
           </div>
 
@@ -78,8 +81,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
                       className={({ isActive }) =>
                         `flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 ${
                           isActive
-                            ? 'bg-[#0d6b66]/10 text-[#0d6b66] shadow-xs'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                         }`
                       }
                     >
@@ -97,11 +100,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
         <div className="p-3 border-t flex-shrink-0">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <LogOut className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0" />
             Log Out
           </button>
         </div>
@@ -110,20 +111,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links })
       {/* Main Panel */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top header */}
-        <header className="border-b bg-white px-4 sm:px-8 py-3 flex items-center justify-between flex-shrink-0">
+        <header className="border-b dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-8 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="lg:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
             </button>
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">{title}</h2>
+            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{title}</h2>
           </div>
           <div className="flex items-center gap-3">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="h-4.5 w-4.5 text-amber-400" /> : <Moon className="h-4.5 w-4.5 text-[#0d6b66]" />}
+            </button>
             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0d6b66] to-[#149a93] text-white flex items-center justify-center text-xs font-semibold uppercase shadow-sm">
               U
             </div>

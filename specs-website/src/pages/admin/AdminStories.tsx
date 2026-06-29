@@ -339,7 +339,7 @@ const AdminStories: React.FC = () => {
                       </span>
                     )}
 
-                    <h3 className="font-bold text-slate-850 text-base line-clamp-1">{story.title || 'Untitled'}</h3>
+                    <h3 className="font-bold text-slate-800 text-base line-clamp-1">{story.title || 'Untitled'}</h3>
                     <span className="text-xs text-slate-400 block font-medium">By: {authorName}</span>
                     <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mt-2">{story.post_description || 'No description provided.'}</p>
                   </div>
@@ -442,7 +442,7 @@ const AdminStories: React.FC = () => {
                         setEditImageFile(null);
                         setRemoveExistingImage(true);
                       }}
-                      className="absolute top-2 right-2 bg-red-650 hover:bg-red-700 text-white rounded-lg p-1.5 shadow-sm text-xs"
+                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-lg p-1.5 shadow-sm text-xs"
                     >
                       Remove cover
                     </button>

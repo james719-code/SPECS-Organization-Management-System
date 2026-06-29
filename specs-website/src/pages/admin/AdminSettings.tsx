@@ -72,7 +72,7 @@ const AdminSettings: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={handleReset}
-            className="rounded-lg border border-red-200 bg-red-50 text-red-650 hover:bg-red-100 px-4 py-2 text-sm font-semibold transition-colors"
+            className="rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 text-sm font-semibold transition-colors"
           >
             Reset to Defaults
           </button>
@@ -190,7 +190,7 @@ const AdminSettings: React.FC = () => {
               <select
                 value={settings.defaultView}
                 onChange={e => setSettings(prev => ({ ...prev, defaultView: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-750 focus:border-[#0d6b66] outline-none"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
               >
                 <option value="dashboard">Dashboard Overview</option>
                 <option value="accounts">Accounts Directory</option>
@@ -235,7 +235,7 @@ const AdminSettings: React.FC = () => {
             <select
               value={settings.exportFormat}
               onChange={e => setSettings(prev => ({ ...prev, exportFormat: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-750 focus:border-[#0d6b66] outline-none"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
             >
               <option value="csv">CSV (Comma-Separated Values)</option>
               <option value="json">JSON (JavaScript Object Notation)</option>

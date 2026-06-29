@@ -150,7 +150,7 @@ const StudentEvents: React.FC = () => {
                   </div>
 
                   <div className="p-5 space-y-2">
-                    <h3 className="font-bold text-slate-850 text-base line-clamp-1">{event.event_name}</h3>
+                    <h3 className="font-bold text-slate-800 text-base line-clamp-1">{event.event_name}</h3>
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold uppercase">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

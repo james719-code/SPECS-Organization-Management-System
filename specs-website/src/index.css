@@ -102,3 +102,73 @@
     animation: fade-in 0.2s ease-out forwards;
   }
 }
+
+/* Dark mode overrides for dashboard sub-pages & layout components */
+.dark {
+  /* Panels & Cards */
+  .bg-white {
+    background-color: #0f172a !important; /* slate-900 */
+  }
+  .bg-slate-50 {
+    background-color: #020617 !important; /* slate-950 */
+  }
+  .bg-slate-100 {
+    background-color: #1e293b !important; /* slate-800 */
+  }
+  
+  /* Text colors */
+  .text-slate-900 {
+    color: #f8fafc !important; /* slate-50 */
+  }
+  .text-slate-805, .text-slate-800, .text-slate-850 {
+    color: #f1f5f9 !important; /* slate-100 */
+  }
+  .text-slate-750, .text-slate-700 {
+    color: #e2e8f0 !important; /* slate-200 */
+  }
+  .text-slate-650, .text-slate-600 {
+    color: #cbd5e1 !important; /* slate-300 */
+  }
+  .text-slate-550, .text-slate-500 {
+    color: #94a3b8 !important; /* slate-400 */
+  }
+  
+  /* Borders & Dividers */
+  .border-slate-200, .border-slate-150, .border-slate-100, .border-slate-50, .divide-slate-100, .divide-slate-200 {
+    border-color: #1e293b !important; /* slate-800 */
+  }
+  .divide-y > :not([hidden]) ~ :not([hidden]) {
+    border-color: #1e293b !important; /* slate-800 */
+  }
+  
+  /* Hover effects */
+  .hover\:bg-slate-50:hover {
+    background-color: #1e293b !important; /* slate-800 */
+  }
+  .hover\:bg-slate-100:hover {
+    background-color: #334155 !important; /* slate-700 */
+  }
+  
+  /* Forms & Interactive elements */
+  input, select, textarea {
+    background-color: #0f172a !important; /* slate-900 */
+    color: #f8fafc !important;
+    border-color: #1e293b !important;
+  }
+  input::placeholder, textarea::placeholder {
+    color: #64748b !important; /* slate-500 */
+  }
+  
+  /* Charts and specific component styling if needed */
+  .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line {
+    stroke: #334155 !important;
+  }
+  .recharts-text {
+    fill: #94a3b8 !important;
+  }
+  
+  /* Modals inside dashboard (e.g. createPortal elements) */
+  .bg-black\/50, .bg-black\/45 {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+  }
+}

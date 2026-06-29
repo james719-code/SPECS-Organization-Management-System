@@ -215,7 +215,7 @@ const VolunteersManagement: React.FC = () => {
                     )}
                   </div>
 
-                  <h3 className="font-bold text-slate-850 text-base">{student.name}</h3>
+                  <h3 className="font-bold text-slate-800 text-base">{student.name}</h3>
                   <p className="text-xs text-slate-400 mt-0.5">Year {student.yearLevel || 'N/A'} — Section {student.section || 'N/A'}</p>
                   
                   <div className="space-y-1 mt-3.5 text-xs text-slate-500">
@@ -225,7 +225,7 @@ const VolunteersManagement: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span>Updated On:</span>
-                      <span className="font-medium text-slate-450">{new Date(student.$updatedAt).toLocaleDateString()}</span>
+                      <span className="font-medium text-slate-500">{new Date(student.$updatedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ const VolunteersManagement: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setActionConfirm({ open: true, student, action: 'reject' })}
-                        className="flex-1 rounded-lg border border-red-200 bg-red-50 text-red-650 hover:bg-red-100 py-1.5 text-xs font-semibold transition-colors"
+                        className="flex-1 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 text-xs font-semibold transition-colors"
                       >
                         Decline
                       </button>

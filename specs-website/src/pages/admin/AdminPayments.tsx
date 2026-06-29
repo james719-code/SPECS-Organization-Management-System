@@ -6,6 +6,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, PaymentDoc, AccountDoc } from '../../types/database';
+import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
 
 const AdminPayments: React.FC = () => {
   // Navigation / View state
@@ -57,13 +58,15 @@ const AdminPayments: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const [studentsRes, paymentsRes, eventsRes] = await Promise.all([
+      const [studentsRes, officersRes, paymentsRes, eventsRes] = await Promise.all([
         cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
+        cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000),
         cachedApi.payments.listAll({}, isRefresh ? 0 : 1 * 60 * 1000),
         cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000)
       ]);
 
-      setStudents(studentsRes.documents);
+      const combined = [...studentsRes.documents, ...officersRes.documents];
+      setStudents(combined);
       setPayments(paymentsRes.documents);
       setEvents(eventsRes.documents);
 
@@ -265,7 +268,7 @@ const AdminPayments: React.FC = () => {
     return { totalPaid, totalOutstanding, completionRate };
   }, [payments]);
 
-  // Aggregate student payments for list grid
+  // Aggregate student & officer payments for list grid
   const studentLedger = useMemo(() => {
     return students.map(std => {
       const profile = std.students as any;
@@ -281,7 +284,8 @@ const AdminPayments: React.FC = () => {
       return {
         studentDoc: std,
         sId,
-        name: profile?.name || std.username || 'Unknown Student',
+        name: profile?.name || std.username || 'Unknown Member',
+        role: std.type,
         yearLevel: profile?.yearLevel || 0,
         outstanding,
         paid,
@@ -314,7 +318,7 @@ const AdminPayments: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Payment Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Assign dues, collect payments, and manage student accounts</p>
+          <p className="text-sm text-slate-500 mt-1">Assign dues, collect payments, and manage student and officer accounts</p>
         </div>
         <div className="flex items-center gap-2">
           {selectedStudent && (
@@ -322,9 +326,7 @@ const AdminPayments: React.FC = () => {
               onClick={() => setSelectedStudent(null)}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
             >
-              <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
+              <ArrowLeft className="h-4 w-4 text-slate-500" />
               Back to List
             </button>
           )}
@@ -333,9 +335,7 @@ const AdminPayments: React.FC = () => {
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <svg className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
-            </svg>
+            <RotateCw className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
@@ -347,7 +347,7 @@ const AdminPayments: React.FC = () => {
           {/* General Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Students</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Members</span>
               <p className="text-2xl font-bold text-slate-900 mt-1">{students.length}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -369,12 +369,10 @@ const AdminPayments: React.FC = () => {
 
           {/* Search bar */}
           <div className="relative max-w-sm">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search student ledger..."
+              placeholder="Search ledger..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none transition-colors"
@@ -387,7 +385,7 @@ const AdminPayments: React.FC = () => {
               {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredLedger.length === 0 ? (
-            <EmptyState title="No Student Records found" description="Adjust your filters or add payments dues first." />
+            <EmptyState title="No Records found" description="Adjust your filters or add payments dues first." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredLedger.map(ledgerItem => (
@@ -402,7 +400,14 @@ const AdminPayments: React.FC = () => {
                         {ledgerItem.name.substring(0, 2)}
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-800 line-clamp-1">{ledgerItem.name}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="font-bold text-slate-800 line-clamp-1">{ledgerItem.name}</h4>
+                          {ledgerItem.role === 'officer' && (
+                            <span className="inline-flex items-center rounded-full bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider">
+                              Officer
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 font-semibold uppercase">Year {ledgerItem.yearLevel || 'N/A'}</p>
                       </div>
                     </div>
@@ -435,9 +440,7 @@ const AdminPayments: React.FC = () => {
             className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-2xl transition-transform hover:scale-105 active:scale-95"
             title="Create Payment Entry"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus className="h-6 w-6" />
           </button>
         </>
       ) : (
@@ -447,10 +450,17 @@ const AdminPayments: React.FC = () => {
           <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 border border-slate-100 font-bold text-lg text-[#0d6b66] uppercase shadow-inner">
-                {selectedStudent.username?.substring(0, 2) || 'ST'}
+                {selectedStudent.username?.substring(0, 2) || 'MB'}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">{(selectedStudent.students as any)?.name || selectedStudent.username}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900">{(selectedStudent.students as any)?.name || selectedStudent.username}</h3>
+                  {selectedStudent.type === 'officer' && (
+                    <span className="inline-flex items-center rounded-full bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                      Officer
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 font-medium">BSCS — Year {(selectedStudent.students as any)?.yearLevel || 'N/A'}</p>
               </div>
             </div>
@@ -503,18 +513,14 @@ const AdminPayments: React.FC = () => {
                             className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
                             title="Edit due"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
+                            <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteConfirm({ open: true, payment: p })}
                             className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500 hover:bg-red-50 transition-colors"
                             title="Delete due"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -568,9 +574,7 @@ const AdminPayments: React.FC = () => {
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">New Payment Due Entry</h2>
               <button onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -666,16 +670,16 @@ const AdminPayments: React.FC = () => {
                   className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66]"
                 />
                 <label htmlFor="assignAllCheck" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                  Assign to all student directory
+                  Assign to all members directory
                 </label>
               </div>
 
               {!assignAll && (
                 <div className="relative">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Search Student assignee</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Search assignee</label>
                   <input
                     type="text"
-                    placeholder="Type student name..."
+                    placeholder="Type name..."
                     value={assignStudentQuery}
                     onChange={e => handleAssigneeSearch(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
@@ -710,12 +714,7 @@ const AdminPayments: React.FC = () => {
                   disabled={submitting}
                   className="rounded-lg bg-[#0d6b66] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
-                  {submitting && (
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  )}
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Create Due
                 </button>
               </div>
@@ -731,9 +730,7 @@ const AdminPayments: React.FC = () => {
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">Modify Outstanding Dues</h2>
               <button onClick={() => setEditingPayment(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-5 w-5" />
               </button>
             </div>
 

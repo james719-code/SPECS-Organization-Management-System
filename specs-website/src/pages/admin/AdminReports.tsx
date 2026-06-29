@@ -346,7 +346,7 @@ const AdminReports: React.FC = () => {
                 <select
                   value={accountType}
                   onChange={e => setAccountType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-750 focus:border-[#0d6b66] outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
                 >
                   <option value="all">All Roles</option>
                   <option value="student">Students Only</option>
@@ -358,7 +358,7 @@ const AdminReports: React.FC = () => {
                 <select
                   value={verificationStatus}
                   onChange={e => setVerificationStatus(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-750 focus:border-[#0d6b66] outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
                 >
                   <option value="all">All Verification</option>
                   <option value="verified">Verified Only</option>
@@ -370,7 +370,7 @@ const AdminReports: React.FC = () => {
                 <select
                   value={activeStatus}
                   onChange={e => setActiveStatus(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-750 focus:border-[#0d6b66] outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
                 >
                   <option value="all">All Status</option>
                   <option value="active">Active Only</option>
@@ -439,7 +439,7 @@ const AdminReports: React.FC = () => {
                 <select
                   value={activeChartOption}
                   onChange={e => setActiveChartOption(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-650 focus:border-[#0d6b66] outline-none"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-[#0d6b66] outline-none"
                 >
                   {reportResults.chartOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>

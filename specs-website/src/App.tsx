@@ -73,6 +73,8 @@ export default function App() {
             <DashboardLayout 
               title="Student Dashboard" 
               role="Student"
+              theme={theme}
+              toggleTheme={toggleTheme}
               links={[
                 {
                   groupName: 'General',
@@ -116,6 +118,8 @@ export default function App() {
             <DashboardLayout 
               title="Officer Dashboard" 
               role="Officer"
+              theme={theme}
+              toggleTheme={toggleTheme}
               links={[
                 {
                   groupName: 'Core',
@@ -168,6 +172,8 @@ export default function App() {
             <DashboardLayout 
               title="Admin Panel" 
               role="Admin"
+              theme={theme}
+              toggleTheme={toggleTheme}
               links={[
                 {
                   groupName: 'General',

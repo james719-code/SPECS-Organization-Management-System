@@ -6,7 +6,7 @@ import {
   Terminal, Code2, Users, Calendar, ArrowRight, Award, Sparkles, Lightbulb, Check,
   MapPin, Clock, Menu, X, ChevronRight, Mail, Phone, Compass, ShieldCheck, ExternalLink, Sun, Moon 
 } from 'lucide-react';
-import { COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
+import { COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, BUCKET_ID_EVENT_IMAGES } from '../shared/constants';
 const BUCKET_ID_PICTURES = (import.meta.env.VITE_BUCKET_ID_PICTURES as string) || 'pictures';
 import { SITE_LEADERSHIP, FAQS } from '../data/landingData';
 import MockTerminal from '../components/MockTerminal';
@@ -116,6 +116,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       return null;
     }
   };
+ 
+  const getEventImageUrl = (fileId: string) => {
+    if (!fileId) return null;
+    try {
+      if (storage && typeof storage.getFilePreview === 'function') {
+        return storage.getFilePreview(BUCKET_ID_EVENT_IMAGES || 'event-images', fileId, 400, 250, 'center', 90);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
 
   // Filter events based on active tab
   const filteredEvents = events.filter(event => {
@@ -125,7 +137,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-955 dark:bg-slate-955 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans scroll-smooth">
+    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans scroll-smooth">
       {/* 1. HEADER (Glassmorphic) */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-all duration-300">
         <div className="flex items-center gap-3">
@@ -228,7 +240,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               Welcome to the official SPECS Portal. A dedicated digital platform engineered for PSU computing students to manage member profiles, check attendance, settle dues, and showcase software portfolios.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <Link to="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d6b66] hover:bg-[#094d4a] text-white dark:bg-teal-500 dark:hover:bg-teal-400 dark:text-slate-955 dark:text-slate-955 dark:text-slate-950 font-bold px-8 py-4 shadow-lg shadow-teal-700/10 dark:shadow-teal-500/20 hover:shadow-teal-900/20 dark:hover:shadow-teal-500/35 hover:-translate-y-0.5 transition-all w-full sm:w-auto">
+              <Link to="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d6b66] hover:bg-[#094d4a] text-white dark:bg-teal-500 dark:hover:bg-teal-400 dark:text-slate-950 font-bold px-8 py-4 shadow-lg shadow-teal-700/10 dark:shadow-teal-500/20 hover:shadow-teal-900/20 dark:hover:shadow-teal-500/35 hover:-translate-y-0.5 transition-all w-full sm:w-auto">
                 Enter Portal <ArrowRight className="h-5 w-5" />
               </Link>
               <a href="#about" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white font-bold px-8 py-4 hover:-translate-y-0.5 transition-all w-full sm:w-auto shadow-sm dark:shadow-none">
@@ -461,12 +473,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                             className="h-20 w-20 rounded-full object-cover mx-auto mb-4 border-2 border-[#0d6b66] dark:border-teal-500 p-0.5"
                           />
                         ) : (
-                          <div className="h-20 w-20 rounded-full bg-teal-50 dark:bg-slate-850 text-[#0d6b66] dark:text-teal-455 font-bold flex items-center justify-center text-lg mx-auto mb-4 border border-teal-100 dark:border-teal-900/50">
+                          <div className="h-20 w-20 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 font-bold flex items-center justify-center text-lg mx-auto mb-4 border border-teal-100 dark:border-teal-900/50">
                             {off.name.split(' ').slice(0, 2).map(n => n[0]).join('')}
                           </div>
                         )}
                         <h5 className="font-extrabold text-slate-900 dark:text-white text-sm tracking-tight mb-1 truncate">{off.name}</h5>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-455 font-bold uppercase tracking-wider">{off.position}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">{off.position}</p>
                       </div>
                     );
                   })}
@@ -506,7 +518,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           <blockquote className="text-xs italic text-slate-500 dark:text-slate-400 border-l-2 border-slate-200 dark:border-slate-800 pl-3 py-1">
                             "{dev.quote}"
                           </blockquote>
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-teal-50 dark:bg-teal-955/20 text-[#0d6b66] dark:text-teal-400 mt-4 border border-teal-100 dark:border-teal-900/30">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-teal-50 dark:bg-teal-950/20 text-[#0d6b66] dark:text-teal-400 mt-4 border border-teal-100 dark:border-teal-900/30">
                             <Code2 className="h-3 w-3" /> Core Technical Lead
                           </span>
                         </div>
@@ -594,90 +606,134 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               ))}
             </div>
           ) : filteredEvents.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-850 p-12 text-center bg-slate-50 dark:bg-slate-900/20 max-w-md mx-auto">
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center bg-slate-50 dark:bg-slate-900/20 max-w-md mx-auto">
               <Calendar className="h-8 w-8 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
               <h4 className="font-bold text-slate-900 dark:text-white">No events found</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">There are no events listed under this category at the moment. Check back soon!</p>
             </div>
-          ) : (
-            /* Events Grid */
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              {filteredEvents.map(event => {
-                const dateInfo = formatDate(event.date_to_held);
-                const isUpcoming = !event.event_ended;
+          ) : (             /* Events Grid */
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+               {filteredEvents.map(event => {
+                 const dateInfo = formatDate(event.date_to_held);
+                 const isUpcoming = !event.event_ended;
+                 const eventPic = getEventImageUrl(event.image_file);
+ 
+                 return (
+                   <div 
+                     key={event.$id} 
+                     className="group rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-6 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden hover:-translate-y-0.5"
+                   >
+                     {/* Event Image Banner / Left Block */}
+                     <div className="w-full md:w-44 h-48 md:h-full relative flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+                       {eventPic ? (
+                         <img 
+                           src={eventPic} 
+                           alt={event.event_name || 'Event image'} 
+                           className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                         />
+                       ) : (
+                         <div className="h-full w-full bg-gradient-to-br from-[#0d6b66] to-[#0ba8a0] opacity-90 flex items-center justify-center text-white p-6">
+                           <Calendar className="h-10 w-10 text-white/80" />
+                         </div>
+                       )}
+                       
+                       {/* Floating Date Block on Image */}
+                       <div className="absolute top-3 left-3 flex flex-col items-center justify-center rounded-xl bg-white/90 dark:bg-slate-950/90 text-slate-800 dark:text-slate-100 font-bold p-2 text-center shadow-md min-w-[55px]">
+                         <span className="text-xl font-extrabold leading-none tracking-tight block text-[#0d6b66] dark:text-teal-400">{dateInfo.day}</span>
+                         <span className="text-[9px] font-extrabold uppercase tracking-widest mt-1 block">{dateInfo.month}</span>
+                       </div>
+                     </div>
+ 
+                     {/* Content Block */}
+                     <div className="flex-1 p-6 flex flex-col justify-between">
+                       <div>
+                         {/* Tags / Status Header */}
+                         <div className="flex flex-wrap items-center gap-2 mb-3">
+                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
+                             isUpcoming 
+                               ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+                               : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-350 border-slate-150 dark:border-slate-705'
+                           }`}>
+                             <span className={`h-1.5 w-1.5 rounded-full ${isUpcoming ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                             {isUpcoming ? 'Upcoming / Open' : 'Completed'}
+                           </span>
+ 
+                           {/* Collaboration badges */}
+                           {event.collab && event.collab.map((col: string, idx: number) => (
+                             <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
+                               <Users className="h-2.5 w-2.5" /> {col}
+                             </span>
+                           ))}
+                           
+                           {/* Meaning/Keywords tags */}
+                           {event.meaning && event.meaning.map((tag: string, idx: number) => (
+                             <span key={idx} className="bg-teal-50/50 dark:bg-teal-950/10 text-[#0d6b66] dark:text-teal-400 text-[9px] font-medium px-2 py-0.5 rounded-md border border-teal-100/30">
+                               #{tag}
+                             </span>
+                           ))}
+                         </div>
+ 
+                         {/* Title */}
+                         <h4 className="text-lg font-bold text-slate-900 dark:text-white leading-snug group-hover:text-[#0d6b66] dark:group-hover:text-teal-400 transition-colors mb-2">
+                           {event.event_name}
+                         </h4>
 
-                return (
-                  <div 
-                    key={event.$id} 
-                    className="group rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 flex flex-col sm:flex-row gap-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden hover:-translate-y-0.5"
-                  >
-                    {/* Date Block */}
-                    <div className="flex sm:flex-col items-center justify-center rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-100 dark:border-teal-900/30 text-[#0d6b66] dark:text-teal-400 font-bold p-4 text-center min-w-[75px] h-fit">
-                      <span className="text-3xl font-extrabold leading-none tracking-tight block">{dateInfo.day}</span>
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest mt-1.5 block">{dateInfo.month}</span>
-                      <span className="text-[10px] text-[#0d6b66]/60 dark:text-teal-400/60 font-semibold block mt-0.5 sm:mt-1">{dateInfo.year}</span>
-                    </div>
+                         {/* Description */}
+                         <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-4">
+                           {event.description}
+                         </p>
+                         </div>
 
-                    {/* Content Block */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        {/* Tags / Status Header */}
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
-                            isUpcoming 
-                              ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
-                              : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-350 border-slate-150 dark:border-slate-705'
-                          }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${isUpcoming ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                            {isUpcoming ? 'Upcoming / Open' : 'Completed'}
-                          </span>
-
-                          {/* Collaboration badges */}
-                          {event.collab && event.collab.map((col: string, idx: number) => (
-                            <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
-                              <Users className="h-2.5 w-2.5" /> {col}
+                         {/* Event Meta Footer */}
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center gap-4 text-xs font-semibold text-slate-505 dark:text-slate-400">
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" /> {dateInfo.full !== 'Date TBD' ? '9:00 AM' : 'TBD'}
                             </span>
-                          ))}
+                            <span className="flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5" /> {event.location || 'Main Campus'}
+                            </span>
+                          </div>
+ 
+                          <div className="flex items-center gap-3">
+                            {event.related_links && event.related_links.map((link: string, idx: number) => (
+                              <a 
+                                key={idx} 
+                                href={link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] dark:text-teal-400 hover:underline"
+                              >
+                                Details <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ))}
+ 
+                            {isUpcoming ? (
+                              <Link 
+                                to="/login" 
+                                className="inline-flex items-center gap-1 text-xs font-bold text-white bg-[#0d6b66] hover:bg-[#0b5c58] px-3 py-1.5 rounded-lg shadow-sm transition-all group/btn"
+                              >
+                                Register <ArrowRight className="h-3 w-3 transform group-hover/btn:translate-x-1 transition-transform" />
+                              </Link>
+                            ) : event.rating_links ? (
+                              <a 
+                                href={event.rating_links} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="inline-flex items-center gap-1 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-3.5 py-1.5 rounded-lg shadow-sm transition-all group/btn"
+                              >
+                                Give Feedback <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-450 dark:text-slate-550 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md">Feedback Closed</span>
+                            )}
+                          </div>
                         </div>
-
-                        {/* Title */}
-                        <h4 className="text-xl font-bold text-slate-900 dark:text-white leading-snug group-hover:text-[#0d6b66] dark:group-hover:text-teal-400 transition-colors mb-2">
-                          {event.event_name}
-                        </h4>
-                        
-                        {/* Description */}
-                        <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-4">
-                          {event.description}
-                        </p>
-                      </div>
-
-                      {/* Event Meta Footer */}
-                      <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-4 text-xs font-semibold text-slate-505 dark:text-slate-400">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5" /> 9:00 AM
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" /> Main Campus
-                          </span>
-                        </div>
-
-                        {isUpcoming ? (
-                          <Link 
-                            to="/login" 
-                            className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] dark:text-teal-400 hover:text-[#094d4a] dark:hover:text-teal-355 transition-all group/btn"
-                          >
-                            Register for Event <ArrowRight className="h-3.5 w-3.5 transform group-hover/btn:translate-x-1 transition-transform" />
-                          </Link>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-400 dark:text-slate-505">Feedback Closed</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                     </div>
+                   </div>
+                 );
+               })}
+             </div>
           )}
         </div>
       </section>
@@ -702,7 +758,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               ))}
             </div>
           ) : stories.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-850 p-12 text-center bg-white dark:bg-slate-900 max-w-md mx-auto shadow-sm">
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center bg-white dark:bg-slate-900 max-w-md mx-auto shadow-sm">
               <span className="text-2xl mb-2 block">🌟</span>
               <h4 className="font-bold text-slate-900 dark:text-white">No spotlight stories found</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Our members have lots of stories! We'll publish them soon.</p>
@@ -718,7 +774,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                     className={`rounded-2xl border shadow-sm p-6 md:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:-translate-y-1 ${
                       isAward 
                         ? 'bg-gradient-to-br from-slate-900 to-[#0c403d] dark:from-slate-950 dark:to-[#072c2a] border-teal-900 dark:border-teal-900 text-white lg:col-span-2' 
-                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-850 text-slate-800 dark:text-slate-200'
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-200'
                     }`}
                   >
                     <div>
@@ -798,7 +854,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           )}
 
           {/* Frequently Asked Questions (FAQ) Accordion Subsection */}
-          <div className="max-w-3xl mx-auto mt-24 pt-16 border-t border-slate-200 dark:border-slate-850">
+          <div className="max-w-3xl mx-auto mt-24 pt-16 border-t border-slate-200 dark:border-slate-800">
             <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white text-center mb-8">Frequently Asked Questions</h3>
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-150 dark:border-slate-800/80 p-6 shadow-sm divide-y divide-slate-100 dark:divide-slate-800">
               {FAQS.map(faq => (
@@ -835,7 +891,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           </div>
           <div className="flex items-center gap-8 opacity-65 dark:opacity-50 grayscale hover:grayscale-0 hover:opacity-100 dark:hover:opacity-100 transition-all duration-305">
             <div className="flex items-center gap-2">
-              <Users className="h-8 w-8 text-[#0d6b66] dark:text-teal-405" />
+              <Users className="h-8 w-8 text-[#0d6b66] dark:text-teal-400" />
               <span className="font-extrabold text-slate-800 dark:text-slate-205 text-lg tracking-tight">PSU DCS</span>
             </div>
             <div className="h-8 w-px bg-slate-202 dark:bg-slate-800"></div>
@@ -847,7 +903,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       </section>
 
       {/* 7. FOOTER */}
-      <footer className="bg-slate-955 bg-slate-955 bg-slate-950 text-slate-400 pt-20 pb-8 border-t border-slate-900 dark:border-slate-950">
+      <footer className="bg-slate-950 text-slate-400 pt-20 pb-8 border-t border-slate-900 dark:border-slate-950">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-20 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           {/* Brand */}
           <div className="space-y-4">
@@ -855,7 +911,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               <img src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg" />
               <span className="text-lg font-bold text-white tracking-tight">SPECS Portal</span>
             </div>
-            <p className="text-xs text-slate-550 leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-slate-500">
               Official organization management portal for the Society of Programmers and Enthusiasts in Computer Science at Partido State University.
             </p>
           </div>
@@ -887,15 +943,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             <h5 className="text-white text-xs font-bold tracking-wider uppercase mb-4">Support & Contact</h5>
             <ul className="space-y-2 text-xs space-y-3">
               <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-teal-450 text-teal-400 flex-shrink-0" />
-                <span className="text-[11px] text-slate-550 text-slate-500 truncate">specs@student.psu.edu.ph</span>
+                <Mail className="h-4 w-4 text-teal-400 flex-shrink-0" />
+                <span className="text-[11px] text-slate-500 truncate">specs@student.psu.edu.ph</span>
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-teal-455 text-teal-405 flex-shrink-0" />
+                <Phone className="h-4 w-4 text-teal-400 flex-shrink-0" />
                 <span className="text-[11px] text-slate-500">+63 912 345 6780</span>
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-teal-455 text-teal-405 flex-shrink-0" />
+                <MapPin className="h-4 w-4 text-teal-400 flex-shrink-0" />
                 <span className="text-[11px] text-slate-500 leading-normal">Partido State University, Goa Campus, Camarines Sur, Philippines</span>
               </li>
             </ul>

@@ -90,7 +90,7 @@ const StoryPage: React.FC = () => {
         </h1>
 
         {/* Story Metadata */}
-        <div className="flex flex-wrap items-center gap-4 sm:gap-6 border-y border-slate-100 dark:border-slate-850 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6 border-y border-slate-100 dark:border-slate-800 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-extrabold text-slate-700 dark:text-slate-350">
               {authorInitials}
@@ -99,7 +99,7 @@ const StoryPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Calendar className="h-4 w-4 text-slate-450" />
+            <Calendar className="h-4 w-4 text-slate-400" />
             <span>{formatDate(story.$createdAt)}</span>
           </div>
 
@@ -112,7 +112,7 @@ const StoryPage: React.FC = () => {
       {/* Hero Image */}
       {imageUrl && (
         <div className="max-w-4xl mx-auto px-6 my-6">
-          <div className="rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-850 aspect-video shadow-sm">
+          <div className="rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 aspect-video shadow-sm">
             <img src={imageUrl} alt={story.title} className="w-full h-full object-cover" />
           </div>
         </div>
@@ -122,7 +122,7 @@ const StoryPage: React.FC = () => {
       {story.post_description && (
         <div className="max-w-3xl mx-auto px-6 mb-8">
           <div className="border-l-4 border-[#0d6b66] dark:border-teal-400 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-r-xl">
-            <p className="text-sm sm:text-base font-semibold italic text-slate-750 dark:text-slate-300 leading-relaxed">
+            <p className="text-sm sm:text-base font-semibold italic text-slate-700 dark:text-slate-300 leading-relaxed">
               "{story.post_description}"
             </p>
           </div>
@@ -137,7 +137,7 @@ const StoryPage: React.FC = () => {
 
         {/* Links section */}
         {story.related_links && story.related_links.length > 0 && (
-          <div className="mt-12 pt-8 border-t border-slate-100 dark:border-slate-850">
+          <div className="mt-12 pt-8 border-t border-slate-100 dark:border-slate-800">
             <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Related Links</h3>
             <div className="flex flex-col gap-3">
               {story.related_links.map((link: string, idx: number) => (
@@ -146,7 +146,7 @@ const StoryPage: React.FC = () => {
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-850 break-all w-fit"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-800 break-all w-fit"
                 >
                   <span>{link}</span>
                   <ExternalLink className="h-4 w-4 shrink-0" />

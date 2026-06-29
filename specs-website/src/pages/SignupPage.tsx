@@ -113,7 +113,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
             Your SPECS account was created. A verification link has been sent to <span className="font-bold text-slate-900 dark:text-white">{email}</span>.
           </p>
-          <div className="bg-amber-50 dark:bg-amber-955/10 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 mb-6 text-left text-xs text-amber-800 dark:text-amber-400 flex items-start gap-2.5">
+          <div className="bg-amber-50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 mb-6 text-left text-xs text-amber-800 dark:text-amber-400 flex items-start gap-2.5">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
               <span className="font-bold">Next Step:</span> After verifying, your account needs to be cleared and approved by a class representative or SPECS officer before you can log in.
@@ -131,7 +131,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-955 dark:bg-slate-950 py-12 px-4 transition-colors duration-300 relative overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 py-12 px-4 transition-colors duration-300 relative overflow-hidden">
       {/* Background Blobs */}
       <div className="absolute top-1/4 left-1/4 h-[300px] w-[300px] rounded-full bg-teal-500/5 dark:bg-teal-500/10 blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 h-[250px] w-[250px] rounded-full bg-emerald-500/5 dark:bg-emerald-500/10 blur-[90px] pointer-events-none"></div>
@@ -154,8 +154,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
         </div>
 
         {error && (
-          <div className="mb-5 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-left flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-550 dark:text-red-400" />
+          <div className="mb-5 rounded-xl bg-red-50 dark:bg-red-950/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-left flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
             <span>{error}</span>
           </div>
         )}
@@ -275,7 +275,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Min 8 chars"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-955/40 pl-9 pr-3 py-2.5 text-xs focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 pl-9 pr-3 py-2.5 text-xs focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
                   required 
                 />
               </div>
@@ -291,7 +291,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="Repeat password"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-955/40 pl-9 pr-3 py-2.5 text-xs focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 pl-9 pr-3 py-2.5 text-xs focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
                   required 
                 />
               </div>

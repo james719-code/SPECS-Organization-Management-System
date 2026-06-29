@@ -152,7 +152,7 @@ const AdminActivityLogs: React.FC = () => {
           </button>
           <button
             onClick={() => setClearConfirmOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-semibold text-red-650 hover:bg-red-100 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors shadow-sm"
           >
             Clear logs
           </button>
@@ -201,7 +201,7 @@ const AdminActivityLogs: React.FC = () => {
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-slate-750">
+            <table className="w-full text-sm text-slate-700">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="px-6 py-3 text-left">Time stamp</th>
@@ -224,7 +224,7 @@ const AdminActivityLogs: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-3.5 font-medium text-slate-900 leading-relaxed">{log.description}</td>
-                      <td className="px-6 py-3.5 text-slate-550 font-semibold">{log.user}</td>
+                      <td className="px-6 py-3.5 text-slate-500 font-semibold">{log.user}</td>
                     </tr>
                   );
                 })}

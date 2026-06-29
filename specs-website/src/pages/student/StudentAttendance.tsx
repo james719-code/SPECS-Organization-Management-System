@@ -133,7 +133,7 @@ const StudentAttendance: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Check-in:</span>
-                      <span className="font-medium text-slate-850">{record.name_attendance || 'General'}</span>
+                      <span className="font-medium text-slate-800">{record.name_attendance || 'General'}</span>
                     </div>
                   </div>
                 </div>

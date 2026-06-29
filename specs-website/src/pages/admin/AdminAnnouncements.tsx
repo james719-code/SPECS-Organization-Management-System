@@ -211,7 +211,7 @@ const AdminAnnouncements: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-5.603-3.735A.75.75 0 008 10.9v1.4a.75.75 0 00.118.4l5.603 3.735A.75.75 0 0015 16v-1.4a.75.75 0 00-.118-.4z" />
             </svg>
           </div>
-          <h3 className="font-bold text-slate-850">Email All Users</h3>
+          <h3 className="font-bold text-slate-800">Email All Users</h3>
           <p className="text-xs text-slate-400">Draft updates for all community members</p>
         </div>
 
@@ -225,7 +225,7 @@ const AdminAnnouncements: React.FC = () => {
               <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
             </svg>
           </div>
-          <h3 className="font-bold text-slate-850">Email Students</h3>
+          <h3 className="font-bold text-slate-800">Email Students</h3>
           <p className="text-xs text-slate-400">Compose announcement for students only</p>
         </div>
 
@@ -238,7 +238,7 @@ const AdminAnnouncements: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 014 0m-3 8a3 3 0 100-6 3 3 0 000 6z" />
             </svg>
           </div>
-          <h3 className="font-bold text-slate-850">Email Officers</h3>
+          <h3 className="font-bold text-slate-800">Email Officers</h3>
           <p className="text-xs text-slate-400">Send updates to assigned officer list</p>
         </div>
       </div>
@@ -284,7 +284,7 @@ const AdminAnnouncements: React.FC = () => {
                     </button>
                   </div>
 
-                  <h3 className="font-bold text-slate-850 line-clamp-1">{draft.subject || 'Untitled'}</h3>
+                  <h3 className="font-bold text-slate-800 line-clamp-1">{draft.subject || 'Untitled'}</h3>
                   <p className="text-xs text-slate-400 mt-1 line-clamp-2">{draft.message || 'Empty body'}</p>
                 </div>
 
@@ -311,7 +311,7 @@ const AdminAnnouncements: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setIsComposerOpen(false)}>
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-850">Compose Announcement</h2>
+              <h2 className="text-lg font-bold text-slate-800">Compose Announcement</h2>
               <button onClick={() => setIsComposerOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -423,7 +423,7 @@ const AdminAnnouncements: React.FC = () => {
             <div className="px-6 py-4 border-t flex justify-end">
               <button
                 onClick={() => setIsPreviewOpen(false)}
-                className="rounded-lg bg-slate-900 text-white font-semibold text-xs px-4 py-2 hover:bg-slate-850"
+                 className="rounded-lg bg-slate-900 text-white font-semibold text-xs px-4 py-2 hover:bg-slate-800"
               >
                 Close Preview
               </button>

@@ -74,7 +74,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-955 dark:bg-slate-950 px-4 transition-colors duration-300 relative overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 transition-colors duration-300 relative overflow-hidden">
       {/* Background Blobs */}
       <div className="absolute top-1/4 left-1/4 h-[250px] w-[250px] rounded-full bg-teal-500/5 dark:bg-teal-500/10 blur-[90px] pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 h-[200px] w-[200px] rounded-full bg-emerald-500/5 dark:bg-emerald-500/10 blur-[80px] pointer-events-none"></div>
@@ -98,8 +98,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-955/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-450" />
+          <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-950/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
             <span>{error}</span>
           </div>
         )}
@@ -116,7 +116,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@student.psu.edu.ph"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-955/40 pl-11 pr-4 py-3 text-sm focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 pl-11 pr-4 py-3 text-sm focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
                 required 
               />
             </div>
@@ -136,7 +136,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-955/40 pl-11 pr-11 py-3 text-sm focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 pl-11 pr-11 py-3 text-sm focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
                 required 
               />
               <button

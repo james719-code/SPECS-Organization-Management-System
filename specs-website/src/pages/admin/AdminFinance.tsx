@@ -7,9 +7,10 @@ import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { databases } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_REVENUE, COLLECTION_ID_EXPENSES } from '../../shared/constants';
+import { DATABASE_ID, COLLECTION_ID_REVENUE, COLLECTION_ID_EXPENSES, COLLECTION_ID_EVENTS } from '../../shared/constants';
 import { ID, Query } from 'appwrite';
-import type { RevenueDoc, ExpenseDoc, PaymentDoc } from '../../types/database';
+import type { RevenueDoc, ExpenseDoc, PaymentDoc, EventDoc } from '../../types/database';
+import { RotateCw, Trash2, Loader2 } from 'lucide-react';
 
 const AdminFinance: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'revenue' | 'expenses'>('revenue');
@@ -25,6 +26,22 @@ const AdminFinance: React.FC = () => {
   const [expensePrice, setExpensePrice] = useState<number>(0);
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [submittingExpense, setSubmittingExpense] = useState(false);
+  const [eventsList, setEventsList] = useState<EventDoc[]>([]);
+  const [expenseRelType, setExpenseRelType] = useState<'event' | 'activity'>('activity');
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedActivityName, setSelectedActivityName] = useState('General');
+  const [customActivityName, setCustomActivityName] = useState('');
+
+  // Add Revenue form states
+  const [revenueDesc, setRevenueDesc] = useState('');
+  const [revenueQty, setRevenueQuantity] = useState<number>(1);
+  const [revenuePrice, setRevenuePrice] = useState<number>(0);
+  const [revenueDate, setRevenueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [submittingRevenue, setSubmittingRevenue] = useState(false);
+  const [revenueRelType, setRevenueRelType] = useState<'event' | 'activity'>('activity');
+  const [selectedRevEventId, setSelectedRevEventId] = useState('');
+  const [selectedRevActivityName, setSelectedRevActivityName] = useState('General');
+  const [customRevActivityName, setCustomRevActivityName] = useState('');
 
   // Delete Action states
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -38,7 +55,7 @@ const AdminFinance: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const [revenueRes, expensesRes, paymentsRes] = await Promise.all([
+      const [revenueRes, expensesRes, paymentsRes, eventsRes] = await Promise.all([
         databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
           Query.orderDesc('$createdAt'),
           Query.limit(500)
@@ -47,12 +64,17 @@ const AdminFinance: React.FC = () => {
           Query.orderDesc('$createdAt'),
           Query.limit(500)
         ]),
-        cachedApi.payments.listAll({}, isRefresh ? 0 : 2 * 60 * 1000)
+        cachedApi.payments.listAll({}, isRefresh ? 0 : 2 * 60 * 1000),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
+          Query.orderAsc('event_name'),
+          Query.limit(100)
+        ])
       ]);
 
       setRevenue(revenueRes.documents as RevenueDoc[]);
       setExpenses(expensesRes.documents as ExpenseDoc[]);
       setPendingPayments((paymentsRes.documents as PaymentDoc[]).filter(p => !p.is_paid));
+      setEventsList(eventsRes.documents as EventDoc[]);
 
       if (isRefresh) {
         addToast({ type: 'success', title: 'Refreshed', message: 'Finance logs synchronized successfully.' });
@@ -76,28 +98,104 @@ const AdminFinance: React.FC = () => {
       addToast({ type: 'warning', title: 'Invalid Inputs', message: 'Please check expense parameters.' });
       return;
     }
+    
+    if (expenseRelType === 'event' && !selectedEventId) {
+      addToast({ type: 'warning', title: 'Missing Event', message: 'Please select an event for this expense.' });
+      return;
+    }
+    
+    if (expenseRelType === 'activity' && selectedActivityName === 'Custom' && !customActivityName.trim()) {
+      addToast({ type: 'warning', title: 'Missing Activity', message: 'Please provide a custom activity name.' });
+      return;
+    }
 
     setSubmittingExpense(true);
     try {
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, ID.unique(), {
+      const payload: any = {
         name: expenseDesc,
         quantity: expenseQty,
         price: expensePrice,
         date_buy: new Date(expenseDate).toISOString(),
-        isEvent: false
-      });
+        isEvent: expenseRelType === 'event'
+      };
+
+      if (expenseRelType === 'event') {
+        payload.events = selectedEventId;
+        payload.activity_name = null;
+      } else {
+        payload.events = null;
+        payload.activity_name = selectedActivityName === 'Custom' ? customActivityName : selectedActivityName;
+      }
+
+      await databases.createDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, ID.unique(), payload);
 
       addToast({ type: 'success', title: 'Expense Added', message: `Expense recorded successfully.` });
       setExpenseDesc('');
       setExpenseQuantity(1);
       setExpensePrice(0);
       setExpenseDate(new Date().toISOString().split('T')[0]);
+      setSelectedEventId('');
+      setCustomActivityName('');
 
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to add expense record.' });
     } finally {
       setSubmittingExpense(false);
+    }
+  };
+
+  // Form revenue submit
+  const handleAddRevenue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!revenueDesc.trim() || revenuePrice < 0 || revenueQty < 1) {
+      addToast({ type: 'warning', title: 'Invalid Inputs', message: 'Please check revenue parameters.' });
+      return;
+    }
+    
+    if (revenueRelType === 'event' && !selectedRevEventId) {
+      addToast({ type: 'warning', title: 'Missing Event', message: 'Please select an event for this revenue.' });
+      return;
+    }
+    
+    if (revenueRelType === 'activity' && selectedRevActivityName === 'Custom' && !customRevActivityName.trim()) {
+      addToast({ type: 'warning', title: 'Missing Activity', message: 'Please provide a custom activity name.' });
+      return;
+    }
+
+    setSubmittingRevenue(true);
+    try {
+      const payload: any = {
+        name: revenueDesc,
+        quantity: revenueQty,
+        price: revenuePrice,
+        date_earned: new Date(revenueDate).toISOString(),
+        isEvent: revenueRelType === 'event'
+      };
+
+      if (revenueRelType === 'event') {
+        payload.event = selectedRevEventId;
+        payload.activity = null;
+      } else {
+        payload.event = null;
+        payload.activity = selectedRevActivityName === 'Custom' ? customRevActivityName : selectedRevActivityName;
+      }
+
+      await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), payload);
+
+      addToast({ type: 'success', title: 'Revenue Recorded', message: `Revenue record created successfully.` });
+      setRevenueDesc('');
+      setRevenueQuantity(1);
+      setRevenuePrice(0);
+      setRevenueDate(new Date().toISOString().split('T')[0]);
+      setSelectedRevEventId('');
+      setCustomRevActivityName('');
+
+      loadData(true);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record revenue.' });
+    } finally {
+      setSubmittingRevenue(false);
     }
   };
 
@@ -160,6 +258,81 @@ const AdminFinance: React.FC = () => {
     return { totalRev, totalExp, netBal, pendingCount, pendingSum };
   }, [revenue, expenses, pendingPayments]);
 
+  // Grouping Revenue by Event / Activity Name
+  const groupedRevenue = useMemo(() => {
+    const groups: { [key: string]: { name: string; isEvent: boolean; items: RevenueDoc[]; total: number } } = {};
+    revenue.forEach(r => {
+      let groupName = 'General Revenue';
+      
+      if (r.isEvent && r.event) {
+        const matchedEvent = eventsList.find(e => e.$id === r.event);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        } else {
+          groupName = 'Event Payments';
+        }
+      } else if (r.activity) {
+        groupName = r.activity;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      }
+      
+      if (!groups[groupName]) {
+        groups[groupName] = {
+          name: groupName,
+          isEvent: r.isEvent,
+          items: [],
+          total: 0
+        };
+      }
+      groups[groupName].items.push(r);
+      groups[groupName].total += (r.price || 0) * (r.quantity || 1);
+    });
+    return Object.values(groups).sort((a, b) => b.total - a.total);
+  }, [revenue, eventsList]);
+
+  // Grouping Expenses by Event / Activity Name
+  const groupedExpenses = useMemo(() => {
+    const groups: { [key: string]: { name: string; isEvent: boolean; items: ExpenseDoc[]; total: number } } = {};
+    expenses.forEach(e => {
+      let groupName = 'General Expenses';
+      if (e.isEvent) {
+        if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
+          groupName = (e.events as any).event_name;
+        } else if (e.events && typeof e.events === 'string') {
+          const matchedEvent = eventsList.find(ev => ev.$id === e.events);
+          if (matchedEvent && matchedEvent.event_name) {
+            groupName = matchedEvent.event_name;
+          } else {
+            groupName = 'Event Expenses';
+          }
+        } else {
+          groupName = 'Event Expenses';
+        }
+      } else if (e.activity_name) {
+        groupName = e.activity_name;
+      } else if (e.name) {
+        groupName = e.name;
+      }
+      
+      if (!groups[groupName]) {
+        groups[groupName] = {
+          name: groupName,
+          isEvent: e.isEvent,
+          items: [],
+          total: 0
+        };
+      }
+      groups[groupName].items.push(e);
+      groups[groupName].total += (e.price || 0) * (e.quantity || 1);
+    });
+    return Object.values(groups).sort((a, b) => b.total - a.total);
+  }, [expenses, eventsList]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -186,9 +359,7 @@ const AdminFinance: React.FC = () => {
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <svg className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
-            </svg>
+            <RotateCw className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
@@ -245,162 +416,382 @@ const AdminFinance: React.FC = () => {
       {loading ? (
         <SkeletonTable rows={5} cols={5} />
       ) : activeTab === 'revenue' ? (
-        /* Revenue Logs Panel */
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-          <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Collected Revenue</h3>
+        /* Grouped Revenue Cards and Form */
+        <div className="space-y-6">
+          {/* Add Revenue form */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Record New Revenue</h3>
+            <form onSubmit={handleAddRevenue} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Description / Source</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BSCS-3A T-Shirt Payments / Sponsorship"
+                    value={revenueDesc}
+                    onChange={e => setRevenueDesc(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={revenueQty}
+                    onChange={e => setRevenueQuantity(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Unit Price (PHP)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={revenuePrice || ''}
+                    onChange={e => setRevenuePrice(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date Received</label>
+                  <input
+                    type="date"
+                    required
+                    value={revenueDate}
+                    onChange={e => setRevenueDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Relates To</label>
+                  <select
+                    value={revenueRelType}
+                    onChange={e => setRevenueRelType(e.target.value as 'event' | 'activity')}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  >
+                    <option value="activity">General Activity</option>
+                    <option value="event">Official Event</option>
+                  </select>
+                </div>
+
+                {revenueRelType === 'event' ? (
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Event</label>
+                    <select
+                      value={selectedRevEventId}
+                      onChange={e => setSelectedRevEventId(e.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                    >
+                      <option value="">-- Choose Event --</option>
+                      {eventsList.map(ev => (
+                        <option key={ev.$id} value={ev.$id}>{ev.event_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="sm:col-span-2 lg:col-span-2 flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Activity</label>
+                      <select
+                        value={selectedRevActivityName}
+                        onChange={e => setSelectedRevActivityName(e.target.value)}
+                        required
+                        className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                      >
+                        <option value="General">General Operations</option>
+                        <option value="Membership Fee">Membership Fees</option>
+                        <option value="T-Shirt Payment">T-Shirt Payments</option>
+                        <option value="Donation / Sponsorship">Donation & Sponsorships</option>
+                        <option value="Merchandise Sales">Merchandise Sales</option>
+                        <option value="Custom">Custom Activity Name...</option>
+                      </select>
+                    </div>
+                    {selectedRevActivityName === 'Custom' && (
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Custom Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Contribution"
+                          value={customRevActivityName}
+                          onChange={e => setCustomRevActivityName(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingRevenue}
+                className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-sm py-2.5 shadow-sm transition-colors flex items-center justify-center gap-2 mt-4"
+              >
+                {submittingRevenue && <Loader2 className="h-4 w-4 animate-spin" />}
+                Record Revenue Entry
+              </button>
+            </form>
           </div>
-          {revenue.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-400">No revenue collections logged.</div>
+
+          {/* Grouped Revenue Cards */}
+          <div className="space-y-4">
+            {groupedRevenue.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+              No revenue collections logged.
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-slate-700">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="px-6 py-3 text-left">Description</th>
-                    <th className="px-6 py-3 text-left">Source type</th>
-                    <th className="px-6 py-3 text-left">Quantity</th>
-                    <th className="px-6 py-3 text-left">Unit Price</th>
-                    <th className="px-6 py-3 text-left">Total</th>
-                    <th className="px-6 py-3 text-left">Date logged</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {revenue.map(r => (
-                    <tr key={r.$id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-3.5 font-medium text-slate-900">{r.name || 'General Earnings'}</td>
-                      <td className="px-6 py-3.5 text-slate-500">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          r.isEvent ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-slate-50 text-slate-700 border border-slate-200'
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+              {groupedRevenue.map((group, idx) => (
+                <div key={idx} className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-base leading-snug">{group.name}</h3>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider mt-1.5 ${
+                          group.isEvent 
+                            ? 'bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30' 
+                            : 'bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-350 dark:border-slate-700'
                         }`}>
-                          {r.isEvent ? 'Event payment' : 'General'}
+                          {group.isEvent ? 'Event Payments' : 'General Activity'}
                         </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-slate-500">{r.quantity || 1}</td>
-                      <td className="px-6 py-3.5 text-slate-500">{formatCurrency(r.price || 0)}</td>
-                      <td className="px-6 py-3.5 font-bold text-slate-900">{formatCurrency((r.price || 0) * (r.quantity || 1))}</td>
-                      <td className="px-6 py-3.5 text-xs text-slate-400">{r.date_earned ? formatDate(r.date_earned) : 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-500 block">
+                          + {formatCurrency(group.total)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          {group.items.length} payments
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                      {group.items.map(item => (
+                        <div key={item.$id} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800/40 last:border-0 text-xs">
+                          <div>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={item.name || ''}>
+                              {item.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{item.date_earned ? formatDate(item.date_earned) : 'N/A'}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-slate-900 dark:text-white">{formatCurrency((item.price || 0) * (item.quantity || 1))}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Qty: {item.quantity || 1} × {formatCurrency(item.price || 0)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-      ) : (
+      </div>
+    ) : (
         /* Expense Logs Panel (Includes Form + logs list) */
         <div className="space-y-6">
           {/* Add Expense form */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Record New Expense</h3>
-            <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-              <div className="lg:col-span-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Printer inks / Office supplies"
-                  value={expenseDesc}
-                  onChange={e => setExpenseDesc(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66]"
-                />
+            <form onSubmit={handleAddExpense} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Printer inks / Office supplies"
+                    value={expenseDesc}
+                    onChange={e => setExpenseDesc(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={expenseQty}
+                    onChange={e => setExpenseQuantity(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Unit Price (PHP)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={expensePrice || ''}
+                    onChange={e => setExpensePrice(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Quantity</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={expenseQty}
-                  onChange={e => setExpenseQuantity(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66]"
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date Purchased</label>
+                  <input
+                    type="date"
+                    required
+                    value={expenseDate}
+                    onChange={e => setExpenseDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Relates To</label>
+                  <select
+                    value={expenseRelType}
+                    onChange={e => setExpenseRelType(e.target.value as 'event' | 'activity')}
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                  >
+                    <option value="activity">General Activity</option>
+                    <option value="event">Official Event</option>
+                  </select>
+                </div>
+
+                {expenseRelType === 'event' ? (
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Event</label>
+                    <select
+                      value={selectedEventId}
+                      onChange={e => setSelectedEventId(e.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                    >
+                      <option value="">-- Choose Event --</option>
+                      {eventsList.map(ev => (
+                        <option key={ev.$id} value={ev.$id}>{ev.event_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="sm:col-span-2 lg:col-span-2 flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Activity</label>
+                      <select
+                        value={selectedActivityName}
+                        onChange={e => setSelectedActivityName(e.target.value)}
+                        required
+                        className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                      >
+                        <option value="General">General Operations</option>
+                        <option value="Marketing">Marketing / Publicity</option>
+                        <option value="Office Supplies">Office Supplies</option>
+                        <option value="Logistics">Logistics / Transportation</option>
+                        <option value="Food & Catering">Food & Catering</option>
+                        <option value="Prizes & Awards">Prizes & Awards</option>
+                        <option value="Custom">Custom Activity Name...</option>
+                      </select>
+                    </div>
+                    {selectedActivityName === 'Custom' && (
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Custom Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Workshop"
+                          value={customActivityName}
+                          onChange={e => setCustomActivityName(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] dark:bg-slate-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Unit Price (PHP)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={expensePrice || ''}
-                  onChange={e => setExpensePrice(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date Purchased</label>
-                <input
-                  type="date"
-                  required
-                  value={expenseDate}
-                  onChange={e => setExpenseDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66]"
-                />
-              </div>
+
               <button
                 type="submit"
                 disabled={submittingExpense}
-                className="lg:col-span-5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-sm py-2.5 shadow-sm transition-colors flex items-center justify-center gap-2"
+                className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-sm py-2.5 shadow-sm transition-colors flex items-center justify-center gap-2 mt-4"
               >
-                {submittingExpense && (
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                )}
+                {submittingExpense && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save Expense Record
               </button>
             </form>
           </div>
 
-          {/* Expenses Table list */}
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-            <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Expense Logs</h3>
+          {/* Grouped Expenses Cards */}
+          {groupedExpenses.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+              No expense records found.
             </div>
-            {expenses.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-400">No expense records found.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-slate-700">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="px-6 py-3 text-left">Description</th>
-                      <th className="px-6 py-3 text-left">Quantity</th>
-                      <th className="px-6 py-3 text-left">Unit Price</th>
-                      <th className="px-6 py-3 text-left">Total</th>
-                      <th className="px-6 py-3 text-left">Date bought</th>
-                      <th className="px-6 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {expenses.map(e => (
-                      <tr key={e.$id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-3.5 font-medium text-slate-900">{e.name || 'General Expense'}</td>
-                        <td className="px-6 py-3.5 text-slate-500">{e.quantity || 1}</td>
-                        <td className="px-6 py-3.5 text-slate-500">{formatCurrency(e.price || 0)}</td>
-                        <td className="px-6 py-3.5 font-bold text-slate-900">{formatCurrency((e.price || 0) * (e.quantity || 1))}</td>
-                        <td className="px-6 py-3.5 text-xs text-slate-400">{e.date_buy ? formatDate(e.date_buy) : 'N/A'}</td>
-                        <td className="px-6 py-3.5 text-right">
-                          <button
-                            onClick={() => setDeleteConfirm({ open: true, id: e.$id })}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors"
-                            title="Delete record"
-                          >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+              {groupedExpenses.map((group, idx) => (
+                <div key={idx} className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-base leading-snug">{group.name}</h3>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider mt-1.5 ${
+                          group.isEvent 
+                            ? 'bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30' 
+                            : 'bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-350 dark:border-slate-700'
+                        }`}>
+                          {group.isEvent ? 'Event Expense' : 'General Activity'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-red-600 dark:text-red-500 block">
+                          - {formatCurrency(group.total)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          {group.items.length} items
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                      {group.items.map(item => (
+                        <div key={item.$id} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800/40 last:border-0 text-xs">
+                          <div>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" title={item.name || ''}>
+                              {item.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{item.date_buy ? formatDate(item.date_buy) : 'N/A'}</p>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="font-bold text-slate-900 dark:text-white">{formatCurrency((item.price || 0) * (item.quantity || 1))}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Qty: {item.quantity || 1} × {formatCurrency(item.price || 0)}</p>
+                            </div>
+                            <button
+                              onClick={() => setDeleteConfirm({ open: true, id: item.$id })}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-1.5 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
+                              title="Delete record"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

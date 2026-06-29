@@ -199,7 +199,7 @@ const StudentProfile: React.FC = () => {
                   setDeleteConfirmText('');
                   setIsDeleteOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 text-red-650 hover:bg-red-100 px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 px-3.5 py-1.5 text-xs font-semibold transition-colors"
               >
                 Delete Account
               </button>
@@ -273,7 +273,7 @@ const StudentProfile: React.FC = () => {
               {/* Volunteer status badges & actions */}
               {studentData?.is_volunteer && studentData?.volunteer_request_status === 'backout_pending' ? (
                 <>
-                  <span className="badge bg-amber-50 border border-amber-100 text-amber-700 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                     Leave Request Pending
                   </span>
                   <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
@@ -282,7 +282,7 @@ const StudentProfile: React.FC = () => {
                 </>
               ) : studentData?.is_volunteer ? (
                 <>
-                  <span className="badge bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                     Active Volunteer
                   </span>
                   <button
@@ -295,7 +295,7 @@ const StudentProfile: React.FC = () => {
                 </>
               ) : studentData?.volunteer_request_status === 'pending' ? (
                 <>
-                  <span className="badge bg-amber-50 border border-amber-100 text-amber-700 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                     Request Pending
                   </span>
                   <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
@@ -304,7 +304,7 @@ const StudentProfile: React.FC = () => {
                 </>
               ) : studentData?.volunteer_request_status === 'rejected' ? (
                 <>
-                  <span className="badge bg-red-50 border border-red-100 text-red-750 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-semibold text-red-700">
                     Request Declined
                   </span>
                   <button
@@ -340,7 +340,7 @@ const StudentProfile: React.FC = () => {
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">Edit Profile Details</h2>
-              <button onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-slate-650 transition-colors">
+              <button onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -431,8 +431,8 @@ const StudentProfile: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setIsDeleteOpen(false)}>
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between bg-red-50">
-              <h2 className="text-base font-bold text-red-750 uppercase tracking-wide">Delete Student Profile</h2>
-              <button onClick={() => setIsDeleteOpen(false)} className="text-slate-400 hover:text-slate-650 transition-colors">
+              <h2 className="text-base font-bold text-red-700 uppercase tracking-wide">Delete Student Profile</h2>
+              <button onClick={() => setIsDeleteOpen(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -446,7 +446,7 @@ const StudentProfile: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">
-                  Type <strong className="text-red-650">DELETE</strong> to confirm
+                  Type <strong className="text-red-600">DELETE</strong> to confirm
                 </label>
                 <input
                   type="text"

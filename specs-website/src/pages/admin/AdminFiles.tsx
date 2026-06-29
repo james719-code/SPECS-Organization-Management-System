@@ -235,7 +235,7 @@ const AdminFiles: React.FC = () => {
                     </button>
                   </div>
 
-                  <h3 className="font-bold text-slate-850 group-hover:text-[#0d6b66] transition-colors line-clamp-1 break-all" title={fileDoc.fileName || ''}>
+                  <h3 className="font-bold text-slate-800 group-hover:text-[#0d6b66] transition-colors line-clamp-1 break-all" title={fileDoc.fileName || ''}>
                     {fileDoc.fileName}
                   </h3>
                   <p className="text-xs text-slate-400 mt-1 line-clamp-2">{fileDoc.description || 'No description provided.'}</p>

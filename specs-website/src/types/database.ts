@@ -53,6 +53,8 @@ export interface EventDoc extends ModelsDocument {
   collab?: string[] | null;
   related_links?: string[] | null;
   meaning?: string[] | null;
+  location?: string | null;
+  rating_links?: string | null;
 }
 
 export interface AttendanceDoc extends ModelsDocument {
