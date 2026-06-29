@@ -18,7 +18,7 @@ const appwriteMocks = vi.hoisted(() => ({
     }
 }));
 
-vi.mock('../../shared/appwrite.js', () => appwriteMocks);
+vi.mock('../../shared/appwrite.ts', () => appwriteMocks);
 
 describe('API cache integration', () => {
     let api;
@@ -29,12 +29,12 @@ describe('API cache integration', () => {
         vi.clearAllMocks();
         localStorage.clear();
 
-        const cacheModule = await import('../../shared/cache.js');
+        const cacheModule = await import('../../shared/cache.ts');
         dataCache = cacheModule.dataCache;
         dataCache.clear();
         dataCache.resetStats();
 
-        const apiModule = await import('../../shared/api.js');
+        const apiModule = await import('../../shared/api.ts');
         api = apiModule.api;
         cachedApi = apiModule.cachedApi;
     });

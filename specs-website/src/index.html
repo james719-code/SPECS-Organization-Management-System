@@ -1,85 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Initializing SPECS Portal...</title>
-    <link rel="icon" href="/logo.webp" type="image/webp">
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f8f9fa;
-            font-family: 'Poppins', system-ui, sans-serif;
-        }
-        .loader {
-            text-align: center;
-            color: #212529;
-        }
-        .loader img {
-            width: 80px;
-            height: 80px;
-            animation: pulse 1.8s infinite ease-in-out;
-        }
-        .loader p {
-            margin-top: 1rem;
-            font-weight: 500;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.8; }
-        }
-    </style>
-
-</head>
-<body>
-
-<div class="loader">
-    <img src="/logo.webp" alt="SPECS Logo">
-    <p>Initializing Website</p>
-</div>
-
-<script type="module">
-    import { account, databases } from './shared/appwrite.js';
-    import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants.js';
-
-    const ROUTES = {
-        ADMIN_DASHBOARD: '/dashboard-admin/',
-        OFFICER_DASHBOARD: '/dashboard-officer/',
-        STUDENT_DASHBOARD: '/dashboard-student/',
-        LANDING_PAGE: '/landing/'
-    };
-
-    (async () => {
-        try {
-            const user = await account.get();
-            const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
-
-            if (profile.type === 'admin') {
-                window.location.replace(ROUTES.ADMIN_DASHBOARD);
-            } else if (profile.type === 'officer' && profile.verified && !profile.deactivated) {
-                window.location.replace(ROUTES.OFFICER_DASHBOARD);
-            } else if (profile.type === 'student' && profile.verified && !profile.deactivated) {
-                window.location.replace(ROUTES.STUDENT_DASHBOARD);
-            }
-
-            window.location.replace(ROUTES.LANDING_PAGE);
-        } catch (error) {
-            window.location.replace(ROUTES.LANDING_PAGE);
-        }
-    })();
-</script>
-
-<noscript>
-    <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
-        <h1>JavaScript Required</h1>
-        <p>This web application requires JavaScript to function. Please enable it in your browser settings and refresh the page.</p>
-    </div>
-</noscript>
-
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/webp" href="/logo.webp" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SPECS Organization Portal</title>
+    <!-- Poppins Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body class="m-0 bg-slate-50 font-sans antialiased text-slate-800">
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
 </html>

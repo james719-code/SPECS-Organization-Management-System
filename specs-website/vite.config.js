@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import { resolve } from 'path';
 
@@ -11,18 +12,15 @@ export default defineConfig({
   define: {
     __APP_TITLE__: JSON.stringify(process.env.VITE_APP_TITLE),
   },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        silenceDeprecations: [
-          'import',
-          'mixed-decls',
-          'color-functions',
-          'global-builtin',
-        ],
-      },
+
+  plugins: [react()],
+
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
     },
   },
+
   build: {
     outDir: '../dist',
     emptyOutDir: true,
@@ -37,49 +35,24 @@ export default defineConfig({
 
     rollupOptions: {
       input: {
-        main: resolve(process.cwd(), 'src/index.html'),
-        landing: resolve(process.cwd(), 'src/landing/index.html'),
-        officerDashboard: resolve(process.cwd(), 'src/dashboard-officer/index.html'),
-        adminDashboard: resolve(process.cwd(), 'src/dashboard-admin/index.html'),
-        studentDashboard: resolve(process.cwd(), 'src/dashboard-student/index.html'),
+        main: resolve(__dirname, 'src/index.html'),
       },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
             if (id.includes('appwrite')) {
               return 'vendor-appwrite';
             }
-            if (id.includes('firebase')) {
-              return 'vendor-firebase';
-            }
-            if (id.includes('bootstrap-icons')) {
+            if (id.includes('lucide-react')) {
               return 'vendor-icons';
-            }
-            if (id.includes('bootstrap')) {
-              return 'vendor-bootstrap';
-            }
-            if (id.includes('chart')) {
-              return 'vendor-chart';
-            }
-            if (id.includes('@aws-sdk')) {
-              return 'vendor-aws';
             }
             return 'vendor';
           }
           if (id.includes('/shared/')) {
             return 'shared-utils';
-          }
-          if (id.includes('/dashboard-admin/views/')) {
-            return 'views-admin';
-          }
-          if (id.includes('/dashboard-officer/views/')) {
-            return 'views-officer';
-          }
-          if (id.includes('/dashboard-student/views/')) {
-            return 'views-student';
-          }
-          if (id.includes('/landing/views/')) {
-            return 'views-landing';
           }
         }
       }

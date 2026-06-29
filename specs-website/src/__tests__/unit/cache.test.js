@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // We need to mock the module before importing it
-vi.mock('../../shared/appwrite.js', () => ({
+vi.mock('../../shared/appwrite.ts', () => ({
     account: {
         get: vi.fn()
     },
@@ -25,7 +25,7 @@ describe('Cache Utility', () => {
     beforeEach(async () => {
         localStorage.clear();
         // Dynamically import to get fresh instance
-        const module = await import('../../shared/cache.js');
+        const module = await import('../../shared/cache.ts');
         cache = module.cache;
         dataCache = module.dataCache;
         dataCache.resetStats();
@@ -71,7 +71,6 @@ describe('Cache Utility', () => {
 
     describe('TTL expiration', () => {
         it('should return null for expired data', () => {
-            // Set with 0 TTL (already expired)
             cache.set('expired-key', 'value', 0);
             const result = cache.get('expired-key');
             expect(result).toBeNull();
@@ -156,6 +155,8 @@ describe('Cache Utility', () => {
     describe('bounded cleanup', () => {
         it('should evict entries when localStorage write fails', () => {
             cache.set('old-key', 'old-value', { ttl: 5000 });
+            
+            // Mock localstorage throw
             localStorage.setItem.mockImplementationOnce(() => {
                 throw new Error('quota exceeded');
             });
