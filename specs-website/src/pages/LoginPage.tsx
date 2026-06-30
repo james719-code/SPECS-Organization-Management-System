@@ -125,7 +125,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Password</label>
-              <span className="text-[11px] font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline cursor-pointer">Forgot?</span>
+              <Link to="/forgot-password" className="text-[11px] font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline">Forgot?</Link>
             </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400 dark:text-slate-500">

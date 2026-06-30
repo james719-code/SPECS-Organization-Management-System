@@ -57,7 +57,7 @@ const MockTerminal: React.FC = () => {
   }, []);
 
   return (
-    <div className="hidden sm:block rounded-xl bg-slate-900 border border-white/5 p-3 font-mono text-[9px] text-teal-300 space-y-1 h-[95px] overflow-hidden relative">
+    <div className="hidden sm:block rounded-xl bg-slate-900 border border-white/5 p-3 font-mono text-[9px] text-teal-300 space-y-1 h-[115px] overflow-hidden relative">
       <div className="absolute top-1.5 right-2 flex items-center gap-1">
         <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
         <span className="text-[6px] text-slate-500 font-bold uppercase tracking-wider">LIVE</span>

@@ -163,6 +163,46 @@ class MockApiService {
         return true;
     }
 
+    async confirmPasswordRecovery(userId, secret, password) {
+        await delay(MOCK_DELAY);
+        console.log('[Mock] Password reset recovery confirmed for userId:', userId, 'with secret:', secret);
+        return true;
+    }
+
+    async updateAccountType(accountId, newType) {
+        await delay(MOCK_DELAY);
+        const index = mockAccounts.findIndex(a => a.$id === accountId);
+        if (index !== -1) {
+            mockAccounts[index].type = newType;
+            const studentRef = mockAccounts[index].students;
+            const studentId = studentRef ? (typeof studentRef === 'object' ? studentRef.$id : studentRef) : null;
+            if (newType === 'officer') {
+                const officerId = `officer-${Date.now()}`;
+                mockOfficers.push({
+                    $id: officerId,
+                    students: studentId,
+                    isSchedule: false,
+                    scheduleId: null,
+                    $createdAt: new Date().toISOString(),
+                    $updatedAt: new Date().toISOString()
+                });
+                mockAccounts[index].officers = { $id: officerId };
+            } else if (newType === 'student') {
+                mockAccounts[index].officers = null;
+                const idx = mockOfficers.findIndex(o => {
+                    const ost = o.students;
+                    const ostId = ost ? (typeof ost === 'object' ? ost.$id : ost) : null;
+                    return ostId === studentId;
+                });
+                if (idx !== -1) {
+                    mockOfficers.splice(idx, 1);
+                }
+            }
+            return mockAccounts[index];
+        }
+        return null;
+    }
+
     /**
      * Parse an Appwrite Query string into its components
      * Query format: "method(\"field\", value)" or "method(value)"

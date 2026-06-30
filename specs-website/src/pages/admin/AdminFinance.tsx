@@ -5,14 +5,28 @@ import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_REVENUE, COLLECTION_ID_EXPENSES, COLLECTION_ID_EVENTS } from '../../shared/constants';
 import { ID, Query } from 'appwrite';
 import type { RevenueDoc, ExpenseDoc, PaymentDoc, EventDoc } from '../../types/database';
-import { RotateCw, Trash2, Loader2 } from 'lucide-react';
+import { RotateCw, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend
+} from 'recharts';
 
-const AdminFinance: React.FC = () => {
+interface AdminFinanceProps {
+  isDetailsView?: boolean;
+}
+
+const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) => {
+  const { name } = useParams<{ name: string }>();
+  const decodedName = name ? decodeURIComponent(name) : '';
   const [activeTab, setActiveTab] = useState<'revenue' | 'expenses'>('revenue');
   const [revenue, setRevenue] = useState<RevenueDoc[]>([]);
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
@@ -333,6 +347,352 @@ const AdminFinance: React.FC = () => {
     return Object.values(groups).sort((a, b) => b.total - a.total);
   }, [expenses, eventsList]);
 
+  const detailsData = useMemo(() => {
+    if (!isDetailsView || !decodedName) return null;
+
+    const matchedRevenues = revenue.filter(r => {
+      let groupName = 'General Revenue';
+      if (r.isEvent && r.event) {
+        const matchedEvent = eventsList.find(e => e.$id === r.event);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        } else {
+          groupName = 'Event Payments';
+        }
+      } else if (r.activity) {
+        groupName = r.activity;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      }
+      return groupName === decodedName;
+    });
+
+    const matchedExpenses = expenses.filter(e => {
+      let groupName = 'General Expenses';
+      if (e.isEvent) {
+        if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
+          groupName = (e.events as any).event_name;
+        } else if (e.events && typeof e.events === 'string') {
+          const matchedEvent = eventsList.find(ev => ev.$id === e.events);
+          if (matchedEvent && matchedEvent.event_name) {
+            groupName = matchedEvent.event_name;
+          } else {
+            groupName = 'Event Expenses';
+          }
+        } else {
+          groupName = 'Event Expenses';
+        }
+      } else if (e.activity_name) {
+        groupName = e.activity_name;
+      } else if (e.name) {
+        groupName = e.name;
+      }
+      return groupName === decodedName;
+    });
+
+    const totalRev = matchedRevenues.reduce((sum, r) => sum + ((r.price || 0) * (r.quantity || 1)), 0);
+    const totalExp = matchedExpenses.reduce((sum, e) => sum + ((e.price || 0) * (e.quantity || 1)), 0);
+    const netBalance = totalRev - totalExp;
+
+    return {
+      revenues: matchedRevenues,
+      expenses: matchedExpenses,
+      totalRev,
+      totalExp,
+      netBalance,
+      isEvent: matchedRevenues[0]?.isEvent || matchedExpenses[0]?.isEvent || false
+    };
+  }, [isDetailsView, decodedName, revenue, expenses, eventsList]);
+
+  const comparisonData = useMemo(() => {
+    if (!detailsData) return [];
+    const data = [];
+    if (detailsData.totalRev > 0) {
+      data.push({ name: 'Revenue', value: detailsData.totalRev });
+    }
+    if (detailsData.totalExp > 0) {
+      data.push({ name: 'Expenses', value: detailsData.totalExp });
+    }
+    return data;
+  }, [detailsData]);
+
+  const revenueBreakdown = useMemo(() => {
+    if (!detailsData) return [];
+    const itemGroups: Record<string, number> = {};
+    detailsData.revenues.forEach(r => {
+      const label = r.name || 'Unnamed Revenue';
+      itemGroups[label] = (itemGroups[label] || 0) + (r.price || 0) * (r.quantity || 1);
+    });
+    return Object.entries(itemGroups).map(([name, value]) => ({ name, value }));
+  }, [detailsData]);
+
+  const expensesBreakdown = useMemo(() => {
+    if (!detailsData) return [];
+    const itemGroups: Record<string, number> = {};
+    detailsData.expenses.forEach(e => {
+      const label = e.name || 'Unnamed Expense';
+      itemGroups[label] = (itemGroups[label] || 0) + (e.price || 0) * (e.quantity || 1);
+    });
+    return Object.entries(itemGroups).map(([name, value]) => ({ name, value }));
+  }, [detailsData]);
+
+  const CHART_COLORS = ['#0d6b66', '#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
+
+  if (isDetailsView) {
+    if (!detailsData) {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm text-center">
+          <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+            <ArrowLeft className="h-6 w-6 text-slate-400" />
+          </div>
+          <h2 className="font-bold text-slate-800 text-lg">No details found</h2>
+          <p className="text-sm text-slate-500 mt-1">We couldn't retrieve financial data for "{decodedName}".</p>
+          <button
+            onClick={() => navigate(window.location.pathname.split('/details')[0])}
+            className="mt-4 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-5 py-2 text-sm font-semibold transition-colors"
+          >
+            Back to Finance
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Detail Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(window.location.pathname.split('/details')[0])}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+              title="Back to Finance Overview"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 leading-snug">{decodedName}</h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Financial analytics and logs for this {detailsData.isEvent ? 'event' : 'activity'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Revenue</span>
+            <span className="text-2xl font-bold text-emerald-600 block">{formatCurrency(detailsData.totalRev)}</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">{detailsData.revenues.length} collection records</span>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Expenses</span>
+            <span className="text-2xl font-bold text-red-600 block">{formatCurrency(detailsData.totalExp)}</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">{detailsData.expenses.length} purchase records</span>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Balance</span>
+            <span className={`text-2xl font-bold block ${detailsData.netBalance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              {detailsData.netBalance >= 0 ? '+' : ''}{formatCurrency(detailsData.netBalance)}
+            </span>
+            <span className="text-[10px] text-slate-400 mt-1 block">Net financial return</span>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Charts Column (Left - 5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Pie Chart Card */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Financial Split</h3>
+              
+              {comparisonData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
+                  <span className="text-xs">No transaction records to display chart.</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={comparisonData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {comparisonData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.name === 'Revenue' ? '#0d6b66' : '#ef4444'} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => [formatCurrency(Number(value)), 'Total']}
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                        />
+                        <Legend verticalAlign="bottom" height={36} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Custom percentages labels for elegance */}
+                  <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                    {comparisonData.map((item, idx) => {
+                      const pct = ((item.value / (detailsData.totalRev + detailsData.totalExp)) * 100).toFixed(1);
+                      return (
+                        <div key={idx} className="text-center">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${item.name === 'Revenue' ? 'text-[#0d6b66]' : 'text-red-500'}`}>
+                            {item.name}
+                          </span>
+                          <p className="text-xl font-bold text-slate-800 mt-0.5">{pct}%</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Breakdown Cards */}
+            {revenueBreakdown.length > 1 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Revenue Breakdown</h3>
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={revenueBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {revenueBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '10px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {expensesBreakdown.length > 1 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Expenses Breakdown</h3>
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={expensesBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {expensesBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '10px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ledger Lists (Right - 7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Revenue List */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Revenue Collections</h3>
+              {detailsData.revenues.length === 0 ? (
+                <div className="text-center py-6 text-sm text-slate-400">No revenue logs for this event.</div>
+              ) : (
+                <div className="overflow-x-auto text-nowrap">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Description</th>
+                        <th className="py-2.5 px-3 text-right">Unit Price</th>
+                        <th className="py-2.5 px-3 text-right">Qty</th>
+                        <th className="py-2.5 px-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {detailsData.revenues.map(item => (
+                        <tr key={item.$id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-slate-400">{item.date_earned ? formatDate(item.date_earned) : 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-700 whitespace-normal">{item.name}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-600">{formatCurrency(item.price || 0)}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-600">{item.quantity || 1}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-emerald-600">
+                            {formatCurrency((item.price || 0) * (item.quantity || 1))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Expenses List */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Expense Purchases</h3>
+              {detailsData.expenses.length === 0 ? (
+                <div className="text-center py-6 text-sm text-slate-400">No expense records for this event.</div>
+              ) : (
+                <div className="overflow-x-auto text-nowrap">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Description</th>
+                        <th className="py-2.5 px-3 text-right">Unit Price</th>
+                        <th className="py-2.5 px-3 text-right">Qty</th>
+                        <th className="py-2.5 px-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {detailsData.expenses.map(item => (
+                        <tr key={item.$id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 text-slate-400">{item.date_buy ? formatDate(item.date_buy) : 'N/A'}</td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-700 whitespace-normal">{item.name}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-600">{formatCurrency(item.price || 0)}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-600">{item.quantity || 1}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-red-600">
+                            {formatCurrency((item.price || 0) * (item.quantity || 1))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -554,7 +914,11 @@ const AdminFinance: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
               {groupedRevenue.map((group, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div
+                  key={idx}
+                  onClick={() => navigate(`details/${encodeURIComponent(group.name)}`)}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                >
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div>
@@ -739,7 +1103,11 @@ const AdminFinance: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
               {groupedExpenses.map((group, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div
+                  key={idx}
+                  onClick={() => navigate(`details/${encodeURIComponent(group.name)}`)}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                >
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div>

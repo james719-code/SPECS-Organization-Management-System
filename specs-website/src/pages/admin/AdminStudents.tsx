@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { RotateCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { formatDate } from '../../shared/formatters';
@@ -8,7 +9,10 @@ import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
-import type { StudentDoc } from '../../types/database';
+import { databases, functions } from '../../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, FUNCTION_ID } from '../../shared/constants';
+import { Query } from 'appwrite';
+import type { StudentDoc, AccountDoc } from '../../types/database';
 
 const PAGE_SIZE = 12;
 
@@ -30,6 +34,8 @@ const AdminStudents: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailStudent, setDetailStudent] = useState<StudentDoc | null>(null);
+  const [linkedAccount, setLinkedAccount] = useState<AccountDoc | null>(null);
+  const [loadingAccount, setLoadingAccount] = useState(false);
   
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; student: StudentDoc | null }>({ open: false, student: null });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
@@ -37,6 +43,83 @@ const AdminStudents: React.FC = () => {
 
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  // Fetch linked account when student drawer details open
+  useEffect(() => {
+    if (!detailStudent) {
+      setLinkedAccount(null);
+      return;
+    }
+    const fetchLinkedAccount = async () => {
+      setLoadingAccount(true);
+      try {
+        const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
+          Query.equal('students', detailStudent.$id)
+        ]);
+        if (res.documents.length > 0) {
+          setLinkedAccount(res.documents[0] as AccountDoc);
+        } else {
+          setLinkedAccount(null);
+        }
+      } catch (err) {
+        console.error('Failed to load linked account:', err);
+        setLinkedAccount(null);
+      } finally {
+        setLoadingAccount(false);
+      }
+    };
+    fetchLinkedAccount();
+  }, [detailStudent]);
+
+  const handlePromoteOfficer = async () => {
+    if (!linkedAccount) return;
+    setActionLoading(true);
+    try {
+      const currentUser = await cachedApi.users.getCurrent();
+      await functions.createExecution(
+        FUNCTION_ID,
+        JSON.stringify({
+          action: 'promote_officer',
+          payload: { userId: linkedAccount.$id },
+          requestingUserId: currentUser?.$id
+        }),
+        false
+      );
+      addToast({ type: 'success', title: 'Promoted', message: `"${detailStudent?.name}" has been promoted to Officer.` });
+      setLinkedAccount(prev => prev ? { ...prev, type: 'officer' } : null);
+      api.cache.clearTags(['accounts', 'students', 'dashboard']);
+      fetchStudents(true);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to promote student.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDemoteOfficer = async () => {
+    if (!linkedAccount) return;
+    setActionLoading(true);
+    try {
+      const currentUser = await cachedApi.users.getCurrent();
+      await functions.createExecution(
+        FUNCTION_ID,
+        JSON.stringify({
+          action: 'demote_officer',
+          payload: { userId: linkedAccount.$id },
+          requestingUserId: currentUser?.$id
+        }),
+        false
+      );
+      addToast({ type: 'success', title: 'Demoted', message: `"${detailStudent?.name}" has been demoted back to Student.` });
+      setLinkedAccount(prev => prev ? { ...prev, type: 'student' } : null);
+      api.cache.clearTags(['accounts', 'students', 'dashboard']);
+      fetchStudents(true);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to demote officer.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchStudents = async (isRefresh = false) => {
     try {
@@ -179,9 +262,7 @@ const AdminStudents: React.FC = () => {
           onClick={() => fetchStudents(true)}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm self-start sm:self-auto"
         >
-          <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
-          </svg>
+          <RotateCw className={`h-4 w-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
@@ -387,26 +468,70 @@ const AdminStudents: React.FC = () => {
                   <span className="text-sm text-slate-500">Registered On</span>
                   <span className="text-sm font-semibold text-slate-900">{formatDate(detailStudent.$createdAt)}</span>
                 </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-sm text-slate-500">Account Role</span>
+                  {loadingAccount ? (
+                    <span className="text-xs text-slate-400">Loading role...</span>
+                  ) : linkedAccount ? (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
+                      linkedAccount.type === 'admin' ? 'bg-purple-100 text-purple-700' :
+                      linkedAccount.type === 'officer' ? 'bg-blue-100 text-blue-700' :
+                      'bg-slate-100 text-slate-700'
+                    }`}>
+                      {linkedAccount.type}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-slate-400">No Account Linked</span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-6 border-t mt-8">
-              <button
-                onClick={() => {
-                  setDetailStudent(null);
-                  navigate('/dashboard/admin/payments');
-                }}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-              >
-                View Payments
-              </button>
-              <button
-                onClick={() => setDeleteConfirm({ open: true, student: detailStudent })}
-                className="flex-1 rounded-lg bg-red-50 border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm"
-              >
-                Delete Record
-              </button>
+            <div className="space-y-3 pt-6 border-t mt-8">
+              {linkedAccount && (
+                <>
+                  {linkedAccount.type === 'student' && linkedAccount.verified && (
+                    <button
+                      type="button"
+                      onClick={handlePromoteOfficer}
+                      disabled={actionLoading}
+                      className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
+                    >
+                      Promote to Officer
+                    </button>
+                  )}
+                  {linkedAccount.type === 'officer' && (
+                    <button
+                      type="button"
+                      onClick={handleDemoteOfficer}
+                      disabled={actionLoading}
+                      className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 text-white py-2.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
+                    >
+                      Demote to Student
+                    </button>
+                  )}
+                </>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailStudent(null);
+                    navigate('/dashboard/admin/payments');
+                  }}
+                  className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  View Payments
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm({ open: true, student: detailStudent })}
+                  className="flex-1 rounded-lg bg-red-50 border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm"
+                >
+                  Delete Record
+                </button>
+              </div>
             </div>
           </div>
         </div>

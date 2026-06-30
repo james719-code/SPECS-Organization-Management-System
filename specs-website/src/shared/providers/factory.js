@@ -34,7 +34,8 @@ async function initializeProviders() {
             login: (e, p) => mockApi.login(e, p),
             logout: () => mockApi.logout(),
             register: (e, p, n) => mockApi.register(e, p, n),
-            sendPasswordRecovery: () => mockApi.sendPasswordResetEmail(),
+            sendPasswordRecovery: (email, redirectUrl) => mockApi.sendPasswordResetEmail(email, redirectUrl),
+            confirmPasswordRecovery: (userId, secret, password) => mockApi.confirmPasswordRecovery ? mockApi.confirmPasswordRecovery(userId, secret, password) : Promise.resolve(true),
             sendVerification: () => mockApi.sendVerificationEmail()
         };
 

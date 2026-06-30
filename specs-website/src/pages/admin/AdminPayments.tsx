@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { cachedApi, api } from '../../shared/api';
 import { formatCurrency } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, PaymentDoc, AccountDoc } from '../../types/database';
 import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
 
-const AdminPayments: React.FC = () => {
+interface AdminPaymentsProps {
+  isCreateView?: boolean;
+}
+
+const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) => {
+  const navigate = useNavigate();
   // Navigation / View state
   const [selectedStudent, setSelectedStudent] = useState<AccountDoc | null>(null);
 
@@ -22,8 +30,12 @@ const AdminPayments: React.FC = () => {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Add Payment Modal State
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  // Add Payment View State
+  const isAddView = isCreateView;
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
@@ -32,8 +44,7 @@ const AdminPayments: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState('');
   const [assignAll, setAssignAll] = useState(false);
   const [assignStudentQuery, setAssignStudentQuery] = useState('');
-  const [selectedAssignee, setSelectedAssignee] = useState<{ id: string; name: string } | null>(null);
-  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // Edit Payment Modal State
@@ -91,39 +102,20 @@ const AdminPayments: React.FC = () => {
     loadData();
   }, []);
 
-  // Autocomplete change
-  const handleAssigneeSearch = (val: string) => {
-    setAssignStudentQuery(val);
-    setSelectedAssignee(null);
-
-    if (val.trim().length < 2) {
-      setAutocompleteResults([]);
-      return;
-    }
-
-    const matches = students
-      .filter(acc => {
-        const profile = acc.students as any;
-        const name = profile?.name || acc.username || '';
-        return name.toLowerCase().includes(val.toLowerCase());
-      })
-      .map(acc => {
-        const profile = acc.students as any;
-        return {
-          id: profile?.$id || acc.$id,
-          name: profile?.name || acc.username || 'Unknown Student'
-        };
-      })
-      .slice(0, 5);
-
-    setAutocompleteResults(matches);
-  };
-
-  const handleSelectAssignee = (id: string, name: string) => {
-    setSelectedAssignee({ id, name });
-    setAssignStudentQuery(name);
-    setAutocompleteResults([]);
-  };
+  // Filter list of assignees for the check-list
+  const filteredAssignees = useMemo(() => {
+    const q = assignStudentQuery.trim().toLowerCase();
+    const list = students.map(std => {
+      const profile = std.students as any;
+      return {
+        id: profile?.$id || std.$id,
+        name: profile?.name || std.username || 'Unknown Member',
+        yearLevel: profile?.yearLevel || 0
+      };
+    });
+    if (!q) return list;
+    return list.filter(item => item.name.toLowerCase().includes(q));
+  }, [students, assignStudentQuery]);
 
   // Assign payment logic
   const handleCreatePayment = async (e: React.FormEvent) => {
@@ -133,8 +125,8 @@ const AdminPayments: React.FC = () => {
       return;
     }
 
-    if (!assignAll && !selectedAssignee) {
-      addToast({ type: 'warning', title: 'Assignee needed', message: 'Select a student or check assign to all.' });
+    if (!assignAll && selectedAssigneeIds.length === 0) {
+      addToast({ type: 'warning', title: 'Assignees needed', message: 'Select at least one student or check assign to all.' });
       return;
     }
 
@@ -162,12 +154,16 @@ const AdminPayments: React.FC = () => {
           })
         );
         addToast({ type: 'success', title: 'Assigned All', message: `Outstanding dues assigned to ${students.length} students.` });
-      } else if (selectedAssignee) {
-        await api.payments.create({ ...payload, students: selectedAssignee.id });
-        addToast({ type: 'success', title: 'Assigned', message: `Outstanding due assigned to ${selectedAssignee.name}.` });
+      } else if (selectedAssigneeIds.length > 0) {
+        await Promise.all(
+          selectedAssigneeIds.map(async (id) => {
+            await api.payments.create({ ...payload, students: id });
+          })
+        );
+        addToast({ type: 'success', title: 'Assigned', message: `Outstanding dues assigned to ${selectedAssigneeIds.length} students.` });
       }
 
-      setIsAddOpen(false);
+      navigate(window.location.pathname.split('/create')[0]);
       setItemName('');
       setPrice(0);
       setQuantity(1);
@@ -176,7 +172,7 @@ const AdminPayments: React.FC = () => {
       setSelectedEventId('');
       setAssignAll(false);
       setAssignStudentQuery('');
-      setSelectedAssignee(null);
+      setSelectedAssigneeIds([]);
 
       loadData(true);
     } catch (err: any) {
@@ -270,7 +266,7 @@ const AdminPayments: React.FC = () => {
 
   // Aggregate student & officer payments for list grid
   const studentLedger = useMemo(() => {
-    return students.map(std => {
+    const list = students.map(std => {
       const profile = std.students as any;
       const sId = profile?.$id || std.$id;
       const stdPayments = payments.filter(p => {
@@ -292,6 +288,19 @@ const AdminPayments: React.FC = () => {
         paymentsCount: stdPayments.length
       };
     });
+
+    // Sort: 1. outstanding > 0 first, sorted by outstanding desc, but only keep top 20 with dues.
+    // The rest with dues + those without dues are sorted by name.
+    const withDues = list.filter(item => item.outstanding > 0)
+      .sort((a, b) => b.outstanding - a.outstanding || a.name.localeCompare(b.name));
+    const withoutDues = list.filter(item => item.outstanding === 0);
+
+    const top20WithDues = withDues.slice(0, 20);
+    const restWithDues = withDues.slice(20);
+
+    const remainingList = [...withoutDues, ...restWithDues].sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...top20WithDues, ...remainingList];
   }, [students, payments]);
 
   // Filter student ledger items
@@ -300,6 +309,17 @@ const AdminPayments: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return studentLedger.filter(l => l.name.toLowerCase().includes(q));
   }, [studentLedger, searchQuery]);
+
+  // Reset pagination to page 1 on filter
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Slice paginated items
+  const paginatedLedger = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredLedger.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredLedger, currentPage]);
 
   // Specific student payments details
   const currentStudentPayments = useMemo(() => {
@@ -321,9 +341,15 @@ const AdminPayments: React.FC = () => {
           <p className="text-sm text-slate-500 mt-1">Assign dues, collect payments, and manage student and officer accounts</p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedStudent && (
+          {(selectedStudent || isAddView) && (
             <button
-              onClick={() => setSelectedStudent(null)}
+              onClick={() => {
+                if (isCreateView) {
+                  navigate(window.location.pathname.split('/create')[0]);
+                } else {
+                  setSelectedStudent(null);
+                }
+              }}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
             >
               <ArrowLeft className="h-4 w-4 text-slate-500" />
@@ -342,7 +368,235 @@ const AdminPayments: React.FC = () => {
       </div>
 
       {/* Main Ledger List State */}
-      {!selectedStudent ? (
+      {isAddView ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="border-b border-slate-100 pb-4 mb-6">
+            <h2 className="text-xl font-bold text-slate-900">New Payment Due Entry</h2>
+            <p className="text-sm text-slate-500 mt-1">Fill out the due parameters and select who should receive this charge.</p>
+          </div>
+
+          <form onSubmit={handleCreatePayment} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Column - Form Fields */}
+            <div className="lg:col-span-5 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Item Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Membership Fee 2026"
+                  value={itemName}
+                  onChange={e => setItemName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Price (PHP)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={price || ''}
+                    onChange={e => setPrice(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Quantity</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={quantity}
+                    onChange={e => setQuantity(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="linkEventCheck"
+                  checked={isEventLink}
+                  onChange={e => setIsEventLink(e.target.checked)}
+                  className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                />
+                <label htmlFor="linkEventCheck" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                  Link this payment to an organization event
+                </label>
+              </div>
+
+              {isEventLink ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Select Event</label>
+                  <select
+                    required
+                    value={selectedEventId}
+                    onChange={e => setSelectedEventId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none transition-colors"
+                  >
+                    <option value="">-- Choose an event --</option>
+                    {events.map(ev => (
+                      <option key={ev.$id} value={ev.$id}>{ev.event_name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Activity Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1st Semester Collection"
+                    value={activityName}
+                    onChange={e => setActivityName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
+                  />
+                </div>
+              )}
+
+              <hr className="border-slate-100 my-2" />
+
+              <div className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="assignAllCheck"
+                  checked={assignAll}
+                  onChange={e => setAssignAll(e.target.checked)}
+                  className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                />
+                <label htmlFor="assignAllCheck" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                  Assign to all members directory
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t justify-start lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => navigate(window.location.pathname.split('/create')[0])}
+                  className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 rounded-lg bg-[#0d6b66] py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Create Due
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column - Assignees selection or all info */}
+            <div className="lg:col-span-7 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-slate-100 pt-6 lg:pt-0 lg:pl-8 min-h-[300px]">
+              <div className="space-y-4 flex-1">
+                {!assignAll ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Assignees ({selectedAssigneeIds.length} selected)</label>
+                      {selectedAssigneeIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAssigneeIds([])}
+                          className="text-[11px] font-semibold text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Clear Selection
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search student directories..."
+                        value={assignStudentQuery}
+                        onChange={e => setAssignStudentQuery(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 pl-10 pr-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 max-h-[350px] overflow-y-auto space-y-1.5">
+                      {filteredAssignees.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-slate-400 font-medium">No students matched the query</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {filteredAssignees.map(student => {
+                            const isChecked = selectedAssigneeIds.includes(student.id);
+                            return (
+                              <label
+                                key={student.id}
+                                className={`flex items-center gap-3 p-2.5 rounded-lg border bg-white cursor-pointer transition-all ${
+                                  isChecked 
+                                    ? 'border-[#0d6b66] ring-1 ring-[#0d6b66]/20 bg-[#0d6b66]/5' 
+                                    : 'border-slate-200 hover:bg-slate-50/80'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setSelectedAssigneeIds(prev => prev.filter(id => id !== student.id));
+                                    } else {
+                                      setSelectedAssigneeIds(prev => [...prev, student.id]);
+                                    }
+                                  }}
+                                  className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66]"
+                                />
+                                <div className="text-xs">
+                                  <span className="font-bold text-slate-800 block truncate">{student.name}</span>
+                                  {student.yearLevel > 0 && (
+                                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Year {student.yearLevel}</span>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center p-8 bg-teal-50/40 border border-teal-100 rounded-xl h-full min-h-[250px]">
+                    <div className="h-12 w-12 rounded-full bg-teal-100 text-[#0d6b66] flex items-center justify-center mb-3">
+                      <Plus className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-bold text-slate-900">Assigning to all members</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mt-1">
+                      Every member currently registered in the database directory ({students.length} people) will be assigned this outstanding due item.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Submit Row */}
+              <div className="hidden lg:flex gap-3 pt-6 border-t border-slate-100 justify-end w-full">
+                <button
+                  type="button"
+                  onClick={() => navigate(window.location.pathname.split('/create')[0])}
+                  className="rounded-lg border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-[#0d6b66] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Create Due Entry
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : !selectedStudent ? (
         <>
           {/* General Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -387,56 +641,66 @@ const AdminPayments: React.FC = () => {
           ) : filteredLedger.length === 0 ? (
             <EmptyState title="No Records found" description="Adjust your filters or add payments dues first." />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredLedger.map(ledgerItem => (
-                <div
-                  key={ledgerItem.sId}
-                  onClick={() => setSelectedStudent(ledgerItem.studentDoc)}
-                  className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold uppercase">
-                        {ledgerItem.name.substring(0, 2)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-bold text-slate-800 line-clamp-1">{ledgerItem.name}</h4>
-                          {ledgerItem.role === 'officer' && (
-                            <span className="inline-flex items-center rounded-full bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider">
-                              Officer
-                            </span>
-                          )}
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {paginatedLedger.map(ledgerItem => (
+                  <div
+                    key={ledgerItem.sId}
+                    onClick={() => setSelectedStudent(ledgerItem.studentDoc)}
+                    className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold uppercase">
+                          {ledgerItem.name.substring(0, 2)}
                         </div>
-                        <p className="text-[10px] text-slate-400 font-semibold uppercase">Year {ledgerItem.yearLevel || 'N/A'}</p>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-bold text-slate-800 line-clamp-1">{ledgerItem.name}</h4>
+                            {ledgerItem.role === 'officer' && (
+                              <span className="inline-flex items-center rounded-full bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider">
+                                Officer
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase">Year {ledgerItem.yearLevel || 'N/A'}</p>
+                        </div>
+                      </div>
+                      
+                      <hr className="my-3 text-slate-100" />
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Outstanding:</span>
+                          <span className="font-bold text-red-500">{formatCurrency(ledgerItem.outstanding)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Collected:</span>
+                          <span className="font-bold text-emerald-600">{formatCurrency(ledgerItem.paid)}</span>
+                        </div>
                       </div>
                     </div>
                     
-                    <hr className="my-3 text-slate-100" />
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Outstanding:</span>
-                        <span className="font-bold text-red-500">{formatCurrency(ledgerItem.outstanding)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Collected:</span>
-                        <span className="font-bold text-emerald-600">{formatCurrency(ledgerItem.paid)}</span>
-                      </div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-3 text-right">
+                      {ledgerItem.paymentsCount} total records
                     </div>
                   </div>
-                  
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-3 text-right">
-                    {ledgerItem.paymentsCount} total records
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredLedger.length / PAGE_SIZE)}
+                onPageChange={setCurrentPage}
+                totalItems={filteredLedger.length}
+                pageSize={PAGE_SIZE}
+              />
+            </>
           )}
 
           {/* Add Dues FAB */}
           <button
-            onClick={() => setIsAddOpen(true)}
+            onClick={() => navigate('create')}
             className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-2xl transition-transform hover:scale-105 active:scale-95"
             title="Create Payment Entry"
           >
@@ -567,164 +831,10 @@ const AdminPayments: React.FC = () => {
         </div>
       )}
 
-      {/* Add Payment Modal */}
-      {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setIsAddOpen(false)}>
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">New Payment Due Entry</h2>
-              <button onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleCreatePayment} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Item Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Membership Fee 2026"
-                  value={itemName}
-                  onChange={e => setItemName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Price (PHP)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={price || ''}
-                    onChange={e => setPrice(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={quantity}
-                    onChange={e => setQuantity(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="linkEventCheck"
-                  checked={isEventLink}
-                  onChange={e => setIsEventLink(e.target.checked)}
-                  className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66]"
-                />
-                <label htmlFor="linkEventCheck" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                  Link this payment to an organization event
-                </label>
-              </div>
-
-              {isEventLink ? (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Event</label>
-                  <select
-                    required
-                    value={selectedEventId}
-                    onChange={e => setSelectedEventId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
-                  >
-                    <option value="">-- Choose an event --</option>
-                    {events.map(ev => (
-                      <option key={ev.$id} value={ev.$id}>{ev.event_name}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Activity Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1st Semester Collection"
-                    value={activityName}
-                    onChange={e => setActivityName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
-                  />
-                </div>
-              )}
-
-              <hr className="my-4 border-slate-100" />
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="assignAllCheck"
-                  checked={assignAll}
-                  onChange={e => setAssignAll(e.target.checked)}
-                  className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66]"
-                />
-                <label htmlFor="assignAllCheck" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                  Assign to all members directory
-                </label>
-              </div>
-
-              {!assignAll && (
-                <div className="relative">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Search assignee</label>
-                  <input
-                    type="text"
-                    placeholder="Type name..."
-                    value={assignStudentQuery}
-                    onChange={e => handleAssigneeSearch(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
-                  />
-                  {autocompleteResults.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white shadow-xl max-h-40 overflow-y-auto z-20">
-                      {autocompleteResults.map(match => (
-                        <button
-                          key={match.id}
-                          type="button"
-                          onClick={() => handleSelectAssignee(match.id, match.name)}
-                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0"
-                        >
-                          {match.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4 border-t justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsAddOpen(false)}
-                  className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-[#0d6b66] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center gap-2"
-                >
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Create Due
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Edit Payment Modal */}
-      {editingPayment && (
+      {editingPayment && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setEditingPayment(null)}>
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between">
@@ -836,7 +946,8 @@ const AdminPayments: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Confirm Action Modals */}

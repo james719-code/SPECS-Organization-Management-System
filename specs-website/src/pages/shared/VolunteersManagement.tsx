@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { RotateCw } from 'lucide-react';
 import { databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS } from '../../shared/constants';
 import { Query } from 'appwrite';
@@ -164,9 +165,7 @@ const VolunteersManagement: React.FC = () => {
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <svg className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
-            </svg>
+            <RotateCw className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>

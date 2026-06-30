@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { account } from '../shared/appwrite';
 import { Sun, Moon, Menu, LogOut } from 'lucide-react';
 
@@ -24,6 +24,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, theme, toggleTheme }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -72,24 +73,57 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
                   </h4>
                 )}
                 <div className="space-y-0.5">
-                  {group.items.map((link, linkIdx) => (
-                    <NavLink
-                      key={linkIdx}
-                      to={link.to}
-                      end={link.to === `/dashboard/${role.toLowerCase()}`}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 ${
-                          isActive
-                            ? 'bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 shadow-xs'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
-                        }`
+                  {group.items.map((link, linkIdx) => {
+                    const isParentActive = location.pathname.startsWith(link.to);
+                    const isCreatePath = isParentActive && location.pathname === `${link.to}/create`;
+                    const isDetailsPath = isParentActive && location.pathname.startsWith(`${link.to}/details`);
+                    const showSubLink = isCreatePath || isDetailsPath;
+
+                    let subLinkLabel = "Create Due";
+                    if (isDetailsPath) {
+                      const parts = location.pathname.split('/');
+                      const encodedName = parts[parts.length - 1];
+                      try {
+                        subLinkLabel = decodeURIComponent(encodedName) || "Details";
+                      } catch {
+                        subLinkLabel = "Details";
                       }
-                    >
-                      {link.icon && <span className="flex-shrink-0 text-slate-400">{link.icon}</span>}
-                      <span>{link.label}</span>
-                    </NavLink>
-                  ))}
+                      if (subLinkLabel.length > 20) {
+                        subLinkLabel = subLinkLabel.substring(0, 18) + "...";
+                      }
+                    }
+
+                    return (
+                      <div key={linkIdx} className="space-y-0.5">
+                        <NavLink
+                          to={link.to}
+                          end={link.to === `/dashboard/${role.toLowerCase()}`}
+                          onClick={() => setSidebarOpen(false)}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 ${
+                              isActive || (isParentActive && link.to !== `/dashboard/${role.toLowerCase()}`)
+                                ? 'bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+                            }`
+                          }
+                        >
+                          {link.icon && <span className="flex-shrink-0 text-slate-400">{link.icon}</span>}
+                          <span>{link.label}</span>
+                        </NavLink>
+
+                        {showSubLink && (
+                          <NavLink
+                            to={location.pathname}
+                            onClick={() => setSidebarOpen(false)}
+                            className="flex items-center gap-3 rounded-lg pl-9 pr-3 py-1.5 text-[11px] font-semibold text-[#0d6b66] dark:text-teal-400 bg-[#0d6b66]/5 dark:bg-teal-500/5 transition-all duration-150"
+                          >
+                            <span className="text-slate-400 dark:text-slate-500 font-normal">↳</span>
+                            <span>{subLinkLabel}</span>
+                          </NavLink>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

@@ -40,12 +40,12 @@ export const FAQS = [
   {
     id: 'one',
     question: 'What is SPECS?',
-    answer: 'The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the official organization for Computer Science students at Partido State University. We aim to foster a community of learning, innovation, and collaboration.'
+    answer: 'The Society of Programmers and Enthusiasts in Computer Science (SPECS) is the official organization for Computer Science students at the College of Engineering and Computational Sciences. We aim to foster a community of learning, innovation, and collaboration.'
   },
   {
     id: 'two',
     question: 'Who can join SPECS?',
-    answer: 'All bona fide students enrolled in the Computer Science program at Partido State University are automatically members and are encouraged to become active participants in the organization.'
+    answer: 'All bona fide students enrolled in the Computer Science program at the College of Engineering and Computational Sciences are automatically members and are encouraged to become active participants in the organization.'
   },
   {
     id: 'three',

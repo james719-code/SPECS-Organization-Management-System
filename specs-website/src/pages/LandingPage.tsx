@@ -28,7 +28,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
   // Set Title on Load
   useEffect(() => {
-    document.title = "SPECS Portal | Partido State University";
+    document.title = "SPECS Portal | College of Engineering and Computational Sciences";
   }, []);
 
   // Fetch Events and Stories with Fallback
@@ -129,6 +129,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
     }
   };
 
+  const adviserUrl = getPictureUrl(SITE_LEADERSHIP.adviser.fileId, 200);
+
   // Filter events based on active tab
   const filteredEvents = events.filter(event => {
     if (activeTab === 'upcoming') return !event.event_ended;
@@ -138,13 +140,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans scroll-smooth">
-      {/* 1. HEADER (Glassmorphic) */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-all duration-300">
         <div className="flex items-center gap-3">
           <img src="/logo.webp" alt="SPECS Logo" className="h-10 w-10 object-contain rounded-xl shadow-md" />
           <div className="flex flex-col">
             <span className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-none">SPECS Portal</span>
-            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase mt-0.5">Partido State University</span>
+            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-505 tracking-wider uppercase mt-0.5">College of Engineering and Computational Sciences</span>
           </div>
         </div>
 
@@ -222,17 +223,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       )}
 
       {/* 2. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-teal-50/50 via-emerald-50/30 to-cyan-50/40 dark:from-slate-950 dark:via-[#053230] dark:to-[#041a19] text-slate-800 dark:text-white py-24 px-6 sm:px-12 md:px-20 lg:py-32 transition-colors duration-300">
-        {/* Background Decorative Blobs */}
-        <div className="absolute top-1/4 left-1/4 h-[300px] w-[300px] rounded-full bg-emerald-400/15 dark:bg-emerald-500/10 blur-[100px] pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/4 h-[250px] w-[250px] rounded-full bg-teal-400/15 dark:bg-teal-500/10 blur-[90px] pointer-events-none"></div>
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 dark:from-slate-950 dark:via-[#042422] dark:to-[#021312] text-slate-800 dark:text-white py-24 px-6 sm:px-12 md:px-20 lg:py-32 transition-colors duration-300">
+        {/* Dot Matrix Pattern Overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(#0d6b6612_1px,transparent_1px)] dark:bg-[radial-gradient(#2dd4bf08_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_80%,transparent_100%)] pointer-events-none"></div>
+
+        {/* Diagonal Tech Grid Lines */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808005_1px,transparent_1px),linear-gradient(to_bottom,#80808005_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none"></div>
+
+        {/* Ambient Pulsing Circles with Opacity */}
+        <div className="absolute -top-24 -right-24 h-[400px] w-[400px] rounded-full bg-teal-500/5 dark:bg-teal-400/[0.02] border border-teal-500/10 dark:border-teal-400/10 pointer-events-none animate-pulse duration-[8000ms]"></div>
+        <div className="absolute -top-12 -right-12 h-[220px] w-[220px] rounded-full bg-emerald-500/5 dark:bg-emerald-400/[0.01] border border-emerald-500/10 dark:border-emerald-400/10 pointer-events-none animate-pulse duration-[6000ms]"></div>
+        
+        <div className="absolute -bottom-20 -left-20 h-[350px] w-[350px] rounded-full bg-cyan-500/5 dark:bg-cyan-400/[0.02] border border-cyan-500/10 dark:border-cyan-400/10 pointer-events-none animate-pulse duration-[7000ms]"></div>
+        <div className="absolute -bottom-10 -left-10 h-[180px] w-[180px] rounded-full bg-teal-500/5 dark:bg-teal-400/[0.01] border border-teal-500/10 dark:border-teal-400/10 pointer-events-none animate-pulse duration-[5000ms]"></div>
+
+        {/* Distributed Floating Bubble Circles */}
+        <div className="absolute top-10 left-1/3 h-[120px] w-[120px] rounded-full bg-emerald-500/5 dark:bg-emerald-400/[0.01] border border-emerald-500/10 dark:border-emerald-400/5 pointer-events-none animate-pulse duration-[9000ms]"></div>
+        <div className="absolute top-1/2 left-1/4 h-[80px] w-[80px] rounded-full bg-cyan-500/5 dark:bg-cyan-400/[0.01] border border-cyan-500/10 dark:border-cyan-400/5 pointer-events-none animate-pulse duration-[7500ms]"></div>
+        <div className="absolute bottom-1/3 right-1/3 h-[150px] w-[150px] rounded-full bg-teal-500/5 dark:bg-teal-400/[0.01] border border-teal-500/10 dark:border-teal-400/5 pointer-events-none animate-pulse duration-[8500ms]"></div>
+        <div className="absolute top-1/4 right-1/4 h-[100px] w-[100px] rounded-full bg-teal-500/5 dark:bg-teal-400/[0.01] border border-teal-500/10 dark:border-teal-400/5 pointer-events-none animate-pulse duration-[10000ms]"></div>
+        
+        {/* Floating tech background shapes */}
+        <div className="absolute top-1/3 left-10 text-slate-200 dark:text-slate-850 opacity-20 dark:opacity-10 font-mono text-9xl select-none pointer-events-none font-black hidden lg:block">&lt;/&gt;</div>
+        <div className="absolute bottom-1/4 right-12 text-slate-200 dark:text-slate-850 opacity-15 dark:opacity-5 font-mono text-[140px] select-none pointer-events-none font-black hidden lg:block">&#123;&#125;</div>
         
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
           {/* Hero Left Content */}
           <div className="lg:col-span-7 flex flex-col items-start text-left">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#0d6b66]/10 dark:bg-teal-400/10 text-[#0d6b66] dark:text-teal-300 border border-[#0d6b66]/20 dark:border-teal-400/20 mb-6 shadow-inner tracking-wider uppercase">
-              <Sparkles className="h-3.5 w-3.5" /> Partido State University
-            </span>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1] mb-6">
               Society of Programmers and <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0d6b66] via-teal-600 to-cyan-600 dark:from-teal-400 dark:via-emerald-300 dark:to-cyan-300">Enthusiasts</span> in Computer Science
             </h1>
@@ -361,7 +378,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Our Mission</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                    To cultivate an environment of technical advancement, collaboration, and peer learning. We empower Computer Science students at Partido State University with advanced industry skills to succeed as global developers.
+                    To cultivate an environment of technical advancement, collaboration, and peer learning. We empower Computer Science students at the College of Engineering and Computational Sciences with advanced industry skills to succeed as global developers.
                   </p>
                 </div>
 
@@ -443,15 +460,58 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           {aboutTab === 'officers' && (
             <div className="space-y-16 animate-fade-in">
               {/* Adviser Spotlight Card */}
-              <div className="max-w-md mx-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 text-center shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-teal-500 to-emerald-450"></div>
-                <div className="h-28 w-28 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 font-extrabold flex items-center justify-center text-4xl mx-auto border-4 border-white dark:border-slate-900 shadow-md mb-6">
-                  {SITE_LEADERSHIP.adviser.name.split(' ').map(n => n[0]).join('')}
-                </div>
-                <h4 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">{SITE_LEADERSHIP.adviser.name}</h4>
-                <p className="text-sm font-bold text-[#0d6b66] dark:text-teal-400 tracking-wide uppercase">{SITE_LEADERSHIP.adviser.position}</p>
-                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
-                  <Users className="h-4 w-4" /> Partido State University Faculty
+              <div className="max-w-xl mx-auto rounded-3xl bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-950 border border-slate-150 dark:border-white/10 p-8 md:p-10 text-center md:text-left shadow-xl hover:shadow-2xl hover:shadow-teal-900/5 dark:hover:shadow-teal-500/5 hover:-translate-y-1.5 transition-all duration-500 relative overflow-hidden group hover:border-[#0d6b66]/30 dark:hover:border-teal-500/30">
+                {/* Bubble Circle background elements */}
+                <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-gradient-to-br from-teal-500/10 to-[#0d6b66]/10 dark:from-teal-500/5 dark:to-teal-955/20 blur-sm pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+                <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500/10 to-teal-400/10 dark:from-emerald-500/5 dark:to-teal-900/10 blur-xs pointer-events-none group-hover:scale-115 transition-transform duration-700"></div>
+                <div className="absolute top-1/4 right-1/4 w-12 h-12 rounded-full border border-teal-500/10 dark:border-teal-500/5 pointer-events-none group-hover:translate-y-2 transition-transform duration-700"></div>
+                <div className="absolute bottom-1/3 left-10 w-8 h-8 rounded-full border border-emerald-500/15 dark:border-emerald-500/5 pointer-events-none group-hover:-translate-y-2 transition-transform duration-700"></div>
+
+                {/* Premium Glow effect behind image */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[200px] w-[200px] rounded-full bg-gradient-to-tr from-teal-400/10 to-emerald-400/15 dark:from-teal-500/5 dark:to-emerald-500/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                
+                {/* Corner Accent Line */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-teal-500/10 to-transparent rounded-bl-full group-hover:scale-110 transition-transform duration-500 pointer-events-none"></div>
+
+                <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                  {/* Avatar with offset border and hover rotation */}
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-[#0d6b66] to-teal-400 opacity-20 blur-md group-hover:opacity-30 transition-opacity duration-300 pointer-events-none"></div>
+                    {adviserUrl ? (
+                      <img 
+                        src={adviserUrl} 
+                        alt={SITE_LEADERSHIP.adviser.name} 
+                        className="h-32 w-32 rounded-2xl object-cover relative z-10 border-2 border-white dark:border-slate-800 shadow-lg ring-4 ring-teal-500/20 group-hover:ring-teal-500/45 transition-all duration-305 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="h-32 w-32 rounded-2xl bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 font-extrabold flex items-center justify-center text-5xl relative z-10 border-2 border-white dark:border-slate-800 shadow-lg ring-4 ring-teal-500/20 group-hover:ring-teal-500/45 transition-all duration-305">
+                        {SITE_LEADERSHIP.adviser.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Adviser Details */}
+                  <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
+                    <h4 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight group-hover:text-[#0d6b66] dark:group-hover:text-teal-400 transition-colors duration-300">
+                      {SITE_LEADERSHIP.adviser.name}
+                    </h4>
+                    
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-505 tracking-wider uppercase mb-4">
+                      {SITE_LEADERSHIP.adviser.position}
+                    </p>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm mb-5 font-medium italic">
+                      "Guiding the next generation of computing leaders, software engineers, and technology innovators."
+                    </p>
+
+                    {/* Affiliation Badge */}
+                    <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center md:justify-start gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 shadow-inner">
+                        <Users className="h-3.5 w-3.5 text-[#0d6b66] dark:text-teal-400" /> 
+                        College of Engineering and Computational Sciences Faculty
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -883,24 +943,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
         </div>
       </section>
 
-      {/* 6. PARTIDO STATE UNIVERSITY PARTNERSHIP SECTION */}
+      {/* 6. PARTNERSHIP SECTION */}
       <section className="py-16 px-6 sm:px-12 md:px-20 bg-white dark:bg-slate-950 transition-colors duration-300">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 border-b border-slate-100 dark:border-slate-900 pb-16">
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
             <h4 className="text-xs font-bold tracking-widest uppercase text-slate-400 dark:text-slate-505 mb-2">OFFICIAL CHAPTER</h4>
             <p className="text-xl font-bold text-slate-905 dark:text-white max-w-lg">
-              Aligned with Partido State University’s Department of Computer Studies curriculum.
+              Aligned with the College of Engineering and Computational Sciences.
             </p>
           </div>
-          <div className="flex items-center gap-8 opacity-65 dark:opacity-50 grayscale hover:grayscale-0 hover:opacity-100 dark:hover:opacity-100 transition-all duration-305">
-            <div className="flex items-center gap-2">
-              <Users className="h-8 w-8 text-[#0d6b66] dark:text-teal-400" />
-              <span className="font-extrabold text-slate-800 dark:text-slate-205 text-lg tracking-tight">PSU DCS</span>
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-6 md:gap-8 opacity-75 dark:opacity-60 transition-all duration-300">
+            {/* PSU Logo Placeholder */}
+            <div className="flex flex-col items-center text-center">
+              <div className="h-10 w-10 border border-dashed border-slate-350 dark:border-slate-650 rounded-xl bg-slate-105/50 dark:bg-slate-800/30 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 select-none" title="Partido State University Logo Placeholder">
+                Logo
+              </div>
+              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">Partido State University</span>
             </div>
-            <div className="h-8 w-px bg-slate-202 dark:bg-slate-800"></div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-slate-800 dark:text-slate-205 text-lg tracking-tight">CHED Recognised</span>
+
+            <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+
+            {/* College Logo Placeholder */}
+            <div className="flex flex-col items-center text-center">
+              <div className="h-10 w-10 border border-dashed border-slate-350 dark:border-slate-650 rounded-xl bg-slate-105/50 dark:bg-slate-800/30 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 select-none" title="College Logo Placeholder">
+                Logo
+              </div>
+              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">College of Engineering & Comp. Sciences</span>
             </div>
+
+
           </div>
         </div>
       </section>
@@ -915,7 +986,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               <span className="text-lg font-bold text-white tracking-tight">SPECS Portal</span>
             </div>
             <p className="text-xs leading-relaxed text-slate-500">
-              Official organization management portal for the Society of Programmers and Enthusiasts in Computer Science at Partido State University.
+              Official organization management portal for the Society of Programmers and Enthusiasts in Computer Science at the College of Engineering and Computational Sciences.
             </p>
           </div>
 
@@ -937,7 +1008,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               <li><Link to="/login" className="hover:text-teal-400 transition-colors">Sign In to Dashboard</Link></li>
               <li><Link to="/signup" className="hover:text-teal-400 transition-colors">Student Registration</Link></li>
               <li><Link to="/login" className="hover:text-[#0d6b66] transition-colors">Officer Access</Link></li>
-              <li><Link to="/pending" className="hover:text-teal-400 transition-colors">Pending Clearances</Link></li>
             </ul>
           </div>
 
@@ -947,7 +1017,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             <ul className="space-y-2 text-xs space-y-3">
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-teal-400 flex-shrink-0" />
-                <span className="text-[11px] text-slate-500 truncate">specs@student.psu.edu.ph</span>
+                <a href="mailto:parsu.specs@gmail.com" className="text-[11px] text-slate-500 hover:text-teal-400 transition-colors truncate">
+                  parsu.specs@gmail.com
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <svg className="h-4 w-4 text-teal-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                </svg>
+                <a href="https://www.facebook.com/parsu.specs" target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-500 hover:text-teal-400 transition-colors truncate">
+                  facebook.com/parsu.specs
+                </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-teal-400 flex-shrink-0" />

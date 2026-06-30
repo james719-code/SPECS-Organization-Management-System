@@ -172,3 +172,10 @@
     background-color: rgba(0, 0, 0, 0.7) !important;
   }
 }
+
+/* Disable MS Edge default password reveal and clear button */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+

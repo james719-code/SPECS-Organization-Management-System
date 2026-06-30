@@ -29,7 +29,7 @@ if (DEV_BYPASS) {
             return res;
         },
         createRecovery: (email: string, _url: string) => mockApi.sendPasswordResetEmail(email),
-        updateRecovery: (_userId: string, _secret: string, _password: string) => Promise.resolve({ success: true }),
+        updateRecovery: (userId: string, secret: string, password: string) => mockApi.confirmPasswordRecovery(userId, secret, password),
         create: (_userId: string, email: string, password: string, name: string) => mockApi.register(email, password, name),
         createVerification: (_url: string) => mockApi.sendVerificationEmail()
     };
@@ -52,11 +52,34 @@ if (DEV_BYPASS) {
     };
 
     functions = {
-        createExecution: (_functionId: string, _body: any, _async?: boolean) => Promise.resolve({
-            $id: `execution-${Date.now()}`,
-            status: 'completed',
-            responseBody: JSON.stringify({ success: true })
-        })
+        createExecution: async (_functionId: string, body: any, _async?: boolean) => {
+            try {
+                const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+                const { action, payload } = parsed;
+                if (action === 'promote_officer') {
+                    await mockApi.updateAccountType(payload.userId, 'officer');
+                    return {
+                        $id: `execution-${Date.now()}`,
+                        status: 'completed',
+                        responseBody: JSON.stringify({ success: true })
+                    };
+                } else if (action === 'demote_officer') {
+                    await mockApi.updateAccountType(payload.userId, 'student');
+                    return {
+                        $id: `execution-${Date.now()}`,
+                        status: 'completed',
+                        responseBody: JSON.stringify({ success: true })
+                    };
+                }
+            } catch (e) {
+                console.error('[Mock Functions] Failed to simulate execution:', e);
+            }
+            return {
+                $id: `execution-${Date.now()}`,
+                status: 'completed',
+                responseBody: JSON.stringify({ success: true })
+            };
+        }
     };
 } else {
     client = new Client()

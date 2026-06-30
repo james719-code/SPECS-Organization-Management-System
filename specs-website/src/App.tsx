@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import PendingVerificationPage from './pages/PendingVerificationPage';
 import StoryPage from './pages/StoryPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 // Import Layout
 import DashboardLayout from './components/DashboardLayout';
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/story/:id" element={<StoryPage />} />
       <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/signup" element={<SignupPage theme={theme} toggleTheme={toggleTheme} />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/pending" element={<PendingVerificationPage />} />
 
       {/* Role-Guarded Student Routes */}
@@ -156,7 +158,9 @@ export default function App() {
       >
         <Route index element={<AdminOverview />} />
         <Route path="finance" element={<AdminFinance />} />
+        <Route path="finance/details/:name" element={<AdminFinance isDetailsView={true} />} />
         <Route path="payments" element={<AdminPayments />} />
+        <Route path="payments/create" element={<AdminPayments isCreateView={true} />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="volunteers" element={<VolunteersManagement />} />
         <Route path="files" element={<AdminFiles />} />
@@ -225,7 +229,9 @@ export default function App() {
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AdminAttendance />} />
         <Route path="payments" element={<AdminPayments />} />
+        <Route path="payments/create" element={<AdminPayments isCreateView={true} />} />
         <Route path="finance" element={<AdminFinance />} />
+        <Route path="finance/details/:name" element={<AdminFinance isDetailsView={true} />} />
         <Route path="files" element={<AdminFiles />} />
         <Route path="volunteers" element={<VolunteersManagement />} />
         <Route path="stories" element={<AdminStories />} />
