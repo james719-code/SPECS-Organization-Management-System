@@ -31,6 +31,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
     setLoading(true);
     setError('');
 
+    let createdStudentDocId: string | null = null;
+    let createdAccountDocId: string | null = null;
+    let sessionCreated = false;
+
     try {
       // 1. Client-side validations — run ALL before touching the database
       if (!name.trim()) {
@@ -44,6 +48,9 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
       }
       if (!studentId.trim()) {
         throw new Error('Student ID is required.');
+      }
+      if (!/^\d+$/.test(studentId.trim())) {
+        throw new Error('Student ID must contain only numbers (no letters, spaces, or dashes).');
       }
       if (password.length < 8) {
         throw new Error('Password must be at least 8 characters long.');
@@ -60,6 +67,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
 
       // 3. Initiate temp login session to authorize database writes
       await account.createEmailPasswordSession(email, password);
+      sessionCreated = true;
 
       // 4. Create Student profile document
       //    NOTE: username is NOT a field on StudentDoc — it lives on AccountDoc
@@ -70,18 +78,19 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
         {
           name: name,
           email: email,
-          student_id: Number(studentId),
+          student_id: Number(studentId.trim()),
           yearLevel: parseInt(yearLevel, 10),
           section: section,
           address: address,
           is_volunteer: false
         }
       );
+      createdStudentDocId = studentDoc.$id;
 
       // 5. Create Account relation document
       //    - `username` belongs here on AccountDoc
       //    - relationship field is `students` (not `student`)
-      await databases.createDocument(
+      const accountDoc = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_ACCOUNTS,
         user.$id,
@@ -93,6 +102,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
           deactivated: false
         }
       );
+      createdAccountDocId = accountDoc.$id;
 
       // 6. Send verification email
       try {
@@ -109,6 +119,32 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'An error occurred during registration.');
+
+      // Cleanup created DB documents on error
+      if (createdAccountDocId) {
+        try {
+          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, createdAccountDocId);
+        } catch (cleanErr) {
+          console.warn('Failed to delete account document during rollback:', cleanErr);
+        }
+      }
+      if (createdStudentDocId) {
+        try {
+          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, createdStudentDocId);
+        } catch (cleanErr) {
+          console.warn('Failed to delete student document during rollback:', cleanErr);
+        }
+      }
+
+      // End temp session if it was created
+      if (sessionCreated) {
+        try {
+          await account.deleteSession('current');
+        } catch (cleanErr) {
+          // Ignore session deletion errors
+        }
+      }
+
       setLoading(false);
     }
   };
@@ -226,7 +262,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
                 type="text" 
                 value={studentId}
                 onChange={e => setStudentId(e.target.value)}
-                placeholder="2023-12345"
+                placeholder="202312345"
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/40 px-3 py-2.5 text-xs focus:border-[#0d6b66] dark:focus:border-teal-500 focus:outline-none transition-all dark:text-white"
                 required 
               />

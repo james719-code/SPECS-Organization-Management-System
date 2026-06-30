@@ -39,7 +39,7 @@ const AdminStudents: React.FC = () => {
   
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; student: StudentDoc | null }>({ open: false, student: null });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -72,53 +72,77 @@ const AdminStudents: React.FC = () => {
   }, [detailStudent]);
 
   const handlePromoteOfficer = async () => {
-    if (!linkedAccount) return;
-    setActionLoading(true);
-    try {
-      const currentUser = await cachedApi.users.getCurrent();
-      await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'promote_officer',
-          payload: { userId: linkedAccount.$id },
-          requestingUserId: currentUser?.$id
-        }),
-        false
-      );
-      addToast({ type: 'success', title: 'Promoted', message: `"${detailStudent?.name}" has been promoted to Officer.` });
-      setLinkedAccount(prev => prev ? { ...prev, type: 'officer' } : null);
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchStudents(true);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to promote student.' });
-    } finally {
-      setActionLoading(false);
-    }
+    if (!linkedAccount || !detailStudent) return;
+    const studentId = detailStudent.$id;
+    const accId = linkedAccount.$id;
+    const studentName = detailStudent.name || 'Student';
+
+    // Close details drawer immediately
+    setDetailStudent(null);
+    setProcessingIds(prev => new Set([...prev, studentId]));
+
+    (async () => {
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'promote_officer',
+            payload: { userId: accId },
+            requestingUserId: currentUser?.$id
+          }),
+          false
+        );
+        addToast({ type: 'success', title: 'Promoted', message: `"${studentName}" has been promoted to Officer.` });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchStudents(true);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to promote "${studentName}" to Officer.` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+      }
+    })();
   };
 
   const handleDemoteOfficer = async () => {
-    if (!linkedAccount) return;
-    setActionLoading(true);
-    try {
-      const currentUser = await cachedApi.users.getCurrent();
-      await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'demote_officer',
-          payload: { userId: linkedAccount.$id },
-          requestingUserId: currentUser?.$id
-        }),
-        false
-      );
-      addToast({ type: 'success', title: 'Demoted', message: `"${detailStudent?.name}" has been demoted back to Student.` });
-      setLinkedAccount(prev => prev ? { ...prev, type: 'student' } : null);
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchStudents(true);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to demote officer.' });
-    } finally {
-      setActionLoading(false);
-    }
+    if (!linkedAccount || !detailStudent) return;
+    const studentId = detailStudent.$id;
+    const accId = linkedAccount.$id;
+    const studentName = detailStudent.name || 'Officer';
+
+    // Close details drawer immediately
+    setDetailStudent(null);
+    setProcessingIds(prev => new Set([...prev, studentId]));
+
+    (async () => {
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'demote_officer',
+            payload: { userId: accId },
+            requestingUserId: currentUser?.$id
+          }),
+          false
+        );
+        addToast({ type: 'success', title: 'Demoted', message: `"${studentName}" has been demoted back to Student.` });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchStudents(true);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to demote "${studentName}".` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(studentId);
+          return next;
+        });
+      }
+    })();
   };
 
   const fetchStudents = async (isRefresh = false) => {
@@ -206,80 +230,100 @@ const AdminStudents: React.FC = () => {
     }
   };
 
-  /** Calls delete_account on the backend — cascades to teams, officer doc, student doc, and auth user */
-  const deleteAccount = async (student: StudentDoc) => {
-    if (!linkedAccount && detailStudent?.$id === student.$id) {
-      // If we don't have a linked account yet, still attempt via student-only direct delete
-      // as a fallback (e.g., orphaned student records)
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id);
-      return;
-    }
-    const targetAccount = (detailStudent?.$id === student.$id ? linkedAccount : null);
-    if (!targetAccount) {
-      // Orphaned student record with no linked account — direct delete
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id);
-      return;
-    }
-    const currentUser = await cachedApi.users.getCurrent();
-    const execution = await functions.createExecution(
-      FUNCTION_ID,
-      JSON.stringify({
-        action: 'delete_account',
-        payload: { userId: targetAccount.$id },
-        requestingUserId: currentUser?.$id,
-      }),
-      false
-    );
-    let result: any = {};
-    try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-    if (result.success === false) {
-      throw new Error(result.error || 'Failed to delete account');
-    }
-  };
-
   const handleSingleDelete = async () => {
     if (!deleteConfirm.student) return;
     const student = deleteConfirm.student;
-    setActionLoading(true);
-    try {
-      await deleteAccount(student);
-      api.cache.clearTags(['students', 'accounts', 'dashboard']);
-      setStudents(prev => prev.filter(s => s.$id !== student.$id));
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        next.delete(student.$id);
-        return next;
-      });
-      addToast({ type: 'success', title: 'Deleted', message: `"${student.name}" has been deleted.` });
-      setDeleteConfirm({ open: false, student: null });
-      setDetailStudent(null);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete student.' });
-    } finally {
-      setActionLoading(false);
-    }
+    
+    // Close modal and drawer immediately
+    setDeleteConfirm({ open: false, student: null });
+    setDetailStudent(null);
+    setProcessingIds(prev => new Set([...prev, student.$id]));
+
+    (async () => {
+      try {
+        // Resolve linked account if possible
+        let targetAccount: AccountDoc | null = null;
+        if (detailStudent?.$id === student.$id) {
+          targetAccount = linkedAccount;
+        } else {
+          // If deleted from list directly, look up the linked account
+          const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
+            Query.equal('students', student.$id)
+          ]);
+          if (res.documents.length > 0) {
+            targetAccount = res.documents[0] as AccountDoc;
+          }
+        }
+
+        if (!targetAccount) {
+          // Orphaned student record with no linked account — direct delete
+          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id);
+        } else {
+          const currentUser = await cachedApi.users.getCurrent();
+          const execution = await functions.createExecution(
+            FUNCTION_ID,
+            JSON.stringify({
+              action: 'delete_account',
+              payload: { userId: targetAccount.$id },
+              requestingUserId: currentUser?.$id,
+            }),
+            false
+          );
+          let result: any = {};
+          try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+          if (result.success === false) {
+            throw new Error(result.error || 'Failed to delete account');
+          }
+        }
+
+        api.cache.clearTags(['students', 'accounts', 'dashboard']);
+        setStudents(prev => prev.filter(s => s.$id !== student.$id));
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          next.delete(student.$id);
+          return next;
+        });
+        addToast({ type: 'success', title: 'Deleted', message: `"${student.name}" has been deleted.` });
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to delete student "${student.name}".` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(student.$id);
+          return next;
+        });
+      }
+    })();
   };
 
   const handleBulkDelete = async () => {
-    setActionLoading(true);
-    try {
-      const ids = Array.from(selectedIds);
-      // Bulk delete: for each selected student, attempt account-level delete
-      // We don't have linked accounts cached for all, so fall back to direct student delete
-      await Promise.all(ids.map(id => {
-        const student = students.find(s => s.$id === id);
-        return student ? databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id) : Promise.resolve();
-      }));
-      api.cache.clearTags(['students', 'accounts', 'dashboard']);
-      setStudents(prev => prev.filter(s => !selectedIds.has(s.$id)));
-      setSelectedIds(new Set());
-      addToast({ type: 'success', title: 'Success', message: `Deleted ${ids.length} student records.` });
-      setBulkDeleteConfirm(false);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete some records.' });
-    } finally {
-      setActionLoading(false);
-    }
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+
+    // Close modal and selection immediately
+    setBulkDeleteConfirm(false);
+    setSelectedIds(new Set());
+    setProcessingIds(prev => new Set([...prev, ...ids]));
+
+    (async () => {
+      try {
+        // Bulk delete: for each selected student, attempt direct student delete
+        // (Appwrite backend accounts will be orphaned if deleted bulk from students directory,
+        // which matches previous logic of direct DB deletion on list)
+        await Promise.all(ids.map(id => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id)));
+        api.cache.clearTags(['students', 'accounts', 'dashboard']);
+        setStudents(prev => prev.filter(s => !ids.includes(s.$id)));
+        addToast({ type: 'success', title: 'Success', message: `Deleted ${ids.length} student records.` });
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete some records.' });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          ids.forEach(id => next.delete(id));
+          return next;
+        });
+      }
+    })();
   };
 
   return (
@@ -390,45 +434,59 @@ const AdminStudents: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginatedStudents.map(student => {
               const selected = selectedIds.has(student.$id);
+              const isProcessing = processingIds.has(student.$id);
               const name = student.name || 'Unknown';
               const style = getAvatarStyle(name);
               return (
                 <div
                   key={student.$id}
-                  onClick={() => setDetailStudent(student)}
+                  onClick={isProcessing ? undefined : () => setDetailStudent(student)}
                   className={`group relative rounded-xl border bg-white p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
                     selected ? 'border-[#0d6b66] ring-1 ring-[#0d6b66] bg-emerald-50/20' : 'border-slate-200'
-                  }`}
+                  } ${isProcessing ? 'cursor-not-allowed opacity-80' : ''}`}
                 >
+                  {isProcessing && (
+                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-xl flex flex-col items-center justify-center z-20">
+                      <svg className="animate-spin h-6 w-6 text-[#0d6b66]" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span className="text-[10px] text-[#0d6b66] font-semibold mt-1">Processing...</span>
+                    </div>
+                  )}
+
                   {/* Select Checkbox */}
                   <div
                     className="absolute top-4 left-4 z-10"
                     onClick={e => {
                       e.stopPropagation();
-                      handleSelectOne(student.$id);
+                      if (!isProcessing) handleSelectOne(student.$id);
                     }}
                   >
                     <input
                       type="checkbox"
                       checked={selected}
+                      disabled={isProcessing}
                       onChange={() => {}} // handled by click
-                      className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                      className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
 
                   {/* Inline delete */}
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      setDeleteConfirm({ open: true, student });
-                    }}
-                    className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-white shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    title="Delete record"
-                  >
-                    <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  {!isProcessing && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setDeleteConfirm({ open: true, student });
+                      }}
+                      className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-white shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      title="Delete record"
+                    >
+                      <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
 
                   <div className="flex flex-col items-center text-center mt-2">
                     <div className={`flex h-14 w-14 items-center justify-center rounded-full font-bold text-lg ${style.bg} border ${style.border} mb-3 shadow-inner`}>
@@ -578,7 +636,7 @@ const AdminStudents: React.FC = () => {
         message={`Are you sure you want to delete student profile for "${deleteConfirm.student?.name}"? All associated attendance records and settings for this student will be affected.`}
         confirmLabel="Delete"
         variant="danger"
-        loading={actionLoading}
+        loading={false}
       />
 
       <ConfirmModal
@@ -589,7 +647,7 @@ const AdminStudents: React.FC = () => {
         message={`Are you sure you want to delete the selected ${selectedIds.size} student profile(s)? This action cannot be undone.`}
         confirmLabel={`Delete ${selectedIds.size} Records`}
         variant="danger"
-        loading={actionLoading}
+        loading={false}
       />
     </div>
   );

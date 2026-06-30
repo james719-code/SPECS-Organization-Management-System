@@ -21,7 +21,7 @@ const AdminAccounts: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; account: AccountDoc | null; action: string }>({ open: false, account: null, action: '' });
-  const [actionLoading, setActionLoading] = useState(false);
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const { addToast } = useToast();
 
   const fetchAccounts = async () => {
@@ -45,193 +45,273 @@ const AdminAccounts: React.FC = () => {
     ? accounts.filter(a => a.username?.toLowerCase().includes(search.toLowerCase()))
     : accounts;
 
-  /** Calls deactivate_account or reactivate_account on the backend function */
+  const logDebugContext = async (actionName: string, targetId?: string) => {
+    try {
+      const currentUser = await cachedApi.users.getCurrent();
+      let dbProfile = null;
+      try {
+        dbProfile = await api.users.getAccount(currentUser.$id);
+      } catch (dbErr: any) {
+        console.warn('DEBUG: Could not load accounts document matching Auth ID:', dbErr.message);
+      }
+
+      console.log(`%c[DEBUG] Executing Action: ${actionName}`, 'color: #0d6b66; font-weight: bold; font-size: 13px;', {
+        timestamp: new Date().toISOString(),
+        authUserId: currentUser?.$id,
+        authUserEmail: currentUser?.email,
+        dbProfileId: dbProfile?.$id,
+        dbProfileType: dbProfile?.type,
+        dbProfileVerified: dbProfile?.verified,
+        targetId: targetId
+      });
+    } catch (err: any) {
+      console.error('DEBUG: Failed to gather execution context:', err);
+    }
+  };
+
+  /** Calls deactivate_account or reactivate_account on the backend function in the background */
   const handleToggleDeactivation = async () => {
     if (!confirmModal.account) return;
-    setActionLoading(true);
-    try {
-      const acc = confirmModal.account;
-      const currentUser = await cachedApi.users.getCurrent();
-      const action = acc.deactivated ? 'reactivate_account' : 'deactivate_account';
+    const acc = confirmModal.account;
+    const action = acc.deactivated ? 'reactivate_account' : 'deactivate_account';
+    
+    // Close modal immediately
+    setConfirmModal({ open: false, account: null, action: '' });
+    
+    // Mark as processing
+    setProcessingIds(prev => new Set([...prev, acc.$id]));
 
-      const execution = await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action,
-          payload: { userId: acc.$id },
-          requestingUserId: currentUser?.$id,
-        }),
-        false
-      );
-
-      // Parse the function response to surface backend errors
-      let result: any = {};
+    (async () => {
       try {
-        result = JSON.parse(execution?.responseBody || '{}');
-      } catch { /* ignore */ }
+        const currentUser = await cachedApi.users.getCurrent();
+        await logDebugContext(action, acc.$id);
 
-      if (result.success === false) {
-        throw new Error(result.error || `Failed to ${action.replace('_', ' ')}`);
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action,
+            payload: { userId: acc.$id },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+
+        // Parse the function response to surface backend errors
+        let result: any = {};
+        try {
+          result = JSON.parse(execution?.responseBody || '{}');
+        } catch { /* ignore */ }
+
+        if (result.success === false) {
+          throw new Error(result.error || `Failed to ${action.replace('_', ' ')}`);
+        }
+
+        addToast({
+          type: 'success',
+          title: 'Success',
+          message: `Account "${acc.username}" ${acc.deactivated ? 'activated' : 'deactivated'} successfully`,
+        });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchAccounts();
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to update account "${acc.username}"` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(acc.$id);
+          return next;
+        });
       }
-
-      addToast({
-        type: 'success',
-        title: 'Success',
-        message: `Account "${acc.username}" ${acc.deactivated ? 'activated' : 'deactivated'} successfully`,
-      });
-      setConfirmModal({ open: false, account: null, action: '' });
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchAccounts();
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update account' });
-    } finally {
-      setActionLoading(false);
-    }
+    })();
   };
 
-  /** Calls delete_account on the backend for full cascade deletion */
+  /** Calls delete_account on the backend for full cascade deletion in the background */
   const handleDeleteAccount = async () => {
     if (!confirmModal.account) return;
-    setActionLoading(true);
-    try {
-      const acc = confirmModal.account;
-      const currentUser = await cachedApi.users.getCurrent();
+    const acc = confirmModal.account;
+    
+    // Close modal immediately
+    setConfirmModal({ open: false, account: null, action: '' });
+    
+    // Mark as processing
+    setProcessingIds(prev => new Set([...prev, acc.$id]));
 
-      const execution = await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'delete_account',
-          payload: { userId: acc.$id },
-          requestingUserId: currentUser?.$id,
-        }),
-        false
-      );
-
-      let result: any = {};
+    (async () => {
       try {
-        result = JSON.parse(execution?.responseBody || '{}');
-      } catch { /* ignore */ }
+        const currentUser = await cachedApi.users.getCurrent();
+        await logDebugContext('delete_account', acc.$id);
 
-      if (result.success === false) {
-        throw new Error(result.error || 'Failed to delete account');
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'delete_account',
+            payload: { userId: acc.$id },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+
+        let result: any = {};
+        try {
+          result = JSON.parse(execution?.responseBody || '{}');
+        } catch { /* ignore */ }
+
+        if (result.success === false) {
+          throw new Error(result.error || 'Failed to delete account');
+        }
+
+        addToast({
+          type: 'success',
+          title: 'Deleted',
+          message: `Account "${acc.username}" and all related data have been permanently deleted.`,
+        });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchAccounts();
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to delete account "${acc.username}"` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(acc.$id);
+          return next;
+        });
       }
-
-      addToast({
-        type: 'success',
-        title: 'Deleted',
-        message: `Account "${acc.username}" and all related data have been permanently deleted.`,
-      });
-      setConfirmModal({ open: false, account: null, action: '' });
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchAccounts();
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete account' });
-    } finally {
-      setActionLoading(false);
-    }
+    })();
   };
 
-  /** Calls accept_student on the backend — verifies the account and adds to students team */
+  /** Calls accept_student on the backend in the background — verifies the account and adds to students team */
   const handleAcceptStudent = async (acc: AccountDoc) => {
-    setActionLoading(true);
-    try {
-      const currentUser = await cachedApi.users.getCurrent();
-      const execution = await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'accept_student',
-          payload: { userId: acc.$id },
-          requestingUserId: currentUser?.$id,
-        }),
-        false
-      );
-      let result: any = {};
-      try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-      if (result.success === false) throw new Error(result.error || 'Failed to accept student');
-      addToast({ type: 'success', title: 'Accepted', message: `"${acc.username}" has been verified and added to the students team.` });
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchAccounts();
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to accept student' });
-    } finally {
-      setActionLoading(false);
-    }
+    // Mark as processing
+    setProcessingIds(prev => new Set([...prev, acc.$id]));
+
+    (async () => {
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        await logDebugContext('accept_student', acc.$id);
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'accept_student',
+            payload: { userId: acc.$id },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+        if (result.success === false) throw new Error(result.error || 'Failed to accept student');
+        addToast({ type: 'success', title: 'Accepted', message: `"${acc.username}" has been verified and added to the students team.` });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchAccounts();
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to accept student "${acc.username}"` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(acc.$id);
+          return next;
+        });
+      }
+    })();
   };
 
-  /** Calls bulk_accept_students for all selected pending accounts */
+  /** Calls bulk_accept_students for all selected pending accounts in the background */
   const handleBulkAccept = async () => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
-    setActionLoading(true);
-    try {
-      const currentUser = await cachedApi.users.getCurrent();
-      const execution = await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'bulk_accept_students',
-          payload: { userIds: ids },
-          requestingUserId: currentUser?.$id,
-        }),
-        false
-      );
-      let result: any = {};
-      try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-      if (result.success === false) throw new Error(result.error || 'Bulk accept failed');
-      const accepted = result.accepted_count ?? ids.length;
-      const failed = result.failed_ids?.length ?? 0;
-      addToast({
-        type: failed > 0 ? 'error' : 'success',
-        title: failed > 0 ? 'Partial Success' : 'Bulk Accepted',
-        message: `Accepted ${accepted} of ${ids.length} accounts.${ failed > 0 ? ` ${failed} failed.` : '' }`,
-      });
-      setSelectedIds(new Set());
-      api.cache.clearTags(['accounts', 'students', 'dashboard']);
-      fetchAccounts();
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Bulk accept failed' });
-    } finally {
-      setActionLoading(false);
-    }
+    
+    // Clear selection immediately
+    setSelectedIds(new Set());
+    
+    // Mark all as processing
+    setProcessingIds(prev => new Set([...prev, ...ids]));
+
+    (async () => {
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        await logDebugContext('bulk_accept_students', ids.join(', '));
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'bulk_accept_students',
+            payload: { userIds: ids },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+        if (result.success === false) throw new Error(result.error || 'Bulk accept failed');
+        const accepted = result.accepted_count ?? ids.length;
+        const failed = result.failed_ids?.length ?? 0;
+        addToast({
+          type: failed > 0 ? 'error' : 'success',
+          title: failed > 0 ? 'Partial Success' : 'Bulk Accepted',
+          message: `Accepted ${accepted} of ${ids.length} accounts.${ failed > 0 ? ` ${failed} failed.` : '' }`,
+        });
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        fetchAccounts();
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || 'Bulk accept failed' });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          ids.forEach(id => next.delete(id));
+          return next;
+        });
+      }
+    })();
   };
 
-  /** Calls reset_password on the backend to send a password-reset email */
+  /** Calls reset_password on the backend in the background to send a password-reset email */
   const handleResetPassword = async () => {
     if (!confirmModal.account) return;
     const acc = confirmModal.account;
-    // We need the student's email — try to get it from the linked student doc
-    setActionLoading(true);
-    try {
-      const currentUser = await cachedApi.users.getCurrent();
-      // Resolve email from the account's students relationship if present
-      const studentRel = (acc as any).students;
-      const email: string | undefined =
-        typeof studentRel === 'object' && studentRel?.email
-          ? studentRel.email
-          : undefined;
+    
+    // Close modal immediately
+    setConfirmModal({ open: false, account: null, action: '' });
+    
+    // Mark as processing
+    setProcessingIds(prev => new Set([...prev, acc.$id]));
 
-      if (!email) {
-        throw new Error('Could not resolve email for this account. Open the student profile to find the email.');
+    (async () => {
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        await logDebugContext('reset_password', acc.$id);
+        // Resolve email from the account's students relationship if present
+        const studentRel = (acc as any).students;
+        const email: string | undefined =
+          typeof studentRel === 'object' && studentRel?.email
+            ? studentRel.email
+            : undefined;
+
+        if (!email) {
+          throw new Error('Could not resolve email for this account. Open the student profile to find the email.');
+        }
+
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'reset_password',
+            payload: { userId: acc.$id, email },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+        if (result.success === false) throw new Error(result.error || 'Failed to send reset email');
+        addToast({ type: 'success', title: 'Email Sent', message: `Password reset email sent to ${email}.` });
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || `Failed to send password reset for "${acc.username}"` });
+      } finally {
+        setProcessingIds(prev => {
+          const next = new Set(prev);
+          next.delete(acc.$id);
+          return next;
+        });
       }
-
-      const execution = await functions.createExecution(
-        FUNCTION_ID,
-        JSON.stringify({
-          action: 'reset_password',
-          payload: { userId: acc.$id, email },
-          requestingUserId: currentUser?.$id,
-        }),
-        false
-      );
-      let result: any = {};
-      try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-      if (result.success === false) throw new Error(result.error || 'Failed to send reset email');
-      addToast({ type: 'success', title: 'Email Sent', message: `Password reset email sent to ${email}.` });
-      setConfirmModal({ open: false, account: null, action: '' });
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to send password reset' });
-    } finally {
-      setActionLoading(false);
-    }
+    })();
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -286,8 +366,7 @@ const AdminAccounts: React.FC = () => {
             </button>
             <button
               onClick={handleBulkAccept}
-              disabled={actionLoading}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
             >
               Accept All Selected
             </button>
@@ -337,6 +416,7 @@ const AdminAccounts: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredAccounts.map(acc => {
                   const isPending = !acc.verified && acc.type !== 'admin';
+                  const isProcessing = processingIds.has(acc.$id);
                   return (
                   <tr key={acc.$id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-4">
@@ -344,6 +424,7 @@ const AdminAccounts: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={selectedIds.has(acc.$id)}
+                          disabled={isProcessing}
                           onChange={e => {
                             setSelectedIds(prev => {
                               const next = new Set(prev);
@@ -351,7 +432,7 @@ const AdminAccounts: React.FC = () => {
                               return next;
                             });
                           }}
-                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer"
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       ) : <span className="block w-4" />}
                     </td>
@@ -374,54 +455,74 @@ const AdminAccounts: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${
-                          acc.deactivated ? 'bg-red-400' : acc.verified ? 'bg-emerald-400' : 'bg-amber-400'
-                        }`} />
-                        <span className="text-sm text-slate-600">
-                          {acc.deactivated ? 'Deactivated' : acc.verified ? 'Active' : 'Pending'}
-                        </span>
+                        {isProcessing ? (
+                          <>
+                            <span className="h-2 w-2 rounded-full bg-[#0d6b66] animate-pulse" />
+                            <span className="text-sm text-[#0d6b66] italic font-medium animate-pulse">Updating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className={`h-2 w-2 rounded-full ${
+                              acc.deactivated ? 'bg-red-400' : acc.verified ? 'bg-emerald-400' : 'bg-amber-400'
+                            }`} />
+                            <span className="text-sm text-slate-600">
+                              {acc.deactivated ? 'Deactivated' : acc.verified ? 'Active' : 'Pending'}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">{formatRelativeTime(acc.$createdAt)}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Accept: only for pending/unverified non-admin accounts */}
-                        {isPending && (
-                          <button
-                            onClick={() => handleAcceptStudent(acc)}
-                            disabled={actionLoading}
-                            className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
-                          >
-                            Accept
-                          </button>
-                        )}
-                        {/* Reset Password: only for verified active accounts */}
-                        {acc.verified && !acc.deactivated && acc.type !== 'admin' && (
-                          <button
-                            onClick={() => setConfirmModal({ open: true, account: acc, action: 'reset_password' })}
-                            className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-slate-600 bg-slate-100 hover:bg-slate-200"
-                          >
-                            Reset PW
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setConfirmModal({ open: true, account: acc, action: acc.deactivated ? 'activate' : 'deactivate' })}
-                          disabled={acc.type === 'admin'}
-                          className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                            acc.deactivated
-                              ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                              : 'text-amber-700 bg-amber-50 hover:bg-amber-100'
-                          }`}
-                        >
-                          {acc.deactivated ? 'Activate' : 'Deactivate'}
-                        </button>
-                        {acc.type !== 'admin' && (
-                          <button
-                            onClick={() => setConfirmModal({ open: true, account: acc, action: 'delete' })}
-                            className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-red-700 bg-red-50 hover:bg-red-100"
-                          >
-                            Delete
-                          </button>
+                        {isProcessing ? (
+                          <div className="flex items-center gap-1.5 text-xs text-[#0d6b66] font-medium px-3 py-1.5 animate-pulse">
+                            <svg className="animate-spin h-3.5 w-3.5 text-[#0d6b66]" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            <span>Processing...</span>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Accept: only for pending/unverified non-admin accounts */}
+                            {isPending && (
+                              <button
+                                onClick={() => handleAcceptStudent(acc)}
+                                className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                              >
+                                Accept
+                              </button>
+                            )}
+                            {/* Reset Password: only for verified active accounts */}
+                            {acc.verified && !acc.deactivated && acc.type !== 'admin' && (
+                              <button
+                                onClick={() => setConfirmModal({ open: true, account: acc, action: 'reset_password' })}
+                                className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-slate-600 bg-slate-100 hover:bg-slate-200"
+                              >
+                                Reset PW
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setConfirmModal({ open: true, account: acc, action: acc.deactivated ? 'activate' : 'deactivate' })}
+                              disabled={acc.type === 'admin'}
+                              className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                acc.deactivated
+                                  ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                                  : 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                              }`}
+                            >
+                              {acc.deactivated ? 'Activate' : 'Deactivate'}
+                            </button>
+                            {acc.type !== 'admin' && (
+                              <button
+                                onClick={() => setConfirmModal({ open: true, account: acc, action: 'delete' })}
+                                className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors text-red-700 bg-red-50 hover:bg-red-100"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -448,7 +549,7 @@ const AdminAccounts: React.FC = () => {
         }`}
         confirmLabel={confirmModal.action === 'activate' ? 'Activate' : 'Deactivate'}
         variant={confirmModal.action === 'activate' ? 'info' : 'danger'}
-        loading={actionLoading}
+        loading={false}
       />
 
       {/* Permanent delete confirm */}
@@ -460,7 +561,7 @@ const AdminAccounts: React.FC = () => {
         message={`Are you sure you want to permanently delete the account "${confirmModal.account?.username}"? This will remove their student/officer records, team memberships, and auth credentials. This action cannot be undone.`}
         confirmLabel="Delete Permanently"
         variant="danger"
-        loading={actionLoading}
+        loading={false}
       />
 
       {/* Reset Password confirm */}
@@ -472,7 +573,7 @@ const AdminAccounts: React.FC = () => {
         message={`Send a password reset email to "${confirmModal.account?.username}"? They will receive a link to set a new password.`}
         confirmLabel="Send Reset Email"
         variant="info"
-        loading={actionLoading}
+        loading={false}
       />
     </div>
   );
