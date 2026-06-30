@@ -2,7 +2,7 @@
 
 ![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=appwrite) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge)
 
-A centralized web application built with Vanilla JavaScript and Appwrite to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
+A centralized web application built with **React**, **TypeScript**, **TailwindCSS**, and **Appwrite** to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
 
 ---
 
@@ -26,21 +26,21 @@ This **Student & Admin Portal** acts as the "Single Source of Truth" for the org
 
 In building this application, specific architectural and technical choices were made to balance performance, learning curve, and rapid deployment:
 
-### 1. Why Vanilla JavaScript?
-* **Decision:** We avoided heavy frontend frameworks (React/Vue) for the initial version.
-* **Reasoning:** To ensure a deep understanding of DOM manipulation and core Web APIs without the abstraction overhead. This keeps the bundle size incredibly small and the performance high on lower-end devices often used by students.
+### 1. React & TypeScript
+* **Decision:** We migrated from Vanilla JavaScript to React 19 and TypeScript.
+* **Reasoning:** As the application grew in size (14+ admin views, shared components, complex state management), Vanilla JS became hard to scale. React provides a component-driven architecture for high reusability, and TypeScript ensures compile-time type safety, minimizing runtime exceptions and ReferenceErrors.
 
 ### 2. Why Appwrite (BaaS)?
 * **Decision:** We utilized Appwrite for the backend instead of building a custom REST API with Node/Express.
 * **Reasoning:** As a student-led project with tight deadlines, we needed a secure, production-ready backend immediately. Appwrite handles Authentication, Database (CRUD), File Storage, Cloud Functions, and Teams out-of-the-box, allowing us to focus 100% on the frontend logic and user experience.
 
-### 3. SCSS over Plain CSS
-* **Decision:** Used SASS/SCSS with a BEM-like naming convention.
-* **Reasoning:** To maintain modularity and use variables for the organization's color themes, making future rebranding or dark mode implementation significantly easier.
+### 3. TailwindCSS for Styling
+* **Decision:** Replaced Plain CSS/SCSS with TailwindCSS.
+* **Reasoning:** TailwindCSS enables rapid prototyping and styling consistency through a robust utility-first system. It simplifies layout design, responsive configurations, and custom animations, while keeping CSS output extremely small through purge utilities.
 
 ### 4. Multi-Provider Architecture
 * **Decision:** Built an abstraction layer with provider interfaces for Auth, Database, and Storage.
-* **Reasoning:** To allow swapping backend services (e.g., Firebase for auth, Cloudflare R2 for storage) without changing application code. Each provider implements a common interface defined in `providers/interface.js`.
+* **Reasoning:** To allow swapping backend services (e.g., Firebase for auth, Cloudflare R2 for storage) without changing application code. Each provider implements a common interface.
 
 ---
 
@@ -55,7 +55,7 @@ In building this application, specific architectural and technical choices were 
 - **Centralized Caching:** localStorage-based image and data caches with TTL, LRU eviction, and stale-while-revalidate patterns.
 - **Structured Error Handling:** Typed `ApiError` classes with error code enums and Appwrite error mapping.
 - **Toast Notifications:** Custom toast system with 4 types (success, error, warning, info), auto-dismiss, progress bars, and pause-on-hover.
-- **Confirmation Modals:** Promise-based `confirmAction()` replacing `window.confirm()` with 5 visual variants.
+- **Confirmation Modals:** Custom reusable `ConfirmModal` component replacing legacy browser prompts with 5 visual variants.
 
 ### Student Dashboard (5 views)
 - **Event Calendar:** View upcoming and past events.
@@ -75,7 +75,7 @@ In building this application, specific architectural and technical choices were 
 - **Settings:** Manage officer profile and preferences.
 
 ### Admin Panel (14 views)
-- **Dashboard Stats:** At-a-glance overview with Chart.js visualizations and animated counters.
+- **Dashboard Stats:** At-a-glance overview with Chart.js / Recharts visualizations and animated counters.
 - **Account Management:** Approve, verify, deactivate/reactivate, and delete accounts. Promote students to officers or demote via Appwrite Cloud Functions. CSV export.
 - **Event Management:** A timeline view to add, edit, and delete events with related links and collaborators.
 - **Attendance Management:** Event-based attendance tracking with student search autocomplete.
@@ -85,7 +85,7 @@ In building this application, specific architectural and technical choices were 
 - **File Management:** View and manage all uploaded files.
 - **Volunteer Management:** Full volunteer lifecycle management.
 - **Stories Management:** Full CRUD, approval workflow, filtering by status, and statistics.
-- **Announcements:** Draft composition with recipient targeting (all/students/officers/custom), copy-to-clipboard, and open-in-email-client.
+- **Announcements:** Draft composition with recipient targeting (all/students/officers), copy-to-clipboard, and open-in-email-client.
 - **Reports:** Account, student, payment, and event reports with monthly growth charts, distribution analysis, and CSV export.
 - **Activity Logs:** Client-side activity tracking (18 activity types, max 500 entries) with filtering, search, date range, and CSV export.
 - **Settings:** Admin profile and preferences.
@@ -105,10 +105,9 @@ In building this application, specific architectural and technical choices were 
 
 | Category | Technology | Version |
 |----------|-----------|---------|
-| **Frontend** | Vanilla JavaScript (ES6+), HTML5, SASS/SCSS | — |
-| **UI** | Bootstrap (via SCSS) | ^5.3.7 |
-| **Icons** | Bootstrap Icons (SVG) | ^1.13.1 |
-| **Charts** | Chart.js | ^4.5.0 |
+| **Frontend** | React 19, TypeScript, TailwindCSS v3 | — |
+| **Icons** | Lucide React, Bootstrap Icons (SVG) | ^1.22.0 / ^1.13.1 |
+| **Charts** | Chart.js, Recharts | ^4.5.0 / ^3.9.0 |
 | **Backend** | Appwrite Cloud (BaaS) | SDK ^18.1.1 |
 | **Server SDK** | node-appwrite (Cloud Functions) | ^17.0.0 |
 | **Build Tool** | Vite | 7.1.11 |
@@ -122,7 +121,7 @@ In building this application, specific architectural and technical choices were 
 
 ### Centralized API Layer
 
-All backend operations go through a structured `api` object in `shared/api.js`:
+All backend operations go through a structured `api` object in `shared/api.ts`:
 
 | Namespace | Methods |
 |-----------|---------|
@@ -136,55 +135,14 @@ All backend operations go through a structured `api` object in `shared/api.js`:
 
 ### Shared Components
 
-Reusable UI components in `shared/components/`:
+Reusable UI components in `components/ui/` and `shared/`:
 
 | Component | Description |
 |-----------|-------------|
-| `emptyState.js` | Empty state displays with 6 icon types (`default`, `search`, `events`, `users`, `files`, `finance`) plus error states with retry |
-| `skeletonLoader.js` | Loading skeletons: `statCard`, `tableRow`, `accountCard`, `eventCard`, `chart`, `listItem`, `dashboard` |
-| `paginationControls.js` | Full pagination with page size selector, ellipsis, and event listeners |
-| `paymentCard.js` | Student payment cards with summary calculations (`totalDue`, `totalPaid`, `pendingCount`) |
-
-### Shared Utilities
-
-| Module | Description |
-|--------|-------------|
-| `cache.js` | Image cache (7-day TTL, 50MB max, LRU eviction) and data cache (5-min TTL, stale-while-revalidate) |
-| `cache-tools.js` | Developer debugging via `window.cacheTools` — `stats()`, `listKeys()`, `inspect()`, `clear()`, `search()`, `stress()` |
-| `errors.js` | `ApiError` class, `ErrorCodes` enum (17 codes), `mapAppwriteError()`, `createApiError()` |
-| `toast.js` | Toast notifications — `showToast()` and `toast.success/error/warning/info()` |
-| `confirmModal.js` | `confirmAction(title, message, confirmLabel, variant)` → `Promise<boolean>` |
-| `formatters.js` | `formatCurrency()` (₱), `formatDate()`, `formatDateTime()`, `formatRelativeTime()` |
-| `dashboard-utils.js` | `renderDashboardContent()`, `setupDashboardNavigation()`, `createLoadingSpinner()`, `createErrorAlert()` |
-| `lazyLoadHelper.js` | `lazyLoadComponent()`, `lazyImage()`, `initLazyImages()`, `prefetchModule()`, `createViewLoader()` |
-| `utils.js` | `debounce()`, `throttle()`, `chartManager`, `animateNumber()`, `copyToClipboard()` |
-
----
-
-## Performance Optimizations
-
-### Code Splitting & Lazy Loading
-- **Dynamic Imports:** All dashboard views and landing page routes are lazily loaded using `import()` to reduce initial bundle size.
-- **Route Prefetching:** Commonly visited pages are prefetched via `requestIdleCallback`.
-- **IntersectionObserver:** Utility for lazy loading images and below-the-fold components with placeholder SVGs.
-- **Module Caching:** View modules are cached after first load in `renderDashboardContent()`.
-
-### Caching System
-- **Image Cache:** localStorage-based with 7-day TTL, 50MB max capacity, and automatic LRU cleanup at 80% threshold.
-- **Data Cache:** localStorage-based with 5-minute default TTL and stale-while-revalidate pattern via `getOrFetch()`.
-- **Cached API:** Pre-built cached wrappers for events, payments, and user profile reads.
-- **Developer Tools:** `window.cacheTools` provides runtime cache inspection, search, and stress testing.
-
-### Build Optimizations
-- **Vendor Chunking:** Libraries are split into 10+ separate chunks (`vendor-appwrite`, `vendor-bootstrap`, `vendor-chart`, `vendor-firebase`, `vendor-icons`, `vendor-aws`, `shared-utils`, `views-admin`, `views-officer`, `views-student`, `views-landing`).
-- **Console Removal:** Production builds strip `console.log`, `console.debug`, and `console.info` via Terser.
-- **Tree Shaking:** Unused code is automatically removed from production bundles.
-- **SCSS Optimization:** Deprecation silencing for `import`, `mixed-decls`, `color-functions`, `global-builtin`.
-
-### Code Quality
-- **Clean Codebase:** Unnecessary comments removed for improved readability. The code is self-documenting through clear naming conventions.
-- **JSDoc Comments:** Preserved where they provide meaningful API documentation (e.g., `cache.js`, `cachedApi` wrapper, provider interfaces).
-- **Path Aliases:** `@` → `./src`, `@shared` → `./src/shared` for clean imports.
+| `EmptyState.tsx` | Empty state displays with multiple pre-configured icon layouts |
+| `SkeletonLoader.tsx` | Loading skeletons for layouts, lists, metrics, cards, and tables |
+| `Pagination.tsx` | Full pagination controls with page size configuration |
+| `ConfirmModal.tsx` | Reusable modal dialog replacing browser native confirm alerts |
 
 ---
 
@@ -200,7 +158,7 @@ VITE_USE_MOCK_DATA=true
 
 When enabled:
 - Authentication is bypassed with auto-login
-- All API calls return realistic mock data (6 accounts, 5 students, events, stories, payments, files, attendance, expenses, revenue)
+- All API calls return realistic mock data (accounts, students, events, stories, payments, files, attendance, expenses, revenue)
 - Full CRUD operations with Appwrite Query string parsing simulation
 - Pagination simulation
 - A Dev Quick Login panel appears on the landing page
@@ -237,23 +195,6 @@ npm run test:coverage
 npm run test:run
 ```
 
-### Test Structure
-```
-src/__tests__/
-  setup.js                  # Global test setup and mocks
-  unit/
-    cache.test.js            # Cache utility tests
-    lazyLoadHelper.test.js   # Lazy loading tests
-  integration/
-    router.test.js           # Router integration tests
-```
-
-### Test Configuration
-- **Environment:** jsdom
-- **Coverage:** v8 provider with text, JSON, and HTML reporters
-- **Timeout:** 10,000ms
-- **Path aliases:** Same as build (`@`, `@shared`)
-
 ---
 
 ## Multi-Provider Support
@@ -263,37 +204,9 @@ The application supports multiple backend providers through an abstraction layer
 ### Supported Providers
 | Provider | Auth | Database | Storage | Implementation |
 |----------|------|----------|---------|---------------|
-| Appwrite | Yes | Yes | Yes | `appwriteProvider.js` |
-| Firebase | Yes | Yes | No | `firebaseProvider.js` (lazy SDK loading) |
-| Cloudflare R2 | No | No | Yes | `cloudflareR2Provider.js` (pre-signed URLs) |
-
-The factory (`providers/factory.js`) uses a singleton pattern with lazy initialization and environment-based provider selection.
-
-### Configuration
-Set providers in your `.env` file:
-
-```bash
-# Provider Selection
-VITE_AUTH_PROVIDER=appwrite     # appwrite or firebase
-VITE_DB_PROVIDER=appwrite       # appwrite or firebase
-VITE_STORAGE_PROVIDER=appwrite  # appwrite or cloudflare-r2
-```
-
-### Provider-Specific Configuration
-
-**Firebase (optional):**
-```bash
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-```
-
-**Cloudflare R2 (optional):**
-```bash
-VITE_R2_ENDPOINT=
-VITE_R2_BUCKET_NAME=
-VITE_R2_PUBLIC_URL=
-```
+| Appwrite | Yes | Yes | Yes | `appwriteProvider.ts` |
+| Firebase | Yes | Yes | No | `firebaseProvider.ts` (lazy SDK loading) |
+| Cloudflare R2 | No | No | Yes | `cloudflareR2Provider.ts` (pre-signed URLs) |
 
 ---
 
@@ -381,14 +294,6 @@ VITE_BUCKET_ID_HIGHLIGHT_IMAGES="<YOUR_HIGHLIGHT_IMAGES_BUCKET_ID>"
 VITE_FUNCTION_ID="<YOUR_CLOUD_FUNCTION_ID>"
 VITE_TEAM_ID_STUDENTS="<YOUR_STUDENTS_TEAM_ID>"
 VITE_TEAM_ID_OFFICERS="<YOUR_OFFICERS_TEAM_ID>"
-
-# Optional: Multi-Provider Support
-# VITE_AUTH_PROVIDER=appwrite
-# VITE_DB_PROVIDER=appwrite
-# VITE_STORAGE_PROVIDER=appwrite
-
-# Optional: Mock Data (for local development without backend)
-# VITE_USE_MOCK_DATA=true
 ```
 
 #### 5. Run the Development Server
@@ -434,101 +339,37 @@ specs-website/
 ├── public/                          # Static assets
 ├── src/
 │   ├── index.html                   # Entry point
+│   ├── index.css                    # Tailwind CSS directives
 │   ├── __tests__/                   # Test suites
-│   │   ├── setup.js
-│   │   ├── unit/
-│   │   └── integration/
+│   ├── components/                  # Reusable UI React components
+│   │   └── ui/
+│   │       ├── ConfirmModal.tsx
+│   │       ├── EmptyState.tsx
+│   │       ├── Pagination.tsx
+│   │       ├── SkeletonLoader.tsx
+│   │       └── Toast.tsx
 │   ├── guard/
-│   │   └── auth.js                  # Auth guard with role-based routing
-│   ├── landing/                     # Public-facing pages
-│   │   ├── landing.js               # Router & initialization
-│   │   ├── data/data.js             # Static content data
-│   │   └── views/                   # 7 route views
-│   ├── dashboard-admin/             # Admin panel
-│   │   ├── dashboardAdmin.js        # Router & navigation
-│   │   └── views/                   # 14 view modules
-│   ├── dashboard-officer/           # Officer dashboard
-│   │   ├── dashboardOfficer.js      # Router & navigation
-│   │   └── views/                   # 8 view modules
-│   ├── dashboard-student/           # Student dashboard
-│   │   ├── dashboardStudent.js      # Router & navigation
-│   │   └── views/                   # 5 view modules
+│   │   └── AuthGuard.tsx            # React router auth guard
+│   ├── pages/                       # Screen routes grouped by module
+│   │   ├── admin/                   # Admin pages (AdminStudents.tsx, AdminAnnouncements.tsx, etc.)
+│   │   ├── officer/                 # Officer dashboard pages
+│   │   ├── student/                 # Student dashboard pages
+│   │   ├── shared/                  # Common/shared pages
+│   │   └── landing/                 # Public landing page routes
 │   └── shared/                      # Shared code
-│       ├── api.js                   # Centralized API layer
-│       ├── appwrite.js              # Appwrite client setup
-│       ├── cache.js                 # Image & data caching
-│       ├── cache-tools.js           # Developer cache debugging
-│       ├── cache-examples.js        # Cache usage documentation
-│       ├── confirmModal.js          # Promise-based confirmation dialogs
-│       ├── constants.js             # Environment variables & IDs
-│       ├── dashboard-utils.js       # Dashboard rendering utilities
-│       ├── errors.js                # Structured error handling
-│       ├── formatters.js            # Currency, date, time formatters
-│       ├── lazyLoadHelper.js        # Lazy loading & prefetching
-│       ├── toast.js                 # Toast notification system
-│       ├── utils.js                 # Debounce, throttle, chart manager
-│       ├── components/              # Reusable UI components
-│       │   ├── emptyState.js
-│       │   ├── paginationControls.js
-│       │   ├── paymentCard.js
-│       │   └── skeletonLoader.js
+│       ├── api.ts                   # Centralized API layer
+│       ├── appwrite.ts              # Appwrite client setup
+│       ├── cache.ts                 # Data/Image caching layer
+│       ├── constants.ts             # Environment variables & IDs
+│       ├── formatters.ts            # Currency, date, time formatters
+│       ├── utils.ts                 # Debounce, copy, and helper functions
 │       ├── mock/                    # Development mock system
-│       │   ├── devUtils.js
-│       │   ├── mockApiService.js
-│       │   └── mockData.js
 │       └── providers/               # Multi-provider abstraction
-│           ├── interface.js
-│           ├── factory.js
-│           ├── appwriteProvider.js
-│           ├── firebaseProvider.js
-│           └── cloudflareR2Provider.js
 ├── package.json
-├── vite.config.js
-├── vitest.config.js
+├── vite.config.ts
+├── vitest.config.ts
 └── unlighthouse.config.mjs
 ```
-
----
-
-## Project Quality
-
-### Site-wide Performance Scanning
-This project uses **Unlighthouse** to scan the entire site (9 routes including all dashboards) for performance, accessibility, and SEO issues using Microsoft Edge in mobile device mode.
-
-```bash
-npm run audit
-```
-
----
-
-## Limitations & Known Issues
-
-While functional, the current iteration has the following constraints:
-
-* **Scalability of Vanilla JS:** As the codebase has grown to include 14+ admin views, shared components, and a provider abstraction layer, state management in Vanilla JS adds complexity. The project mitigates this with structured utilities (`dashboard-utils.js`, `chartManager`, etc.) but a component-based framework may be warranted for future growth.
-* **Manual Payments:** The system tracks payments but does not *process* them. Students must still pay physically or via external e-wallets, then an admin manually updates the record.
-* **Internet Dependency:** The app requires an active internet connection to fetch data from Appwrite; there is currently no offline/PWA support. The caching layer mitigates this for recently viewed data.
-* **Client-Side Activity Logs:** Activity logs are stored in localStorage (max 500 entries) rather than server-side, meaning they are per-device and not shared across admin sessions.
-* **Announcements:** Currently draft-based with copy-to-clipboard and email client integration rather than in-app push notifications.
-
-## Roadmap & Future Improvements
-* [ ] **Payment Gateway Integration:** Integration with PayMongo or Xendit for real-time, automated payment verification.
-* [ ] **QR Code Attendance:** Generate QR codes for events to automate the existing attendance tracking system.
-* [ ] **Real-time Notifications:** Use Appwrite Realtime to notify students of new events or cleared payments instantly.
-* [ ] **Server-Side Activity Logs:** Move activity logs to an Appwrite collection for cross-device persistence.
-* [ ] **PWA Support:** Add service worker and offline capabilities leveraging the existing cache infrastructure.
-
----
-
-## Contribution Guide
-1. **Create Branch:**
-   `git checkout -b <type>/<feature-name>` (e.g., `feat/add-payment-list-page`)
-2. **Make Changes:**
-   Implement your feature or fix, adhering to the project's coding style.
-3. **Commit Message Convention:**
-   Use conventional commits for clear history. (e.g., `git commit -m "feat: Add payment list page"`)
-4. **Push & PR:**
-   Push your branch to the repository and open a pull request targeting the `main` branch.
 
 ---
 

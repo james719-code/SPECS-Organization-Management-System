@@ -40,6 +40,7 @@ const AdminStudents: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; student: StudentDoc | null }>({ open: false, student: null });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const actionLoading = detailStudent ? processingIds.has(detailStudent.$id) : false;
 
   const { addToast } = useToast();
   const navigate = useNavigate();

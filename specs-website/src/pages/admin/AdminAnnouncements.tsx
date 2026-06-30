@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { cachedApi, api } from '../../shared/api';
+import { Mail, GraduationCap, Shield, Clock, Trash2, X } from 'lucide-react';
 import { copyToClipboard } from '../../shared/utils';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -207,9 +208,7 @@ const AdminAnnouncements: React.FC = () => {
           className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md transition-all text-center space-y-2"
         >
           <div className="h-12 w-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto text-[#0d6b66]">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-5.603-3.735A.75.75 0 008 10.9v1.4a.75.75 0 00.118.4l5.603 3.735A.75.75 0 0015 16v-1.4a.75.75 0 00-.118-.4z" />
-            </svg>
+            <Mail className="h-6 w-6" />
           </div>
           <h3 className="font-bold text-slate-800">Email All Users</h3>
           <p className="text-xs text-slate-400">Draft updates for all community members</p>
@@ -220,10 +219,7 @@ const AdminAnnouncements: React.FC = () => {
           className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md transition-all text-center space-y-2"
         >
           <div className="h-12 w-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
-              <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-            </svg>
+            <GraduationCap className="h-6 w-6" />
           </div>
           <h3 className="font-bold text-slate-800">Email Students</h3>
           <p className="text-xs text-slate-400">Compose announcement for students only</p>
@@ -234,9 +230,7 @@ const AdminAnnouncements: React.FC = () => {
           className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md transition-all text-center space-y-2"
         >
           <div className="h-12 w-12 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto text-blue-600">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 014 0m-3 8a3 3 0 100-6 3 3 0 000 6z" />
-            </svg>
+            <Shield className="h-6 w-6" />
           </div>
           <h3 className="font-bold text-slate-800">Email Officers</h3>
           <p className="text-xs text-slate-400">Send updates to assigned officer list</p>
@@ -247,9 +241,7 @@ const AdminAnnouncements: React.FC = () => {
       <div className="space-y-4">
         <div className="flex justify-between items-center border-b pb-2">
           <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Clock className="h-5 w-5 text-slate-400" />
             Saved Drafts
           </h2>
           <span className="inline-flex items-center rounded-full bg-slate-50 border px-2.5 py-0.5 text-xs font-semibold text-slate-500">
@@ -278,9 +270,7 @@ const AdminAnnouncements: React.FC = () => {
                       className="text-red-500 hover:text-red-700 p-1"
                       title="Delete draft"
                     >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
 
@@ -313,9 +303,7 @@ const AdminAnnouncements: React.FC = () => {
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">Compose Announcement</h2>
               <button onClick={() => setIsComposerOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
 
@@ -405,9 +393,7 @@ const AdminAnnouncements: React.FC = () => {
             <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50">
               <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Announcement Preview</h2>
               <button onClick={() => setIsPreviewOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
             <div className="p-6 space-y-4">
