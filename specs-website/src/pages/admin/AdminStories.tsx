@@ -197,6 +197,8 @@ const AdminStories: React.FC = () => {
     setActionLoading(true);
     try {
       const story = stories.find(s => s.$id === deleteConfirm.id);
+
+      // Clean up image from storage bucket before deleting the story record
       if (story?.image_bucket) {
         try {
           await storage.deleteFile(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket);
@@ -205,7 +207,28 @@ const AdminStories: React.FC = () => {
         }
       }
 
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, deleteConfirm.id);
+      const currentUser = await cachedApi.users.getCurrent();
+
+      if (FUNCTION_ID) {
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'reject_story',
+            payload: { story_id: deleteConfirm.id },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+        if (result.success === false) {
+          throw new Error(result.error || 'Failed to reject/delete story');
+        }
+      } else {
+        // Fallback: direct delete if function ID not configured
+        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, deleteConfirm.id);
+      }
+
       addToast({ type: 'success', title: 'Deleted', message: 'Story has been removed.' });
       setDeleteConfirm({ open: false, id: null });
       loadData(true);

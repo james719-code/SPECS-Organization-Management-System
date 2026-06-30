@@ -206,8 +206,35 @@ const AdminStudents: React.FC = () => {
     }
   };
 
-  const deleteStudent = async (studentId: string) => {
-    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId);
+  /** Calls delete_account on the backend — cascades to teams, officer doc, student doc, and auth user */
+  const deleteAccount = async (student: StudentDoc) => {
+    if (!linkedAccount && detailStudent?.$id === student.$id) {
+      // If we don't have a linked account yet, still attempt via student-only direct delete
+      // as a fallback (e.g., orphaned student records)
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id);
+      return;
+    }
+    const targetAccount = (detailStudent?.$id === student.$id ? linkedAccount : null);
+    if (!targetAccount) {
+      // Orphaned student record with no linked account — direct delete
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id);
+      return;
+    }
+    const currentUser = await cachedApi.users.getCurrent();
+    const execution = await functions.createExecution(
+      FUNCTION_ID,
+      JSON.stringify({
+        action: 'delete_account',
+        payload: { userId: targetAccount.$id },
+        requestingUserId: currentUser?.$id,
+      }),
+      false
+    );
+    let result: any = {};
+    try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+    if (result.success === false) {
+      throw new Error(result.error || 'Failed to delete account');
+    }
   };
 
   const handleSingleDelete = async () => {
@@ -215,7 +242,7 @@ const AdminStudents: React.FC = () => {
     const student = deleteConfirm.student;
     setActionLoading(true);
     try {
-      await deleteStudent(student.$id);
+      await deleteAccount(student);
       api.cache.clearTags(['students', 'accounts', 'dashboard']);
       setStudents(prev => prev.filter(s => s.$id !== student.$id));
       setSelectedIds(prev => {
@@ -237,7 +264,12 @@ const AdminStudents: React.FC = () => {
     setActionLoading(true);
     try {
       const ids = Array.from(selectedIds);
-      await Promise.all(ids.map(id => deleteStudent(id)));
+      // Bulk delete: for each selected student, attempt account-level delete
+      // We don't have linked accounts cached for all, so fall back to direct student delete
+      await Promise.all(ids.map(id => {
+        const student = students.find(s => s.$id === id);
+        return student ? databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id) : Promise.resolve();
+      }));
       api.cache.clearTags(['students', 'accounts', 'dashboard']);
       setStudents(prev => prev.filter(s => !selectedIds.has(s.$id)));
       setSelectedIds(new Set());

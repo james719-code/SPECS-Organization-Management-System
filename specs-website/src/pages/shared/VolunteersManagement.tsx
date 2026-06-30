@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RotateCw } from 'lucide-react';
-import { databases } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_STUDENTS } from '../../shared/constants';
+import { databases, functions } from '../../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_STUDENTS, FUNCTION_ID } from '../../shared/constants';
 import { Query } from 'appwrite';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
+import { cachedApi } from '../../shared/api';
 import type { StudentDoc } from '../../types/database';
 
 const VolunteersManagement: React.FC = () => {
@@ -59,26 +60,48 @@ const VolunteersManagement: React.FC = () => {
     setActionLoading(true);
 
     try {
-      let updatePayload: Partial<StudentDoc> = {};
-      let msg = '';
+      // Map UI actions to backend function action strings
+      const actionMap: Record<typeof action, string> = {
+        approve:       'approve_volunteer',
+        reject:        'reject_volunteer',
+        approve_leave: 'approve_volunteer_backout',
+        reject_leave:  'reject_volunteer_backout',
+      };
+      const successMsgMap: Record<typeof action, string> = {
+        approve:       `Approved volunteer request for ${student.name}.`,
+        reject:        `Rejected volunteer request for ${student.name}.`,
+        approve_leave: `Approved leave/backout for ${student.name}.`,
+        reject_leave:  `Denied leave request — ${student.name} remains a volunteer.`,
+      };
 
-      if (action === 'approve') {
-        updatePayload = { is_volunteer: true, volunteer_request_status: 'approved' };
-        msg = `Approved volunteer request for ${student.name}.`;
-      } else if (action === 'reject') {
-        updatePayload = { is_volunteer: false, volunteer_request_status: 'rejected' };
-        msg = `Rejected volunteer request for ${student.name}.`;
-      } else if (action === 'approve_leave') {
-        updatePayload = { is_volunteer: false, volunteer_request_status: 'none' };
-        msg = `Approved leave program for ${student.name}.`;
-      } else if (action === 'reject_leave') {
-        updatePayload = { is_volunteer: true, volunteer_request_status: 'approved' };
-        msg = `Denied leave program request for ${student.name}.`;
+      if (FUNCTION_ID) {
+        const currentUser = await cachedApi.users.getCurrent();
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: actionMap[action],
+            payload: { student_id: student.$id },
+            requestingUserId: currentUser?.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+        if (result.success === false) {
+          throw new Error(result.error || 'Backend function returned an error');
+        }
+      } else {
+        // Fallback: direct DB write when function not configured
+        const fallbackPayloads: Record<typeof action, Partial<StudentDoc>> = {
+          approve:       { is_volunteer: true,  volunteer_request_status: 'approved' },
+          reject:        { is_volunteer: false, volunteer_request_status: 'rejected' },
+          approve_leave: { is_volunteer: false, volunteer_request_status: 'none' },
+          reject_leave:  { is_volunteer: true,  volunteer_request_status: 'approved' },
+        };
+        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id, fallbackPayloads[action]);
       }
 
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id, updatePayload);
-      addToast({ type: 'success', title: 'Success', message: msg });
-      
+      addToast({ type: 'success', title: 'Success', message: successMsgMap[action] });
       setActionConfirm({ open: false, student: null, action: 'approve' });
       loadData(true);
     } catch (err: any) {

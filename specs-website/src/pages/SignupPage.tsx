@@ -32,9 +32,18 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
     setError('');
 
     try {
-      // 1. Validations
+      // 1. Client-side validations — run ALL before touching the database
+      if (!name.trim()) {
+        throw new Error('Full name is required.');
+      }
+      if (!username.trim()) {
+        throw new Error('Username is required.');
+      }
       if (!email.toLowerCase().endsWith('@parsu.edu.ph')) {
         throw new Error('Registration requires your official PSU email (@parsu.edu.ph)');
+      }
+      if (!studentId.trim()) {
+        throw new Error('Student ID is required.');
       }
       if (password.length < 8) {
         throw new Error('Password must be at least 8 characters long.');
@@ -46,38 +55,40 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
         throw new Error('Please consent to the Data Privacy terms.');
       }
 
-      // 2. Auth user creation
+      // 2. Create Auth account (only reached if all validations pass)
       const user = await account.create(ID.unique(), email, password, name);
 
       // 3. Initiate temp login session to authorize database writes
       await account.createEmailPasswordSession(email, password);
 
       // 4. Create Student profile document
+      //    NOTE: username is NOT a field on StudentDoc — it lives on AccountDoc
       const studentDoc = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_STUDENTS,
         ID.unique(),
         {
           name: name,
-          username: username,
           email: email,
-          student_id: studentId,
-          year_level: parseInt(yearLevel, 10),
+          student_id: Number(studentId),
+          yearLevel: parseInt(yearLevel, 10),
           section: section,
           address: address,
-          verified: false
+          is_volunteer: false
         }
       );
 
       // 5. Create Account relation document
+      //    - `username` belongs here on AccountDoc
+      //    - relationship field is `students` (not `student`)
       await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_ACCOUNTS,
         user.$id,
         {
-          name: name,
+          username: username,
           type: 'student',
-          student: studentDoc.$id,
+          students: studentDoc.$id,
           verified: false,
           deactivated: false
         }
@@ -87,12 +98,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
       try {
         await account.createVerification(window.location.origin + '/verify');
       } catch (err) {
-        console.warn("Could not trigger verification email automatically:", err);
+        console.warn('Could not trigger verification email automatically:', err);
       }
 
-      // 7. Delete active temporary session
+      // 7. Delete the temporary session
       await account.deleteSession('current');
-      
+
       setSuccess(true);
       setLoading(false);
     } catch (err: any) {
