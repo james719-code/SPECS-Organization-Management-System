@@ -1,6 +1,6 @@
-# 🗄️ Database Schema Documentation (v2.1)
+# 🗄️ Database Schema Documentation (v2.2)
 
-This document describes all 11 database collections and 6 storage buckets used by the SPECS Organization Management System.
+This document describes all 13 database collections (11 active, 2 unused) and 6 storage buckets in the database used by the SPECS Organization Management System.
 
 > **Referenced by:** [README.md](README.md) — see the Database Schema section for a relationship overview.
 
@@ -120,6 +120,8 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`collab[]`** | string | Size: 300 | - | - | `NULL` | Array |
 | **`related_links[]`** | url | - | - | - | `NULL` | Array |
 | **`meaning[]`** | string | Size: 10000 | - | - | `NULL` | Array |
+| **`location`** | text | - | - | - | `NULL` | - |
+| **`rating_links`** | text | - | - | - | `NULL` | - |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
@@ -162,7 +164,7 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`is_outside_bscs`** | boolean | - | - | - | `false` | - |
 | **`non_bscs_name`** | string | Size: 200 | - | - | `NULL` | - |
 | **`is_paid`** | boolean | - | - | - | `false` | - |
-| **`modal_paid`** | enum | - | - | - | `NULL` | - |
+| **`modal_paid`** | enum | `cash`, `gcash` | - | - | `NULL` | - |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
@@ -240,6 +242,34 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`description`** | string | Size: 300 | - | ✅ | `NULL` | - |
 | **`uploader`** | string | Size: 30 | - | - | `NULL` | - |
 | **`fileID`** | string | Size: 30 | - | - | `NULL` | - |
+| **`$createdAt`** | datetime | - | - | - | - | - |
+| **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## 12. Collection: `metadata` (Unused)
+
+**Collection ID:** `metadata`
+
+Auxiliary collection containing only system metadata, not currently referenced by the application code.
+
+| Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`$id`** | string | - | - | ✅ | - | - |
+| **`$createdAt`** | datetime | - | - | - | - | - |
+| **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## 13. Collection: `event_non_org` (Unused)
+
+**Collection ID:** `event_non_org`
+
+Auxiliary collection not active or referenced by the application code.
+
+| Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`$id`** | string | - | - | ✅ | - | - |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 

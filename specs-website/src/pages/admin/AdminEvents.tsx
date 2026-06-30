@@ -357,11 +357,14 @@ const AdminEvents: React.FC = () => {
                               #{tag}
                             </span>
                           ))}
-                          {event.related_links?.map((link: string, idx: number) => (
-                            <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#0d6b66] hover:underline">
-                              Link <ExternalLink className="h-2.5 w-2.5" />
-                            </a>
-                          ))}
+                          {event.related_links?.map((link: string, idx: number) => {
+                            const label = event.meaning && event.meaning[idx] ? event.meaning[idx] : 'Link';
+                            return (
+                              <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#0d6b66] hover:underline">
+                                {label} <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

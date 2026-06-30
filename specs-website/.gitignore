@@ -32,3 +32,6 @@ Desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# Folders
+/scripts

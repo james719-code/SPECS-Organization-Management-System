@@ -696,17 +696,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           </div>
  
                           <div className="flex items-center gap-3">
-                            {event.related_links && event.related_links.map((link: string, idx: number) => (
-                              <a 
-                                key={idx} 
-                                href={link} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] dark:text-teal-400 hover:underline"
-                              >
-                                Details <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ))}
+                            {event.related_links && event.related_links.map((link: string, idx: number) => {
+                              const label = event.meaning && event.meaning[idx] ? event.meaning[idx] : 'Details';
+                              return (
+                                <a 
+                                  key={idx} 
+                                  href={link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] dark:text-teal-400 hover:underline"
+                                >
+                                  {label} <ExternalLink className="h-3 w-3" />
+                                </a>
+                              );
+                            })}
  
                             {isUpcoming ? (
                               <Link 
@@ -843,7 +846,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                             isAward ? 'text-teal-400' : 'text-[#0d6b66] dark:text-teal-400'
                           }`}
                         >
-                          Official Link <ExternalLink className="h-3 w-3" />
+                          {story.meaning && story.meaning[0] ? story.meaning[0] : 'Official Link'} <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
                     </div>

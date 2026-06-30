@@ -140,18 +140,21 @@ const StoryPage: React.FC = () => {
           <div className="mt-12 pt-8 border-t border-slate-100 dark:border-slate-800">
             <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Related Links</h3>
             <div className="flex flex-col gap-3">
-              {story.related_links.map((link: string, idx: number) => (
-                <a
-                  key={idx}
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-800 break-all w-fit"
-                >
-                  <span>{link}</span>
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                </a>
-              ))}
+              {story.related_links.map((link: string, idx: number) => {
+                const label = story.meaning && story.meaning[idx] ? story.meaning[idx] : link;
+                return (
+                  <a
+                    key={idx}
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-[#0d6b66] dark:text-teal-400 hover:underline bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-150 dark:border-slate-800 break-all w-fit"
+                  >
+                    <span>{label}</span>
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}
