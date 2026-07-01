@@ -70,6 +70,18 @@ if (DEV_BYPASS) {
                         status: 'completed',
                         responseBody: JSON.stringify({ success: true })
                     };
+                } else if (action === 'send_email') {
+                    console.log('%c[MOCK EMAIL SENT]', 'color: #0d6b66; font-weight: bold; font-size: 13px;', {
+                        to: payload.to,
+                        subject: payload.subject,
+                        html: payload.html,
+                        bodyPreview: payload.body ? (payload.body.length > 300 ? payload.body.substring(0, 300) + '...' : payload.body) : ''
+                    });
+                    return {
+                        $id: `execution-${Date.now()}`,
+                        status: 'completed',
+                        responseBody: JSON.stringify({ success: true, message: 'Mock email logged successfully' })
+                    };
                 }
             } catch (e) {
                 console.error('[Mock Functions] Failed to simulate execution:', e);

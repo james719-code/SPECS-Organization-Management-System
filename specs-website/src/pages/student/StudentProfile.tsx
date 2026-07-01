@@ -353,8 +353,8 @@ const StudentProfile: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={editForm.name}
-                  onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] outline-none"
                 />
               </div>
@@ -363,8 +363,8 @@ const StudentProfile: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Year Level</label>
                   <select
-                    value={editForm.yearLevel}
-                    onChange={e => setEditForm(prev => ({ ...prev, yearLevel: e.target.value }))}
+                    value={editYear}
+                    onChange={e => setEditYear(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] bg-white outline-none"
                   >
                     <option value="1">1st Year</option>
@@ -379,8 +379,8 @@ const StudentProfile: React.FC = () => {
                   <input
                     type="text"
                     required
-                    value={editForm.section}
-                    onChange={e => setEditForm(prev => ({ ...prev, section: e.target.value }))}
+                    value={editSection}
+                    onChange={e => setEditSection(e.target.value)}
                     placeholder="e.g. BSCS-3A"
                     className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] outline-none"
                   />
@@ -391,8 +391,8 @@ const StudentProfile: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Address</label>
                 <textarea
                   required
-                  value={editForm.address}
-                  onChange={e => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                  value={editAddress}
+                  onChange={e => setEditAddress(e.target.value)}
                   rows={3}
                   className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] outline-none resize-none"
                 />

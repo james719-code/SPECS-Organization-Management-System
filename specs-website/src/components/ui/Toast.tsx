@@ -46,13 +46,6 @@ const toastIcons: Record<ToastType, React.ReactNode> = {
   ),
 };
 
-const toastBorders: Record<ToastType, string> = {
-  success: 'border-l-emerald-500',
-  error: 'border-l-red-500',
-  warning: 'border-l-amber-500',
-  info: 'border-l-blue-500',
-};
-
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -63,7 +56,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
   return (
     <div
-      className={`flex items-start gap-3 rounded-lg border border-l-4 ${toastBorders[toast.type]} bg-white px-4 py-3 shadow-lg transition-all duration-300 animate-in slide-in-from-right`}
+      className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-lg transition-all duration-300 animate-in slide-in-from-right"
       role="alert"
     >
       <div className="flex-shrink-0 mt-0.5">{toastIcons[toast.type]}</div>

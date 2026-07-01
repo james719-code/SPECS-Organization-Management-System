@@ -22,6 +22,7 @@ export const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES a
 export const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS as string;
 
 export const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID as string;
+export const EMAIL_FUNCTION_ID = import.meta.env.VITE_EMAIL_FUNCTION_ID as string;
 
 export const TEAM_ID_STUDENTS = import.meta.env.VITE_TEAM_ID_STUDENTS as string;
 export const TEAM_ID_OFFICERS = import.meta.env.VITE_TEAM_ID_OFFICERS as string;

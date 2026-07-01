@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, Loader2, Check } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { formatDateTime, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -7,6 +7,9 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, AttendanceDoc, AccountDoc } from '../../types/database';
+import { functions } from '../../shared/appwrite';
+import { EMAIL_FUNCTION_ID } from '../../shared/constants';
+import { getAttendanceHtml } from '../../shared/emailTemplates';
 
 const AdminAttendance: React.FC = () => {
   const [events, setEvents] = useState<EventDoc[]>([]);
@@ -19,9 +22,10 @@ const AdminAttendance: React.FC = () => {
 
   // Student search autocomplete states
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
-  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string }[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; email?: string } | null>(null);
+  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string; email?: string }[]>([]);
   const [attendanceLabel, setAttendanceLabel] = useState('Morning Check-in');
+  const [notifyViaEmail, setNotifyViaEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Search filter on records
@@ -101,7 +105,8 @@ const AdminAttendance: React.FC = () => {
         const profile = acc.students as any;
         return {
           id: profile?.$id || acc.$id,
-          name: profile?.name || acc.username || 'Unknown Student'
+          name: profile?.name || acc.username || 'Unknown Student',
+          email: profile?.email || ''
         };
       })
       .slice(0, 5);
@@ -109,8 +114,8 @@ const AdminAttendance: React.FC = () => {
     setAutocompleteResults(matches);
   };
 
-  const handleSelectAutocomplete = (id: string, name: string) => {
-    setSelectedStudent({ id, name });
+  const handleSelectAutocomplete = (id: string, name: string, email?: string) => {
+    setSelectedStudent({ id, name, email });
     setStudentSearchTerm(name);
     setAutocompleteResults([]);
   };
@@ -150,6 +155,54 @@ const AdminAttendance: React.FC = () => {
       await api.attendance.create(selectedEventId, selectedStudent.id, 'admin', attendanceLabel);
       addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
       
+      // Dispatch email notification if toggled and email is present
+      if (notifyViaEmail && selectedStudent.email) {
+        try {
+          const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+          const dateStr = selectedEvent?.date_to_held 
+            ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })
+            : new Date().toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              });
+
+          const timeStr = new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          const htmlBody = getAttendanceHtml(
+            selectedStudent.name,
+            selectedEvent?.event_name || 'Organization Event',
+            dateStr,
+            'Present',
+            timeStr,
+            window.location.origin
+          );
+
+          await functions.createExecution(
+            EMAIL_FUNCTION_ID,
+            JSON.stringify({
+              action: 'send_email',
+              payload: {
+                to: selectedStudent.email,
+                subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                body: htmlBody,
+                html: true
+              }
+            })
+          );
+          addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${selectedStudent.email}.` });
+        } catch (emailErr: any) {
+          console.error('[AdminAttendance] Failed to send email notification:', emailErr);
+        }
+      }
+
       // Reset form
       setStudentSearchTerm('');
       setSelectedStudent(null);
@@ -209,20 +262,59 @@ const AdminAttendance: React.FC = () => {
       </div>
 
       {/* Select Event */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-2 max-w-md">
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Event</label>
-        <select
-          value={selectedEventId}
-          onChange={e => setSelectedEventId(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-        >
-          <option value="">-- Choose an event --</option>
-          {events.map(event => (
-            <option key={event.$id} value={event.$id}>
-              {event.event_name} ({formatDate(event.date_to_held || '')})
-            </option>
-          ))}
-        </select>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Event</label>
+          <span className="text-xs text-slate-400 font-medium">{events.length} events available</span>
+        </div>
+        {events.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">No events found. Please add events first.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2.5 max-h-60 overflow-y-auto pr-1">
+            {events.map(event => {
+              const isSelected = selectedEventId === event.$id;
+              return (
+                <button
+                  key={event.$id}
+                  type="button"
+                  onClick={() => setSelectedEventId(event.$id)}
+                  className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-left transition-all duration-200 active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm shadow-[#0d6b66]/10'
+                      : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-white text-[#0d6b66]'
+                        : 'bg-white border border-slate-300 text-transparent group-hover:border-slate-400'
+                    }`}
+                  >
+                    {isSelected ? (
+                      <Check className="h-3 w-3 stroke-[3]" />
+                    ) : (
+                      <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-xs font-semibold truncate max-w-[180px] sm:max-w-[240px] leading-tight transition-colors ${
+                      isSelected ? 'text-white' : 'text-slate-700 group-hover:text-slate-900'
+                    }`}>
+                      {event.event_name}
+                    </span>
+                    <span className={`text-[9px] mt-0.5 transition-colors ${
+                      isSelected ? 'text-white/80' : 'text-slate-400'
+                    }`}>
+                      {formatDate(event.date_to_held || '')}
+                      {event.location && ` • ${event.location}`}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {selectedEventId ? (
@@ -272,7 +364,7 @@ const AdminAttendance: React.FC = () => {
                         <button
                           key={match.id}
                           type="button"
-                          onClick={() => handleSelectAutocomplete(match.id, match.name)}
+                          onClick={() => handleSelectAutocomplete(match.id, match.name, match.email)}
                           className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0"
                         >
                           {match.name}
@@ -292,6 +384,19 @@ const AdminAttendance: React.FC = () => {
                     onChange={e => setAttendanceLabel(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
                   />
+                </div>
+
+                <div className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    id="notifyViaEmailCheck"
+                    checked={notifyViaEmail}
+                    onChange={e => setNotifyViaEmail(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                  />
+                  <label htmlFor="notifyViaEmailCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                    Notify student via email
+                  </label>
                 </div>
 
                 <button

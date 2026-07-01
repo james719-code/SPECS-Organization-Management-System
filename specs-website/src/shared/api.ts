@@ -247,7 +247,7 @@ export const api = {
                 throw createApiError(error, `Failed to delete payment ${paymentId}`);
             }
         },
-        async markPaid(payment: PaymentDoc, recorderId: string, studentName: string): Promise<PaymentDoc> {
+        async markPaid(payment: PaymentDoc, recorderId: string, studentName: string, modalPaid?: 'cash' | 'gcash' | null, officerId?: string | null): Promise<PaymentDoc> {
             try {
                 await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
                     name: `${payment.item_name} (Paid by ${studentName})`,
@@ -261,7 +261,9 @@ export const api = {
                 });
                 const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { 
                     is_paid: true, 
-                    date_paid: new Date().toISOString() 
+                    date_paid: new Date().toISOString(),
+                    modal_paid: modalPaid || null,
+                    officers: officerId || null
                 });
                 dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 return result;

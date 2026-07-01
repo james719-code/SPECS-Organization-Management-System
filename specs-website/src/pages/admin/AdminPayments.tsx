@@ -9,7 +9,10 @@ import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, PaymentDoc, AccountDoc } from '../../types/database';
-import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail } from 'lucide-react';
+import { functions } from '../../shared/appwrite';
+import { EMAIL_FUNCTION_ID } from '../../shared/constants';
+import { getReceiptHtml, getPaymentReminderHtml } from '../../shared/emailTemplates';
 
 interface AdminPaymentsProps {
   isCreateView?: boolean;
@@ -61,6 +64,9 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
   const [paidConfirm, setPaidConfirm] = useState<{ open: boolean; payment: PaymentDoc | null }>({ open: false, payment: null });
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; payment: PaymentDoc | null }>({ open: false, payment: null });
   const [actionLoading, setActionLoading] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<AccountDoc | null>(null);
+  const [modalPaid, setModalPaid] = useState<'cash' | 'gcash'>('cash');
 
   const { addToast } = useToast();
 
@@ -68,6 +74,16 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+
+      let profileDoc: AccountDoc | null = null;
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        if (currentUser) {
+          profileDoc = await cachedApi.users.getAccount(currentUser.$id);
+        }
+      } catch (err) {
+        console.warn('Failed to load current user profile:', err);
+      }
 
       const [studentsRes, officersRes, paymentsRes, eventsRes] = await Promise.all([
         cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
@@ -80,6 +96,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
       setStudents(combined);
       setPayments(paymentsRes.documents);
       setEvents(eventsRes.documents);
+      setCurrentUserProfile(profileDoc);
 
       if (selectedStudent) {
         // Refresh current student doc
@@ -228,8 +245,55 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
     try {
       const studentProfile = selectedStudent?.students as any;
       const sName = studentProfile?.name || selectedStudent?.username || 'Student';
-      await api.payments.markPaid(payment, 'admin', sName);
-      addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid.` });
+
+      const officerId = currentUserProfile && currentUserProfile.type === 'officer'
+        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+        : null;
+
+      const recorderId = currentUserProfile
+        ? (currentUserProfile.$id.substring(0, 30))
+        : 'admin';
+
+      await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId);
+      addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
+      
+      // Send Email Receipt if student email exists
+      const sEmail = studentProfile?.email;
+      if (sEmail) {
+        try {
+          const datePaidStr = new Date().toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          const htmlBody = getReceiptHtml(
+            sName,
+            payment.item_name,
+            payment.price,
+            payment.quantity,
+            datePaidStr,
+            payment.$id
+          );
+          await functions.createExecution(
+            EMAIL_FUNCTION_ID,
+            JSON.stringify({
+              action: 'send_email',
+              payload: {
+                to: sEmail,
+                subject: `Payment Receipt: ${payment.item_name}`,
+                body: htmlBody,
+                html: true
+              }
+            })
+          );
+          addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${sEmail}.` });
+        } catch (emailErr: any) {
+          console.error('[AdminPayments] Failed to send email receipt:', emailErr);
+        }
+      }
+
       setPaidConfirm({ open: false, payment: null });
       loadData(true);
     } catch (err: any) {
@@ -253,6 +317,73 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete record.' });
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Send Outstanding Dues Notification
+  const handleNotifyDues = async () => {
+    if (!selectedStudent) return;
+    const studentProfile = selectedStudent.students as any;
+    const sEmail = studentProfile?.email;
+    const sName = studentProfile?.name || selectedStudent.username || 'Student';
+
+    if (!sEmail) {
+      addToast({ type: 'warning', title: 'No Email Address', message: 'This student does not have an email address associated with their profile.' });
+      return;
+    }
+
+    const pendingDues = currentStudentPayments.filter(p => !p.is_paid);
+    if (pendingDues.length === 0) {
+      addToast({ type: 'warning', title: 'No Pending Dues', message: 'There are no pending dues to notify this student about.' });
+      return;
+    }
+
+    setNotifying(true);
+    try {
+      const formattedDues = pendingDues.map(p => {
+        const linkedEvent = p.is_event && p.events
+          ? (events.find(e => e.$id === p.events || e.$id === (p.events as any).$id)?.event_name || 'Linked Event')
+          : p.activity;
+        return {
+          itemName: p.item_name,
+          price: p.price,
+          quantity: p.quantity,
+          activity: linkedEvent || 'General Collection'
+        };
+      });
+
+      const htmlBody = getPaymentReminderHtml(sName, formattedDues, window.location.origin);
+
+      const response = await functions.createExecution(
+        EMAIL_FUNCTION_ID,
+        JSON.stringify({
+          action: 'send_email',
+          payload: {
+            to: sEmail,
+            subject: 'Action Required: Outstanding Dues Notice',
+            body: htmlBody,
+            html: true
+          }
+        })
+      );
+
+      let result;
+      try {
+        result = JSON.parse(response.responseBody);
+      } catch (e) {
+        result = { success: false, error: 'Failed to parse response body' };
+      }
+
+      if (response.status === 'failed' || !result.success) {
+        throw new Error(result.error || 'Execution failed');
+      }
+
+      addToast({ type: 'success', title: 'Dues Notified', message: `Email notifications successfully dispatched to ${sEmail}.` });
+    } catch (err: any) {
+      console.error('[AdminPayments] Failed to notify student dues:', err);
+      addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to dispatch email notice.' });
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -729,13 +860,26 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
               </div>
             </div>
 
-            <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-2 text-right">
-              <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wide">Total Outstanding Due</span>
-              <span className="text-xl font-bold text-red-700">
-                {formatCurrency(
-                  currentStudentPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0)
-                )}
-              </span>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-2 text-right">
+                <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wide">Total Outstanding Due</span>
+                <span className="text-xl font-bold text-red-700">
+                  {formatCurrency(
+                    currentStudentPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0)
+                  )}
+                </span>
+              </div>
+              {currentStudentPayments.filter(p => !p.is_paid).length > 0 && (
+                <button
+                  onClick={handleNotifyDues}
+                  disabled={notifying}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-bold text-xs px-3.5 py-2.5 shadow-sm disabled:opacity-50 transition-all duration-200"
+                  title="Notify student of outstanding payments via email"
+                >
+                  {notifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                  Notify Dues
+                </button>
+              )}
             </div>
           </div>
 
@@ -767,7 +911,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => setPaidConfirm({ open: true, payment: p })}
+                            onClick={() => {
+                              setModalPaid('cash');
+                              setPaidConfirm({ open: true, payment: p });
+                            }}
                             className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-2.5 py-1.5 shadow-xs transition-colors"
                           >
                             Mark Paid
@@ -950,17 +1097,138 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false }) =
         document.body
       )}
 
-      {/* Confirm Action Modals */}
-      <ConfirmModal
-        isOpen={paidConfirm.open}
-        onClose={() => setPaidConfirm({ open: false, payment: null })}
-        onConfirm={handleMarkPaid}
-        title="Mark Dues as Paid"
-        message={`Confirm collection of ${paidConfirm.payment ? formatCurrency(paidConfirm.payment.price * paidConfirm.payment.quantity) : ''} for "${paidConfirm.payment?.item_name}". This logs revenue and clears outstanding dues.`}
-        confirmLabel="Record Collection"
-        variant="info"
-        loading={actionLoading}
-      />
+      {/* Record Payment Collection Modal */}
+      {paidConfirm.open && paidConfirm.payment && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setPaidConfirm({ open: false, payment: null })}>
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 border border-slate-100" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Record Collection</h2>
+              <button onClick={() => setPaidConfirm({ open: false, payment: null })} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Payment Details Card */}
+              <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Item / Activity</span>
+                    <span className="font-bold text-slate-800 text-sm">{paidConfirm.payment.item_name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Amount</span>
+                    <span className="font-extrabold text-[#0d6b66] text-base">
+                      {formatCurrency(paidConfirm.payment.price * paidConfirm.payment.quantity)}
+                    </span>
+                  </div>
+                </div>
+                <hr className="border-slate-200/50 my-1" />
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Student:</span>
+                  <span className="font-semibold text-slate-700">
+                    {(selectedStudent?.students as any)?.name || selectedStudent?.username || 'Student'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Quantity:</span>
+                  <span className="font-semibold text-slate-700">{paidConfirm.payment.quantity} unit(s)</span>
+                </div>
+              </div>
+
+              {/* Payment Modality Selector */}
+              <div className="space-y-2.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Modality</label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Cash Option */}
+                  <div
+                    onClick={() => setModalPaid('cash')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      modalPaid === 'cash'
+                        ? 'border-emerald-600 bg-emerald-50/30 ring-1 ring-emerald-600/10'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center mb-2 transition-colors ${
+                      modalPaid === 'cash' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <span className={`text-sm font-bold ${modalPaid === 'cash' ? 'text-emerald-800' : 'text-slate-700'}`}>Cash</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Physical Tender</span>
+                  </div>
+
+                  {/* GCash Option */}
+                  <div
+                    onClick={() => setModalPaid('gcash')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      modalPaid === 'gcash'
+                        ? 'border-blue-600 bg-blue-50/30 ring-1 ring-blue-600/10'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center mb-2 transition-colors ${
+                      modalPaid === 'gcash' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <span className={`text-sm font-bold ${modalPaid === 'gcash' ? 'text-blue-800' : 'text-slate-700'}`}>GCash</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Mobile E-Wallet</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Authorization Banner */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-3">
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                  currentUserProfile?.type === 'officer' ? 'bg-teal-100 text-teal-800' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {currentUserProfile?.username?.substring(0, 2).toUpperCase() || 'AD'}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Authorized By</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {currentUserProfile?.type === 'officer' 
+                      ? `Officer: ${currentUserProfile.username}` 
+                      : `Admin: ${currentUserProfile?.username || 'System Admin'} (Officers: NULL)`
+                    }
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  onClick={() => setPaidConfirm({ open: false, payment: null })}
+                  disabled={actionLoading}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMarkPaid}
+                  disabled={actionLoading}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Recording...
+                    </>
+                  ) : (
+                    'Confirm & Record'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <ConfirmModal
         isOpen={deleteConfirm.open}
