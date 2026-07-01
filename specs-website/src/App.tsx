@@ -124,9 +124,10 @@ export default function App() {
               toggleTheme={toggleTheme}
               links={[
                 {
-                  groupName: 'Core',
+                  groupName: 'General',
                   items: [
-                    { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> }
+                    { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -134,7 +135,8 @@ export default function App() {
                   items: [
                     { to: '/dashboard/officer/students', label: 'Students', icon: <UserCheck className="h-4 w-4" /> },
                     { to: '/dashboard/officer/volunteers', label: 'Volunteers', icon: <Users className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/events', label: 'Events', icon: <Calendar className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/events', label: 'Events', icon: <Calendar className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/attendance', label: 'Attendance logs', icon: <CheckSquare className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -157,10 +159,13 @@ export default function App() {
         } 
       >
         <Route index element={<AdminOverview />} />
+        <Route path="profile" element={<StudentProfile />} />
+        <Route path="attendance" element={<AdminAttendance />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="finance/details/:name" element={<AdminFinance isDetailsView={true} />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="payments/create" element={<AdminPayments isCreateView={true} />} />
+        <Route path="payments/outside" element={<AdminPayments isOutsideView={true} />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="volunteers" element={<VolunteersManagement />} />
         <Route path="files" element={<AdminFiles />} />
@@ -230,6 +235,7 @@ export default function App() {
         <Route path="attendance" element={<AdminAttendance />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="payments/create" element={<AdminPayments isCreateView={true} />} />
+        <Route path="payments/outside" element={<AdminPayments isOutsideView={true} />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="finance/details/:name" element={<AdminFinance isDetailsView={true} />} />
         <Route path="files" element={<AdminFiles />} />

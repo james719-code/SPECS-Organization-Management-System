@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { RotateCw, Loader2, Check } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { RotateCw, Loader2, Check, Camera, Search } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { formatDateTime, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -10,6 +10,7 @@ import type { EventDoc, AttendanceDoc, AccountDoc } from '../../types/database';
 import { functions } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID } from '../../shared/constants';
 import { getAttendanceHtml } from '../../shared/emailTemplates';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const AdminAttendance: React.FC = () => {
   const [events, setEvents] = useState<EventDoc[]>([]);
@@ -19,6 +20,11 @@ const AdminAttendance: React.FC = () => {
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // QR Scan vs Manual states
+  const [attendanceMode, setAttendanceMode] = useState<'manual' | 'qr'>('manual');
+  const [scanCooldown, setScanCooldown] = useState<boolean>(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<AccountDoc | null>(null);
 
   // Student search autocomplete states
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
@@ -42,13 +48,26 @@ const AdminAttendance: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setInitialLoading(true);
 
-      const [eventsRes, studentsRes] = await Promise.all([
+      const [eventsRes, studentsRes, officersRes] = await Promise.all([
         cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000),
-        cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000)
+        cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
+        cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000)
       ]);
 
       setEvents(eventsRes.documents);
-      setStudents(studentsRes.documents);
+      
+      // Combine students and officers as eligible attendees
+      const combinedAttendees = [...studentsRes.documents, ...officersRes.documents];
+      setStudents(combinedAttendees);
+
+      // Load logged-in user profile
+      try {
+        const currentUser = await cachedApi.users.getCurrent();
+        const userProfile = await api.users.getAccount(currentUser.$id);
+        setCurrentUserProfile(userProfile);
+      } catch (profileErr: any) {
+        console.warn('Failed to load current user profile:', profileErr);
+      }
 
       if (isRefresh) {
         addToast({ type: 'success', title: 'Refreshed', message: 'Data fetched successfully.' });
@@ -151,8 +170,12 @@ const AdminAttendance: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Create record (officer id is null, admin session)
-      await api.attendance.create(selectedEventId, selectedStudent.id, 'admin', attendanceLabel);
+      // Determine recorder ID: if logged in as officer, pass officer ID. If admin, pass 'admin'
+      const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
+        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+        : 'admin';
+
+      await api.attendance.create(selectedEventId, selectedStudent.id, recorderId || 'admin', attendanceLabel);
       addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
       
       // Dispatch email notification if toggled and email is present
@@ -215,6 +238,164 @@ const AdminAttendance: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  const playBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800 Hz beep
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // low volume
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        audioCtx.close();
+      }, 150);
+    } catch (e) {
+      console.warn('AudioContext beep failed:', e);
+    }
+  };
+
+  const handleQrScanned = async (decodedText: string) => {
+    if (scanCooldown) return;
+    
+    if (!decodedText.startsWith('specs-member:')) {
+      addToast({ type: 'warning', title: 'Invalid QR Code', message: 'Scanned QR code is not a valid SPECS member code.' });
+      return;
+    }
+    
+    const scannedStudentId = decodedText.split(':')[1];
+    if (!scannedStudentId) return;
+
+    setScanCooldown(true);
+    setTimeout(() => setScanCooldown(false), 2500); // 2.5 second cooldown
+
+    // Prevent officer from scanning themselves
+    const currentStudentId = currentUserProfile?.students 
+      ? (typeof currentUserProfile.students === 'object' ? currentUserProfile.students?.$id : currentUserProfile.students)
+      : null;
+
+    if (currentStudentId && scannedStudentId === currentStudentId) {
+      addToast({ type: 'error', title: 'Invalid Scan', message: 'An officer cannot record their own attendance.' });
+      return;
+    }
+
+    // Find attendee name/email from the combined list
+    const attendee = students.find(acc => {
+      const profile = acc.students as any;
+      const profileId = profile?.$id || acc.students;
+      return profileId === scannedStudentId;
+    });
+
+    const attendeeName = attendee ? (attendee.students as any)?.name || attendee.username : 'Unknown Member';
+    const attendeeEmail = attendee ? (attendee.students as any)?.email : '';
+
+    try {
+      const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
+        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+        : 'admin';
+
+      await api.attendance.create(selectedEventId, scannedStudentId, recorderId || 'admin', attendanceLabel);
+      playBeep();
+      addToast({ type: 'success', title: 'Recorded via QR', message: `Attendance marked for ${attendeeName}.` });
+
+      if (notifyViaEmail && attendeeEmail) {
+        try {
+          const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+          const dateStr = selectedEvent?.date_to_held 
+            ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+          const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+          const htmlBody = getAttendanceHtml(
+            attendeeName,
+            selectedEvent?.event_name || 'Organization Event',
+            dateStr,
+            'Present',
+            timeStr,
+            window.location.origin
+          );
+
+          await functions.createExecution(
+            EMAIL_FUNCTION_ID,
+            JSON.stringify({
+              action: 'send_email',
+              payload: {
+                to: attendeeEmail,
+                subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                body: htmlBody,
+                html: true
+              }
+            })
+          );
+        } catch (emailErr) {
+          console.error('[AdminAttendance QR] Failed to send email:', emailErr);
+        }
+      }
+
+      loadAttendanceRecords(selectedEventId);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
+    }
+  };
+
+  const scanHandlerRef = useRef(handleQrScanned);
+  useEffect(() => {
+    scanHandlerRef.current = handleQrScanned;
+  }, [handleQrScanned, scanCooldown]);
+
+  useEffect(() => {
+    let html5QrCode: Html5Qrcode | null = null;
+    
+    if (attendanceMode === 'qr' && selectedEventId) {
+      const elementId = "qr-reader-el";
+      
+      const startScanner = async () => {
+        try {
+          html5QrCode = new Html5Qrcode(elementId);
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: (width, height) => {
+                const size = Math.min(width, height) * 0.7;
+                return { width: size, height: size };
+              }
+            },
+            (decodedText) => {
+              scanHandlerRef.current(decodedText);
+            },
+            () => {
+              // Ignore frame scan errors
+            }
+          );
+        } catch (err) {
+          console.error("Failed to start QR scanner:", err);
+          addToast({ type: 'error', title: 'Camera Error', message: 'Could not access camera for QR scanning.' });
+          setAttendanceMode('manual');
+        }
+      };
+
+      const timer = setTimeout(startScanner, 250);
+      return () => {
+        clearTimeout(timer);
+        if (html5QrCode) {
+          if (html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+              html5QrCode?.clear();
+            }).catch(e => console.error("Error stopping scanner:", e));
+          }
+        }
+      };
+    }
+  }, [attendanceMode, selectedEventId]);
 
   const handleDeleteRecord = async () => {
     if (!deleteConfirm.id) return;
@@ -346,73 +527,147 @@ const AdminAttendance: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Record Attendance Box */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Record Attendance</h3>
-              <form onSubmit={handleAddAttendance} className="space-y-4">
-                <div className="relative">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Student</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Search student name..."
-                    value={studentSearchTerm}
-                    onChange={e => handleStudentSearchChange(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-                  />
-                  {autocompleteResults.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white shadow-xl max-h-48 overflow-y-auto z-20">
-                      {autocompleteResults.map(match => (
-                        <button
-                          key={match.id}
-                          type="button"
-                          onClick={() => handleSelectAutocomplete(match.id, match.name, match.email)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0"
-                        >
-                          {match.name}
-                        </button>
-                      ))}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Record Attendance</h3>
+                <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceMode('manual')}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
+                      attendanceMode === 'manual'
+                        ? 'bg-white text-[#0d6b66] shadow-xs'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Search className="h-3 w-3" />
+                    Manual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceMode('qr')}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
+                      attendanceMode === 'qr'
+                        ? 'bg-white text-[#0d6b66] shadow-xs'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Camera className="h-3 w-3" />
+                    Scan QR
+                  </button>
+                </div>
+              </div>
+
+              {attendanceMode === 'manual' ? (
+                <form onSubmit={handleAddAttendance} className="space-y-4">
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendee</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Search member name..."
+                      value={studentSearchTerm}
+                      onChange={e => handleStudentSearchChange(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    />
+                    {autocompleteResults.length > 0 && (
+                      <div className="absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white shadow-xl max-h-48 overflow-y-auto z-20">
+                        {autocompleteResults.map(match => (
+                          <button
+                            key={match.id}
+                            type="button"
+                            onClick={() => handleSelectAutocomplete(match.id, match.name, match.email)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0"
+                          >
+                            {match.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendance Session Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Morning Check-in"
+                      value={attendanceLabel}
+                      onChange={e => setAttendanceLabel(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      id="notifyViaEmailCheck"
+                      checked={notifyViaEmail}
+                      onChange={e => setNotifyViaEmail(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                    />
+                    <label htmlFor="notifyViaEmailCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                      Notify attendee via email
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] py-2.5 font-semibold text-sm text-white shadow-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    {submitting && (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                    Add Record
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendance Session Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Morning Check-in"
+                      value={attendanceLabel}
+                      onChange={e => setAttendanceLabel(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      id="notifyViaEmailCheckQr"
+                      checked={notifyViaEmail}
+                      onChange={e => setNotifyViaEmail(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
+                    />
+                    <label htmlFor="notifyViaEmailCheckQr" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                      Notify attendee via email
+                    </label>
+                  </div>
+
+                  {/* QR webcam reader container */}
+                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center justify-center">
+                    <div id="qr-reader-el" className="absolute inset-0 w-full h-full object-cover" />
+                    
+                    {/* Floating targeting scan overlay */}
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10 bg-transparent">
+                      <div className="w-44 h-44 border-4 border-dashed border-[#0d6b66] rounded-xl relative shadow-md">
+                        {/* Red scan line */}
+                        <div className="absolute left-0 right-0 h-0.5 bg-red-500 opacity-60 animate-pulse top-1/2" />
+                      </div>
+                      <p className="text-[10px] text-white/90 font-bold uppercase mt-4 tracking-wider bg-slate-900/60 px-3 py-1 rounded-full backdrop-blur-xs shadow-xs">
+                        Align QR code inside box
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendance Session Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Morning Check-in"
-                    value={attendanceLabel}
-                    onChange={e => setAttendanceLabel(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    id="notifyViaEmailCheck"
-                    checked={notifyViaEmail}
-                    onChange={e => setNotifyViaEmail(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
-                  />
-                  <label htmlFor="notifyViaEmailCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                    Notify student via email
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] py-2.5 font-semibold text-sm text-white shadow-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  {submitting && (
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  )}
-                  Add Record
-                </button>
-              </form>
+              )}
             </div>
 
             {/* Attendance Logs sheet */}

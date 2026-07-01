@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 const StudentProfile: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
+  const [accountType, setAccountType] = useState<string>('student');
   const [loading, setLoading] = useState(true);
 
   // Edit profile states
@@ -40,6 +41,7 @@ const StudentProfile: React.FC = () => {
 
       // Fetch account link document
       const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+      setAccountType(accountDoc.type || 'student');
       if (accountDoc.students) {
         let studentDoc = null;
         if (typeof accountDoc.students === 'object' && accountDoc.students.$id && accountDoc.students.name) {
@@ -184,7 +186,7 @@ const StudentProfile: React.FC = () => {
 
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Active Student
+              {accountType === 'officer' ? 'Active Officer' : accountType === 'admin' ? 'Active Admin' : 'Active Student'}
             </span>
 
             <div className="flex gap-2 justify-center pt-3">
@@ -204,6 +206,20 @@ const StudentProfile: React.FC = () => {
                 Delete Account
               </button>
             </div>
+
+            {studentData?.$id && (
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">My Attendance QR</span>
+                <div className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white shadow-xs">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`specs-member:${studentData.$id}`)}`}
+                    alt="Attendance QR Code"
+                    className="w-32 h-32"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">Present this QR to check-in</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -213,7 +229,7 @@ const StudentProfile: React.FC = () => {
             <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 014 0" />
             </svg>
-            Student Information
+            {accountType === 'officer' ? 'Officer & Student Information' : 'Student Information'}
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -241,97 +257,99 @@ const StudentProfile: React.FC = () => {
         </div>
 
         {/* Volunteer program info card */}
-        <div className="col-span-1 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-            Volunteer Program
-          </h3>
+        {accountType === 'student' && (
+          <div className="col-span-1 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              Volunteer Program
+            </h3>
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-slate-800">Join the SPECS Volunteer Team</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Contribute to the SPECS community by creating/sharing stories and experiences with fellow student portals.
-              </p>
-              
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                <span className="inline-flex items-center rounded-full bg-[#0d6b66]/10 px-2 py-0.5 text-[9px] font-bold text-[#0d6b66]">
-                  Create Posts
-                </span>
-                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
-                  Share Stories
-                </span>
-                <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-bold text-purple-700">
-                  Build Portfolio
-                </span>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-800">Join the SPECS Volunteer Team</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Contribute to the SPECS community by creating/sharing stories and experiences with fellow student portals.
+                </p>
+                
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  <span className="inline-flex items-center rounded-full bg-[#0d6b66]/10 px-2 py-0.5 text-[9px] font-bold text-[#0d6b66]">
+                    Create Posts
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                    Share Stories
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-bold text-purple-700">
+                    Build Portfolio
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0">
+                {/* Volunteer status badges & actions */}
+                {studentData?.is_volunteer && studentData?.volunteer_request_status === 'backout_pending' ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Leave Request Pending
+                    </span>
+                    <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
+                      Awaiting Review
+                    </button>
+                  </>
+                ) : studentData?.is_volunteer ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      Active Volunteer
+                    </span>
+                    <button
+                      onClick={handleRequestLeaveVolunteer}
+                      disabled={submittingVolunteerAction}
+                      className="w-full md:w-auto rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-4 text-xs font-semibold transition-colors"
+                    >
+                      Leave Volunteer Program
+                    </button>
+                  </>
+                ) : studentData?.volunteer_request_status === 'pending' ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Request Pending
+                    </span>
+                    <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
+                      Awaiting Review
+                    </button>
+                  </>
+                ) : studentData?.volunteer_request_status === 'rejected' ? (
+                  <>
+                    <span className="inline-flex items-center rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                      Request Declined
+                    </span>
+                    <button
+                      onClick={handleRequestVolunteer}
+                      disabled={submittingVolunteerAction}
+                      className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
+                    >
+                      Request to Join Again
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="badge bg-slate-50 border text-slate-500 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                      Not a Volunteer
+                    </span>
+                    <button
+                      onClick={handleRequestVolunteer}
+                      disabled={submittingVolunteerAction}
+                      className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
+                    >
+                      Request to Join
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-
-            <div className="flex flex-col items-end gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0">
-              {/* Volunteer status badges & actions */}
-              {studentData?.is_volunteer && studentData?.volunteer_request_status === 'backout_pending' ? (
-                <>
-                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Leave Request Pending
-                  </span>
-                  <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                    Awaiting Review
-                  </button>
-                </>
-              ) : studentData?.is_volunteer ? (
-                <>
-                  <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    Active Volunteer
-                  </span>
-                  <button
-                    onClick={handleRequestLeaveVolunteer}
-                    disabled={submittingVolunteerAction}
-                    className="w-full md:w-auto rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-4 text-xs font-semibold transition-colors"
-                  >
-                    Leave Volunteer Program
-                  </button>
-                </>
-              ) : studentData?.volunteer_request_status === 'pending' ? (
-                <>
-                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Request Pending
-                  </span>
-                  <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                    Awaiting Review
-                  </button>
-                </>
-              ) : studentData?.volunteer_request_status === 'rejected' ? (
-                <>
-                  <span className="inline-flex items-center rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                    Request Declined
-                  </span>
-                  <button
-                    onClick={handleRequestVolunteer}
-                    disabled={submittingVolunteerAction}
-                    className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
-                  >
-                    Request to Join Again
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="badge bg-slate-50 border text-slate-500 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
-                    Not a Volunteer
-                  </span>
-                  <button
-                    onClick={handleRequestVolunteer}
-                    disabled={submittingVolunteerAction}
-                    className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
-                  >
-                    Request to Join
-                  </button>
-                </>
-              )}
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Edit Profile Modal */}
