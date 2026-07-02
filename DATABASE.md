@@ -1,6 +1,6 @@
-# 🗄️ Database Schema Documentation (v2.3)
+# 🗄️ Database Schema Documentation (v2.5)
 
-This document describes all 13 database collections (11 active, 2 unused) and 6 storage buckets in the database used by the SPECS Organization Management System.
+This document describes all 14 database collections (11 active, 3 unused) and 6 storage buckets in the database used by the SPECS Organization Management System.
 
 > **Referenced by:** [README.md](README.md) — see the Database Schema section for a relationship overview.
 > **Last audited:** 2026-07-02 via `scripts/audit-collections.mjs` against live Appwrite database `6858fee6003b57a2b4b7`.
@@ -260,8 +260,8 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`adminApproval`** | boolean | - | - | - | `false` | Set `true` when an admin approves the story |
 | **`title`** | string | Size: 200 | - | ✅ | `NULL` | - |
 | **`post_details`** | string | Size: 1000000 | - | - | `NULL` | - |
-| **`related_links[]`** | url | - | - | - | `NULL` | Array |
-| **`meaning[]`** | string | Size: 5000 | - | - | `NULL` | Array |
+| **`related_links[]`** | url | - | - | - | `NULL` | Array of related external URLs |
+| **`meaning[]`** | string | Size: 5000 | - | - | `NULL` | Array of user-facing display names / labels corresponding to `related_links[]` |
 | **`students`** | relationship | - | - | - | `NULL` | Many to one → `students` [onDelete: setNull] |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
@@ -272,7 +272,7 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | --- | --- | --- | --- |
 | `title_index` | key | `title` | ASC |
 
-> **Note:** The `meaning[]` array provides labels/tags for the corresponding `related_links[]` entries.
+> **Note:** The `meaning[]` array provides user-facing display names / labels for the corresponding `related_links[]` entries (mapped by index) so that users see friendly labels instead of raw URLs.
 > **Approval workflow:** Officer sets `officerApproval=true` → story moves to admin queue. Admin sets `adminApproval=true` and `isAccepted=true` → story is published. Managed via Cloud Function (`approve_story` action).
 
 ---
@@ -313,6 +313,7 @@ Auxiliary collection for system-wide flags and configuration. Not currently wire
 | **`ismaintenance`** | boolean | - | - | - | `false` | Global maintenance mode flag |
 | **`ishiddenofficer`** | boolean | - | - | - | `false` | Flag to hide the officers section site-wide |
 | **`schoolYear`** | text | - | - | - | `NULL` | Current school year label (e.g. `2025-2026`) |
+| **`rating`** | double | Min: 0 | - | - | `NULL` | Aggregate rating value (purpose TBD — collection not yet wired into .env) |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
@@ -327,6 +328,26 @@ Auxiliary collection not active or referenced by the application code. No `VITE_
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
 | **`$id`** | string | - | - | ✅ | - | - |
+| **`$createdAt`** | datetime | - | - | - | - | - |
+| **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## 14. Collection: `tasks` (Unused)
+
+**Collection ID:** `tasks`
+
+Auxiliary collection not active or referenced by the application code. No `VITE_COLLECTION_ID_*` entry in `.env`. Likely a leftover from an earlier experiment.
+
+| Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`$id`** | string | - | - | ✅ | - | - |
+| **`name`** | text | - | - | - | `NULL` | Name/title of the task |
+| **`description`** | text | - | - | - | `NULL` | Task description |
+| **`connected_files[]`** | varchar | Size: 255 | - | - | `NULL` | Array of file IDs attached to the task |
+| **`is_done`** | boolean | - | - | - | `false` | Completion flag |
+| **`name_of_done`** | text | - | - | - | `NULL` | Name of the person who marked the task done |
+| **`time_done`** | datetime | - | - | - | `NULL` | Timestamp when the task was marked done |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 

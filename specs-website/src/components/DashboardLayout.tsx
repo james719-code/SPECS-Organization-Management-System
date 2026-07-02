@@ -29,6 +29,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDateTime = currentTime.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+
   const handleLogout = async () => {
     try {
       await account.deleteSession('current');
@@ -260,8 +280,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
             >
               {theme === 'dark' ? <Sun className="h-4.5 w-4.5 text-amber-400" /> : <Moon className="h-4.5 w-4.5 text-[#0d6b66]" />}
             </button>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0d6b66] to-[#149a93] text-white flex items-center justify-center text-xs font-semibold uppercase shadow-sm">
-              U
+            
+            {/* Realtime Date & Time Clock */}
+            <div className="hidden sm:flex items-center rounded-xl bg-slate-100/50 dark:bg-slate-800/40 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition-colors shadow-xs">
+              <span>{formattedDateTime}</span>
+            </div>
+            <div className="flex sm:hidden items-center rounded-xl bg-slate-100/50 dark:bg-slate-800/40 px-2 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition-colors">
+              <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           </div>
         </header>

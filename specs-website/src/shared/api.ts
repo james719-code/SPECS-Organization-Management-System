@@ -11,6 +11,7 @@ import {
     COLLECTION_ID_STORIES,
     COLLECTION_ID_FILES,
     COLLECTION_ID_OFFICERS,
+    COLLECTION_ID_TASKS,
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';
@@ -26,7 +27,8 @@ import {
   ExpenseDoc, 
   StoryDoc, 
   FileDoc,
-  OfficerDoc
+  OfficerDoc,
+  TaskDoc
 } from '../types/database';
 
 export { ApiError, ErrorCodes };
@@ -44,7 +46,8 @@ export const CacheTags = {
     FILES: 'files',
     STORIES: 'stories',
     DASHBOARD: 'dashboard',
-    LANDING: 'landing'
+    LANDING: 'landing',
+    TASKS: 'tasks'
 } as const;
 
 export interface PaginatedResponse<T> {
@@ -132,11 +135,12 @@ export const api = {
                 const pageSize = clampPageSize(limit);
                 const queries = [Query.limit(pageSize), Query.offset(offset)];
                 if (orderDesc) queries.push(Query.orderDesc('date_to_held'));
-                if (!includeArchived) {
-                    queries.push(Query.notEqual('archived', true));
-                }
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, queries);
-                return createPaginatedResponse<EventDoc>(result, pageSize, offset);
+                const paginated = createPaginatedResponse<EventDoc>(result, pageSize, offset);
+                if (!includeArchived) {
+                    paginated.documents = paginated.documents.filter(doc => doc.archived !== true);
+                }
+                return paginated;
             } catch (error) {
                 throw createApiError(error, 'Failed to list events');
             }
@@ -152,10 +156,12 @@ export const api = {
             try {
                 const queries: any[] = [];
                 if (orderDesc) queries.push(Query.orderDesc(orderDesc));
+                const result = await listAllDocuments<EventDoc>(COLLECTION_ID_EVENTS, queries, { maxPages });
                 if (!includeArchived) {
-                    queries.push(Query.notEqual('archived', true));
+                    result.documents = result.documents.filter(doc => doc.archived !== true);
+                    result.total = result.documents.length;
                 }
-                return await listAllDocuments<EventDoc>(COLLECTION_ID_EVENTS, queries, { maxPages });
+                return result;
             } catch (error) {
                 throw createApiError(error, 'Failed to list all events');
             }
@@ -608,6 +614,47 @@ export const api = {
         }
     },
 
+    tasks: {
+        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, extraQueries = [] }: any = {}): Promise<PaginatedResponse<TaskDoc>> {
+            try {
+                const pageSize = clampPageSize(limit);
+                const queries = [...extraQueries, Query.limit(pageSize), Query.offset(offset)];
+                if (orderDesc) queries.push(Query.orderDesc('$createdAt'));
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_TASKS, queries);
+                return createPaginatedResponse<TaskDoc>(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list tasks');
+            }
+        },
+        async create(data: Partial<TaskDoc>): Promise<TaskDoc> {
+            try {
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_TASKS, ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.TASKS]);
+                return result as TaskDoc;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create task');
+            }
+        },
+        async update(taskId: string, data: Partial<TaskDoc>): Promise<TaskDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_TASKS, taskId, data);
+                dataCache.invalidateTags([CacheTags.TASKS]);
+                return result as TaskDoc;
+            } catch (error) {
+                throw createApiError(error, `Failed to update task ${taskId}`);
+            }
+        },
+        async delete(taskId: string): Promise<any> {
+            try {
+                const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_TASKS, taskId);
+                dataCache.invalidateTags([CacheTags.TASKS]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to delete task ${taskId}`);
+            }
+        }
+    },
+
     cache: {
         clearAll(): void {
             dataCache.clear();
@@ -818,6 +865,17 @@ export const cachedApi = {
                 ttl,
                 staleTtl: 5 * 60 * 1000,
                 tags: [CacheTags.DASHBOARD]
+            });
+        }
+    },
+
+    tasks: {
+        async list(options: any = {}, ttl = 2 * 60 * 1000): Promise<PaginatedResponse<TaskDoc>> {
+            const cacheKey = generateCacheKey('tasks_list', options);
+            return dataCache.getOrFetch(cacheKey, () => api.tasks.list(options), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.TASKS]
             });
         }
     }

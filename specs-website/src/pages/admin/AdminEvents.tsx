@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -26,8 +27,7 @@ const AdminEvents: React.FC = () => {
  
   // Optional parameters states
   const [eventCollab, setEventCollab] = useState('');
-  const [eventRelatedLinks, setEventRelatedLinks] = useState('');
-  const [eventMeaning, setEventMeaning] = useState('');
+  const [relatedLinks, setRelatedLinks] = useState<{ name: string; url: string }[]>([]);
   const [eventLocation, setEventLocation] = useState('');
   const [eventRatingLinks, setEventRatingLinks] = useState('');
 
@@ -98,6 +98,10 @@ const AdminEvents: React.FC = () => {
       const currentUser = await cachedApi.users.getCurrent();
 
       // 3. Create Event document
+      const validLinks = relatedLinks.filter(l => l.url.trim() !== '');
+      const relatedLinksUrls = validLinks.map(l => l.url.trim());
+      const relatedLinksNames = validLinks.map(l => l.name.trim() || 'Link');
+
       const newEvent = await api.events.create({
         event_name: eventName,
         description: eventDesc,
@@ -106,8 +110,8 @@ const AdminEvents: React.FC = () => {
         event_ended: false,
         added_by: currentUser?.$id || 'system',
         collab: eventCollab.split(',').map(s => s.trim()).filter(Boolean),
-        related_links: eventRelatedLinks.split(',').map(s => s.trim()).filter(Boolean),
-        meaning: eventMeaning.split(',').map(s => s.trim()).filter(Boolean),
+        related_links: relatedLinksUrls,
+        meaning: relatedLinksNames,
         location: eventLocation.trim() || null,
         rating_links: eventRatingLinks.trim() || null
       });
@@ -122,8 +126,7 @@ const AdminEvents: React.FC = () => {
       setEventImageFile(null);
       setImagePreviewUrl(null);
       setEventCollab('');
-      setEventRelatedLinks('');
-      setEventMeaning('');
+      setRelatedLinks([]);
       setEventLocation('');
       setEventRatingLinks('');
       
@@ -376,16 +379,11 @@ const AdminEvents: React.FC = () => {
                       <p className="text-sm text-slate-500 mt-2 line-clamp-2">{event.description || 'No description provided.'}</p>
                       
                       {/* Additional params view */}
-                      {(event.collab?.length > 0 || event.meaning?.length > 0 || event.related_links?.length > 0) && (
+                      {(event.collab?.length > 0 || event.related_links?.length > 0) && (
                         <div className="flex flex-wrap gap-2 pt-2 items-center">
                           {event.collab?.map((col: string, idx: number) => (
                             <span key={idx} className="bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full text-[9px] font-bold border border-teal-100">
                               {col}
-                            </span>
-                          ))}
-                          {event.meaning?.map((tag: string, idx: number) => (
-                            <span key={idx} className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[9px] font-medium border border-slate-200">
-                              #{tag}
                             </span>
                           ))}
                           {event.related_links?.map((link: string, idx: number) => {
@@ -417,7 +415,7 @@ const AdminEvents: React.FC = () => {
       </button>
 
       {/* Create Event Dialog Modal */}
-      {isCreateOpen && (
+      {isCreateOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setIsCreateOpen(false)}>
           <div
             className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95"
@@ -497,25 +495,61 @@ const AdminEvents: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide mb-1">Related Links (Comma-separated URLs)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. https://forms.gle/xyz, https://specs.org"
-                    value={eventRelatedLinks}
-                    onChange={e => setEventRelatedLinks(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-                  />
-                </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide">
+                      Related Links
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setRelatedLinks([...relatedLinks, { name: '', url: '' }])}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0d6b66] hover:text-[#0b5c58] transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Link
+                    </button>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide mb-1">Tags / Meanings (Comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. academic, workshop, coding"
-                    value={eventMeaning}
-                    onChange={e => setEventMeaning(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-                  />
+                  {relatedLinks.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">No related links added yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                      {relatedLinks.map((link, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Name (e.g. RSVP Form)"
+                            value={link.name}
+                            onChange={e => {
+                              const newLinks = [...relatedLinks];
+                              newLinks[idx].name = e.target.value;
+                              setRelatedLinks(newLinks);
+                            }}
+                            className="flex-1 min-w-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                          />
+                          <input
+                            type="url"
+                            placeholder="URL (e.g. https://...)"
+                            value={link.url}
+                            onChange={e => {
+                              const newLinks = [...relatedLinks];
+                              newLinks[idx].url = e.target.value;
+                              setRelatedLinks(newLinks);
+                            }}
+                            className="flex-[2] min-w-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRelatedLinks(relatedLinks.filter((_, i) => i !== idx));
+                            }}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 hover:border-red-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -561,7 +595,8 @@ const AdminEvents: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Confirm Modals */}

@@ -14,6 +14,7 @@ export const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE 
 
 export const COLLECTION_ID_STORIES = import.meta.env.VITE_COLLECTION_ID_STORIES as string;
 export const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES as string;
+export const COLLECTION_ID_TASKS = (import.meta.env.VITE_COLLECTION_ID_TASKS || 'tasks') as string;
 
 export const BUCKET_ID_RESUMES = import.meta.env.VITE_BUCKET_ID_RESUMES as string;
 export const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES as string;

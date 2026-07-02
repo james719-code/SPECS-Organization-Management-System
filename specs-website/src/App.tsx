@@ -42,6 +42,7 @@ import AdminStories from './pages/admin/AdminStories';
 import AdminReports from './pages/admin/AdminReports';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminOfficers from './pages/admin/AdminOfficers';
+import AdminTasks from './pages/admin/AdminTasks';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -251,7 +252,8 @@ export default function App() {
                   groupName: 'Communication',
                   items: [
                     { to: '/dashboard/officer/stories', label: 'Stories', icon: <Award className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/files', label: 'Files', icon: <FileText className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/files', label: 'Files', icon: <FileText className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/tasks', label: 'Tasks', icon: <CheckSquare className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -279,6 +281,7 @@ export default function App() {
         <Route path="files" element={<AdminFiles />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="stories" element={<AdminStories />} />
+        <Route path="tasks" element={<AdminTasks />} />
       </Route>
 
       {/* Role-Guarded Admin Routes */}
@@ -312,7 +315,8 @@ export default function App() {
                   items: [
                     { to: '/dashboard/admin/events', label: 'Events Manager', icon: <Calendar className="h-4 w-4" /> },
                     { to: '/dashboard/admin/attendance', label: 'Attendance logs', icon: <CheckSquare className="h-4 w-4" /> },
-                    { to: '/dashboard/admin/announcements', label: 'Announcements', icon: <Bell className="h-4 w-4" /> }
+                    { to: '/dashboard/admin/announcements', label: 'Announcements', icon: <Bell className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/tasks', label: 'Tasks Manager', icon: <CheckSquare className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -350,6 +354,7 @@ export default function App() {
         <Route path="files" element={<AdminFiles />} />
         <Route path="volunteers" element={<VolunteersManagement />} />
         <Route path="stories" element={<AdminStories />} />
+        <Route path="tasks" element={<AdminTasks />} />
         <Route path="announcements" element={<AdminAnnouncements />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />

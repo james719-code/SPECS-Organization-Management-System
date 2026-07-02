@@ -474,6 +474,32 @@ export const mockVolunteerRequests = [
     }
 ];
 
+// Collection: tasks (tasks)
+export const mockTasks = [
+    {
+        $id: 'task-1',
+        $createdAt: '2026-06-25T10:00:00.000Z',
+        $updatedAt: '2026-06-25T10:00:00.000Z',
+        name: 'Submit Q4 Finance Audit Report',
+        description: 'Complete and sign off the Q4 report and upload the spreadsheet to files directory.',
+        connected_files: ['file-3'],
+        is_done: false,
+        name_of_done: null,
+        time_done: null
+    },
+    {
+        $id: 'task-2',
+        $createdAt: '2026-06-28T09:00:00.000Z',
+        $updatedAt: '2026-07-01T15:30:00.000Z',
+        name: 'Prepare Tech Talk Event Materials',
+        description: 'Design the posters, print feedback form QR codes, and coordinate with speakers.',
+        connected_files: [],
+        is_done: true,
+        name_of_done: 'Maria Santos',
+        time_done: '2026-07-01T15:30:00.000Z'
+    }
+];
+
 // Backward compatibility: Export mockUsers that maps to mockAccounts with user-friendly data
 // The email field from the account is authoritative for login authentication
 export const mockUsers = mockAccounts.map(acc => {
@@ -549,7 +575,9 @@ export function getMockData(collectionId) {
         'files': mockFiles,
         '6859013f00315545756c': mockFiles,
         // Volunteer requests
-        'volunteer_requests': mockVolunteerRequests
+        'volunteer_requests': mockVolunteerRequests,
+        // Tasks
+        'tasks': mockTasks
     };
 
     // Try exact match first
@@ -570,6 +598,7 @@ export function getMockData(collectionId) {
     if (collectionIdLower.includes('stor')) return mockStories;
     if (collectionIdLower.includes('file')) return mockFiles;
     if (collectionIdLower.includes('volunteer')) return mockVolunteerRequests;
+    if (collectionIdLower.includes('task')) return mockTasks;
 
     console.warn('[Mock] No mock data found for collection:', collectionId);
     return [];

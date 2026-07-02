@@ -18,8 +18,10 @@ const AdminStories: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
+  const [userRole, setUserRole] = useState<'admin' | 'officer' | 'student' | null>(null);
+
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'published' | 'all'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'pending_officer' | 'pending_admin' | 'published' | 'all'>('pending_officer');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Viewing state
@@ -65,6 +67,18 @@ const AdminStories: React.FC = () => {
       });
       setStudentLookup(lookup);
 
+      // Fetch user profile and role to adjust filters automatically
+      const currentUser = await cachedApi.users.getCurrent();
+      if (currentUser) {
+        const profile = await cachedApi.users.getAccount(currentUser.$id);
+        setUserRole(profile.type);
+        if (profile.type === 'admin') {
+          setStatusFilter('pending_admin');
+        } else {
+          setStatusFilter('pending_officer');
+        }
+      }
+
       if (isRefresh) {
         addToast({ type: 'success', title: 'Refreshed', message: 'Stories log synchronized successfully.' });
       }
@@ -81,9 +95,10 @@ const AdminStories: React.FC = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const pending = stories.filter(s => !s.isAccepted).length;
+    const pendingOfficer = stories.filter(s => !s.officerApproval && !s.isAccepted).length;
+    const pendingAdmin = stories.filter(s => s.officerApproval && !s.isAccepted).length;
     const published = stories.filter(s => s.isAccepted).length;
-    return { pending, published, total: stories.length };
+    return { pendingOfficer, pendingAdmin, published, total: stories.length };
   }, [stories]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +183,8 @@ const AdminStories: React.FC = () => {
     setActionLoading(true);
     try {
       const currentUser = await cachedApi.users.getCurrent();
+      const story = stories.find(s => s.$id === publishConfirm.id);
+      if (!story) return;
 
       if (FUNCTION_ID) {
         await functions.createExecution(
@@ -180,16 +197,26 @@ const AdminStories: React.FC = () => {
           false
         );
       } else {
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, publishConfirm.id, {
-          isAccepted: true
-        });
+        const updates: any = {};
+        if (userRole === 'admin') {
+          updates.adminApproval = true;
+          updates.officerApproval = true; // Mark officer approved too if admin override
+          updates.isAccepted = true;
+        } else {
+          updates.officerApproval = true;
+        }
+        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, publishConfirm.id, updates);
       }
 
-      addToast({ type: 'success', title: 'Published', message: 'Story successfully published to highlights.' });
+      addToast({ 
+        type: 'success', 
+        title: userRole === 'admin' ? 'Published' : 'Officer Approved', 
+        message: userRole === 'admin' ? 'Story successfully published to highlights.' : 'Story approved and forwarded to admin queue.' 
+      });
       setPublishConfirm({ open: false, id: null });
       loadData(true);
     } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to publish story.' });
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update story status.' });
     } finally {
       setActionLoading(false);
     }
@@ -245,13 +272,14 @@ const AdminStories: React.FC = () => {
   // Filter Logic
   const filteredStories = useMemo(() => {
     return stories.filter(s => {
-      const isPending = !s.isAccepted;
-      
-      const matchesStatus = statusFilter === 'pending'
-        ? isPending
-        : statusFilter === 'published'
-          ? !isPending
-          : true;
+      let matchesStatus = true;
+      if (statusFilter === 'pending_officer') {
+        matchesStatus = !s.officerApproval && !s.isAccepted;
+      } else if (statusFilter === 'pending_admin') {
+        matchesStatus = s.officerApproval && !s.isAccepted;
+      } else if (statusFilter === 'published') {
+        matchesStatus = s.isAccepted;
+      }
 
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch = q
@@ -276,7 +304,8 @@ const AdminStories: React.FC = () => {
             onChange={e => setStatusFilter(e.target.value as any)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
           >
-            <option value="pending">Pending Approval</option>
+            <option value="pending_officer">Pending Officer Review</option>
+            <option value="pending_admin">Pending Admin Review</option>
             <option value="published">Published Only</option>
             <option value="all">All Stories</option>
           </select>
@@ -305,10 +334,14 @@ const AdminStories: React.FC = () => {
       </div>
 
       {/* Stats Counters */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <span className="text-xl font-bold text-amber-500 block">{stats.pending}</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Pending Approval</span>
+          <span className="text-xl font-bold text-amber-500 block">{stats.pendingOfficer}</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Pending Officer</span>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+          <span className="text-xl font-bold text-indigo-500 block">{stats.pendingAdmin}</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Pending Admin</span>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
           <span className="text-xl font-bold text-emerald-600 block">{stats.published}</span>
@@ -361,9 +394,13 @@ const AdminStories: React.FC = () => {
                       <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">
                         Published
                       </span>
+                    ) : story.officerApproval ? (
+                      <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[9px] font-semibold text-indigo-700 uppercase tracking-wide">
+                        Pending Admin Review
+                      </span>
                     ) : (
                       <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-2 py-0.5 text-[9px] font-semibold text-amber-700 uppercase tracking-wide">
-                        Pending Approval
+                        Pending Officer Review
                       </span>
                     )}
 
@@ -375,12 +412,30 @@ const AdminStories: React.FC = () => {
 
                 <div className="p-5 pt-0 border-t border-slate-50 flex flex-col gap-2 mt-4">
                   {!story.isAccepted && (
-                    <button
-                      onClick={() => setPublishConfirm({ open: true, id: story.$id })}
-                      className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-xs py-2 shadow-xs transition-colors"
-                    >
-                      Publish Story
-                    </button>
+                    userRole === 'admin' ? (
+                      <button
+                        onClick={() => setPublishConfirm({ open: true, id: story.$id })}
+                        className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-xs py-2 shadow-xs transition-colors"
+                      >
+                        {story.officerApproval ? 'Publish Story' : 'Publish Story (Override)'}
+                      </button>
+                    ) : userRole === 'officer' ? (
+                      !story.officerApproval ? (
+                        <button
+                          onClick={() => setPublishConfirm({ open: true, id: story.$id })}
+                          className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-xs py-2 shadow-xs transition-colors"
+                        >
+                          Officer Approve
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="w-full rounded-lg bg-slate-100 text-slate-400 font-semibold text-xs py-2 cursor-not-allowed"
+                        >
+                          Awaiting Admin Final Review
+                        </button>
+                      )
+                    ) : null
                   )}
                   <div className="flex gap-2">
                     <button
@@ -582,15 +637,27 @@ const AdminStories: React.FC = () => {
 
             <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
               {!viewingStory.isAccepted && (
-                <button
-                  onClick={() => {
-                    setPublishConfirm({ open: true, id: viewingStory.$id });
-                    setViewingStory(null);
-                  }}
-                  className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
-                >
-                  Publish Story
-                </button>
+                userRole === 'admin' ? (
+                  <button
+                    onClick={() => {
+                      setPublishConfirm({ open: true, id: viewingStory.$id });
+                      setViewingStory(null);
+                    }}
+                    className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                  >
+                    {viewingStory.officerApproval ? 'Publish Story' : 'Publish Story (Override)'}
+                  </button>
+                ) : userRole === 'officer' && !viewingStory.officerApproval ? (
+                  <button
+                    onClick={() => {
+                      setPublishConfirm({ open: true, id: viewingStory.$id });
+                      setViewingStory(null);
+                    }}
+                    className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                  >
+                    Officer Approve
+                  </button>
+                ) : null
               )}
               <button
                 onClick={() => {

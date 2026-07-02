@@ -111,11 +111,22 @@ export interface StoryDoc extends ModelsDocument {
   post_description?: string | null;
   image_bucket?: string | null;
   isAccepted: boolean;
+  officerApproval?: boolean;
+  adminApproval?: boolean;
   title?: string | null;
   post_details?: string | null;
   related_links?: string[] | null;
   meaning?: string[] | null;
   students?: StudentDoc | string | null;
+}
+
+export interface TaskDoc extends ModelsDocument {
+  name?: string | null;
+  description?: string | null;
+  connected_files?: string[] | null;
+  is_done: boolean;
+  name_of_done?: string | null;
+  time_done?: string | null;
 }
 
 export interface FileDoc extends ModelsDocument {
