@@ -74,7 +74,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
       const studentDoc = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_STUDENTS,
-        ID.unique(),
+        user.$id,
         {
           name: name,
           email: email,
