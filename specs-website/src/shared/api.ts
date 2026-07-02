@@ -354,14 +354,17 @@ export const api = {
                 throw createApiError(error, `Failed to list attendance for event ${eventId}`);
             }
         },
-        async create(eventId: string, studentId: string, officerId: string, attendanceName: string): Promise<AttendanceDoc> {
+        async create(eventId: string, studentId: string, officerId: string | null | undefined, attendanceName: string): Promise<AttendanceDoc> {
             try {
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), {
+                const data: any = {
                     events: eventId,
                     students: studentId,
-                    officers: officerId,
                     name_attendance: attendanceName
-                });
+                };
+                if (officerId && officerId !== 'admin') {
+                    data.officers = [officerId];
+                }
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), data);
                 dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 return result;
             } catch (error) {

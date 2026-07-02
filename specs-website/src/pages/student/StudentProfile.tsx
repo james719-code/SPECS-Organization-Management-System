@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { showToast } from '../../shared/toast';
-import { account, databases } from '../../shared/appwrite';
+import { account, databases, Query } from '../../shared/appwrite';
+import { Loader2 } from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
@@ -27,8 +28,17 @@ const StudentProfile: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // QR enlargement state
+  const [isQrOpen, setIsQrOpen] = useState(false);
+
   // Volunteer status states
   const [submittingVolunteerAction, setSubmittingVolunteerAction] = useState(false);
+
+  // Account credentials states
+  const [accountData, setAccountData] = useState<any>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [updatingAccount, setUpdatingAccount] = useState(false);
 
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -41,6 +51,8 @@ const StudentProfile: React.FC = () => {
 
       // Fetch account link document
       const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+      setAccountData(accountDoc);
+      setEditUsername(accountDoc.username || '');
       setAccountType(accountDoc.type || 'student');
       if (accountDoc.students) {
         let studentDoc = null;
@@ -114,6 +126,46 @@ const StudentProfile: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete account.' });
     } finally {
       setDeletingAccount(false);
+    }
+  };
+
+  const handleAccountUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !accountData) return;
+
+    setUpdatingAccount(true);
+    try {
+      const usernameTrimmed = editUsername.trim();
+      if (!usernameTrimmed) {
+        throw new Error('Username cannot be empty.');
+      }
+
+      // 1. Update username in accounts collection if changed
+      if (usernameTrimmed !== accountData.username) {
+        await databases.updateDocument(
+          DATABASE_ID,
+          COLLECTION_ID_ACCOUNTS,
+          currentUser.$id,
+          { username: usernameTrimmed }
+        );
+
+        setAccountData((prev: any) => ({ ...prev, username: usernameTrimmed }));
+        addToast({ type: 'success', title: 'Success', message: 'Username updated successfully!' });
+      }
+
+      // 2. Update password if provided
+      if (newPassword) {
+        if (newPassword.length < 8) {
+          throw new Error('Password must be at least 8 characters long.');
+        }
+        await account.updatePassword(newPassword);
+        setNewPassword('');
+        addToast({ type: 'success', title: 'Success', message: 'Password updated successfully!' });
+      }
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update credentials.' });
+    } finally {
+      setUpdatingAccount(false);
     }
   };
 
@@ -248,13 +300,31 @@ const StudentProfile: React.FC = () => {
             {studentData?.$id && (
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center space-y-2">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">My Attendance QR</span>
-                <div className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white shadow-xs">
+                <button 
+                  onClick={() => setIsQrOpen(true)}
+                  className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white shadow-xs hover:border-[#0d6b66] dark:hover:border-[#0d6b66] transition-colors cursor-pointer group relative"
+                  title="Click to enlarge"
+                >
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`specs-member:${studentData.$id}`)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`specs-member:${currentUser.$id}`)}`}
                     alt="Attendance QR Code"
-                    className="w-32 h-32"
+                    className="w-32 h-32 transition-transform duration-200 group-hover:scale-98"
                   />
-                </div>
+                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white drop-shadow-md animate-in zoom-in-50 duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                    </svg>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setIsQrOpen(true)}
+                  className="inline-flex items-center gap-1 text-[10px] text-[#0d6b66] dark:text-[#10857f] font-bold hover:underline"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                  </svg>
+                  Tap to Enlarge
+                </button>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500">Present this QR to check-in</p>
               </div>
             )}
@@ -262,35 +332,83 @@ const StudentProfile: React.FC = () => {
         </div>
 
         {/* Right Info Details */}
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 014 0" />
-            </svg>
-            {accountType === 'officer' ? 'Officer & Student Information' : 'Student Information'}
-          </h3>
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 014 0" />
+              </svg>
+              {accountType === 'officer' ? 'Officer & Student Information' : 'Student Information'}
+            </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Student ID Number</span>
-              <span className="text-base font-semibold text-slate-900 block mt-1">{studentData?.student_id || 'N/A'}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Student ID Number</span>
+                <span className="text-base font-semibold text-slate-900 block mt-1">{studentData?.student_id || 'N/A'}</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Course Section</span>
+                <span className="text-base font-semibold text-slate-900 block mt-1">{studentData?.section || 'N/A'}</span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Year Level</span>
+                <span className="text-base font-semibold text-slate-900 block mt-1">
+                  {studentData?.yearLevel ? `Year ${studentData.yearLevel}` : 'N/A'}
+                </span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Residential Address</span>
+                <span className="text-base font-semibold text-slate-900 block mt-1 truncate" title={studentData?.address || ''}>
+                  {studentData?.address || 'N/A'}
+                </span>
+              </div>
             </div>
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Course Section</span>
-              <span className="text-base font-semibold text-slate-900 block mt-1">{studentData?.section || 'N/A'}</span>
-            </div>
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Year Level</span>
-              <span className="text-base font-semibold text-slate-900 block mt-1">
-                {studentData?.yearLevel ? `Year ${studentData.yearLevel}` : 'N/A'}
-              </span>
-            </div>
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Residential Address</span>
-              <span className="text-base font-semibold text-slate-900 block mt-1 truncate" title={studentData?.address || ''}>
-                {studentData?.address || 'N/A'}
-              </span>
-            </div>
+          </div>
+
+          {/* Account Credentials Card */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Account Credentials
+            </h3>
+
+            <form onSubmit={handleAccountUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Username</label>
+                  <input
+                    type="text"
+                    required
+                    value={editUsername}
+                    onChange={e => setEditUsername(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-950 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">New Password (Optional)</label>
+                  <input
+                    type="password"
+                    placeholder="Leave blank to keep current"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-955 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={updatingAccount}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {updatingAccount && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Update Credentials
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -553,6 +671,44 @@ const StudentProfile: React.FC = () => {
                   Permanently Delete Account
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Enlarged QR Modal */}
+      {isQrOpen && studentData && createPortal(
+        <div 
+          className="fixed inset-0 z-55 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in" 
+          onClick={() => setIsQrOpen(false)}
+        >
+          <div 
+            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 flex flex-col items-center space-y-4 animate-in zoom-in-95" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-full flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">My Attendance QR</h3>
+              <button 
+                onClick={() => setIsQrOpen(false)} 
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white shadow-md">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`specs-member:${currentUser.$id}`)}`}
+                alt="Enlarged Attendance QR Code"
+                className="w-64 h-64"
+              />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{studentData.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Student ID: {studentData.student_id}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">Present this code clearly to the scanner</p>
             </div>
           </div>
         </div>,

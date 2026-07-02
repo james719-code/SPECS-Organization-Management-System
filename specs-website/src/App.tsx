@@ -190,8 +190,7 @@ export default function App() {
                 {
                   groupName: 'General',
                   items: [
-                    { to: '/dashboard/student', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
-                    { to: '/dashboard/student/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> }
+                    { to: '/dashboard/student', label: 'My Profile', icon: <User className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -218,7 +217,7 @@ export default function App() {
         <Route path="payments" element={<StudentPayments />} />
         <Route path="attendance" element={<StudentAttendance />} />
         <Route path="posts" element={<StudentPosts />} />
-        <Route path="profile" element={<StudentProfile />} />
+        <Route path="profile" element={<Navigate to="/dashboard/student" replace />} />
       </Route>
 
       {/* Role-Guarded Officer Routes */}

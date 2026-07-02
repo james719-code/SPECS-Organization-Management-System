@@ -31,7 +31,7 @@ const AdminAttendance: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; email?: string } | null>(null);
   const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string; email?: string }[]>([]);
   const [attendanceLabel, setAttendanceLabel] = useState('Morning Check-in');
-  const [notifyViaEmail, setNotifyViaEmail] = useState(true);
+  const [notifyViaEmail, setNotifyViaEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Search filter on records
@@ -170,12 +170,12 @@ const AdminAttendance: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Determine recorder ID: if logged in as officer, pass officer ID. If admin, pass 'admin'
+      // Determine recorder ID: if logged in as officer, pass officer ID. Otherwise null
       const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
         ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
-        : 'admin';
+        : null;
 
-      await api.attendance.create(selectedEventId, selectedStudent.id, recorderId || 'admin', attendanceLabel);
+      await api.attendance.create(selectedEventId, selectedStudent.id, recorderId, attendanceLabel);
       addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
       
       // Dispatch email notification if toggled and email is present (Background)
@@ -278,6 +278,28 @@ const AdminAttendance: React.FC = () => {
     const scannedStudentId = decodedText.split(':')[1];
     if (!scannedStudentId) return;
 
+    // Resolve scanned student profile ID and account document (since QR encodes account ID)
+    let studentProfileId = scannedStudentId;
+    let attendeeAccount = students.find(acc => acc.$id === scannedStudentId);
+
+    if (attendeeAccount) {
+      // Scanned ID is an Account ID
+      const profile = attendeeAccount.students as any;
+      studentProfileId = profile?.$id || attendeeAccount.students;
+    } else {
+      // Look up by student profile ID for backwards compatibility
+      attendeeAccount = students.find(acc => {
+        const profile = acc.students as any;
+        const profileId = profile?.$id || acc.students;
+        return profileId === scannedStudentId;
+      });
+    }
+
+    if (!studentProfileId) {
+      addToast({ type: 'error', title: 'Invalid Scan', message: 'Could not resolve student profile from this QR code.' });
+      return;
+    }
+
     // Check for duplicate scan using 1-day localStorage cache
     const cacheKey = 'specs_scanned_qrs';
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -304,12 +326,12 @@ const AdminAttendance: React.FC = () => {
       } catch (e) {}
     }
 
-    const scanKey = `${selectedEventId}:${scannedStudentId}`;
+    const scanKey = `${selectedEventId}:${studentProfileId}:${attendanceLabel.trim()}`;
     if (cache[scanKey]) {
       addToast({ 
         type: 'warning', 
         title: 'Duplicate Scan', 
-        message: 'This member has already been recorded for this event in the last 24 hours.' 
+        message: `This member has already been recorded for "${attendanceLabel}" in this event.` 
       });
       return;
     }
@@ -322,27 +344,20 @@ const AdminAttendance: React.FC = () => {
       ? (typeof currentUserProfile.students === 'object' ? currentUserProfile.students?.$id : currentUserProfile.students)
       : null;
 
-    if (currentStudentId && scannedStudentId === currentStudentId) {
+    if (currentStudentId && studentProfileId === currentStudentId) {
       addToast({ type: 'error', title: 'Invalid Scan', message: 'An officer cannot record their own attendance.' });
       return;
     }
 
-    // Find attendee name/email from the combined list
-    const attendee = students.find(acc => {
-      const profile = acc.students as any;
-      const profileId = profile?.$id || acc.students;
-      return profileId === scannedStudentId;
-    });
-
-    const attendeeName = attendee ? (attendee.students as any)?.name || attendee.username : 'Unknown Member';
-    const attendeeEmail = attendee ? (attendee.students as any)?.email : '';
+    const attendeeName = attendeeAccount ? (attendeeAccount.students as any)?.name || attendeeAccount.username : 'Unknown Member';
+    const attendeeEmail = attendeeAccount ? (attendeeAccount.students as any)?.email : '';
 
     try {
       const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
         ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
-        : 'admin';
+        : null;
 
-      await api.attendance.create(selectedEventId, scannedStudentId, recorderId || 'admin', attendanceLabel);
+      await api.attendance.create(selectedEventId, studentProfileId, recorderId, attendanceLabel);
       
       // Cache successful scan
       try {
@@ -430,6 +445,48 @@ const AdminAttendance: React.FC = () => {
               // Ignore frame scan errors
             }
           );
+
+          // Optimize focus constraints and exposure settings for scanning screens
+          try {
+            let capabilities: any = {};
+            if (typeof html5QrCode.getRunningTrackCapabilities === 'function') {
+              capabilities = html5QrCode.getRunningTrackCapabilities();
+            } else {
+              const track = typeof html5QrCode.getRunningTrack === 'function' 
+                ? html5QrCode.getRunningTrack() 
+                : null;
+              if (track && typeof track.getCapabilities === 'function') {
+                capabilities = track.getCapabilities();
+              }
+            }
+
+            const advancedConstraints: any = {};
+
+            // Request continuous focus if supported
+            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+              advancedConstraints.focusMode = 'continuous';
+            }
+
+            // Request continuous exposure if supported
+            if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
+              advancedConstraints.exposureMode = 'continuous';
+            }
+
+            // Request negative exposure compensation to reduce brightness of screen emission
+            if (capabilities.exposureCompensation) {
+              const minExp = capabilities.exposureCompensation.min || -2.0;
+              advancedConstraints.exposureCompensation = Math.max(minExp, -1.5);
+            }
+
+            if (Object.keys(advancedConstraints).length > 0) {
+              await html5QrCode.applyVideoConstraints({
+                advanced: [advancedConstraints]
+              });
+              console.log("[AdminAttendance QR] Camera optimized for screens:", advancedConstraints);
+            }
+          } catch (constErr) {
+            console.warn("[AdminAttendance QR] Failed to apply advanced camera optimization:", constErr);
+          }
         } catch (err) {
           console.error("Failed to start QR scanner:", err);
           addToast({ type: 'error', title: 'Camera Error', message: 'Could not access camera for QR scanning.' });
@@ -466,17 +523,54 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
-  // Filtered records
-  const filteredRecords = useMemo(() => {
-    if (!recordFilterQuery.trim()) return attendanceRecords;
-    const q = recordFilterQuery.toLowerCase();
-    return attendanceRecords.filter(record => {
+  // Group attendance records by student to prevent duplicate rows in the log sheet
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, {
+      studentId: string;
+      studentName: string;
+      records: { id: string; sessionLabel: string; createdAt: string }[];
+    }> = {};
+
+    attendanceRecords.forEach(record => {
       const profile = record.students as any;
-      const name = profile?.name || '';
-      const label = record.name_attendance || '';
-      return name.toLowerCase().includes(q) || label.toLowerCase().includes(q);
+      const studentId = profile?.$id || record.students;
+      const studentName = profile?.name || 'Unknown Student';
+
+      if (!studentId) return;
+
+      if (!groups[studentId]) {
+        groups[studentId] = {
+          studentId,
+          studentName,
+          records: []
+        };
+      }
+
+      groups[studentId].records.push({
+        id: record.$id,
+        sessionLabel: record.name_attendance || 'Attendance',
+        createdAt: record.$createdAt
+      });
     });
-  }, [attendanceRecords, recordFilterQuery]);
+
+    // Sort records inside each group by createdAt (oldest first)
+    Object.values(groups).forEach(g => {
+      g.records.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+
+    // Sort groups alphabetically by student name
+    return Object.values(groups).sort((a, b) => a.studentName.localeCompare(b.studentName));
+  }, [attendanceRecords]);
+
+  // Filtered grouped records based on query
+  const filteredGroupedRecords = useMemo(() => {
+    if (!recordFilterQuery.trim()) return groupedRecords;
+    const q = recordFilterQuery.toLowerCase();
+    return groupedRecords.filter(group => {
+      if (group.studentName.toLowerCase().includes(q)) return true;
+      return group.records.some(r => r.sessionLabel.toLowerCase().includes(q));
+    });
+  }, [groupedRecords, recordFilterQuery]);
 
   return (
     <div className="space-y-6">
@@ -499,7 +593,17 @@ const AdminAttendance: React.FC = () => {
       {/* Select Event */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Event</label>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+            <span>Select Event</span>
+            {attendanceMode === 'qr' && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 font-semibold normal-case bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full animate-pulse">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Locked in QR Scan Mode
+              </span>
+            )}
+          </label>
           <span className="text-xs text-slate-400 font-medium">{events.length} events available</span>
         </div>
         {events.length === 0 ? (
@@ -508,38 +612,48 @@ const AdminAttendance: React.FC = () => {
           <div className="flex flex-wrap gap-2.5 max-h-60 overflow-y-auto pr-1">
             {events.map(event => {
               const isSelected = selectedEventId === event.$id;
+              const isDisabled = attendanceMode === 'qr';
               return (
                 <button
                   key={event.$id}
                   type="button"
+                  disabled={isDisabled}
                   onClick={() => setSelectedEventId(event.$id)}
-                  className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-left transition-all duration-200 active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm shadow-[#0d6b66]/10'
-                      : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                  className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-left transition-all duration-200 ${
+                    isDisabled
+                      ? (isSelected
+                          ? 'border-[#0d6b66]/60 bg-[#0d6b66]/60 text-white/80 cursor-not-allowed opacity-90'
+                          : 'border-slate-200/40 bg-slate-50/20 text-slate-400 cursor-not-allowed opacity-50')
+                      : (isSelected
+                          ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm shadow-[#0d6b66]/10 active:scale-[0.98]'
+                          : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]')
                   }`}
                 >
                   <div
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                       isSelected
                         ? 'bg-white text-[#0d6b66]'
-                        : 'bg-white border border-slate-300 text-transparent group-hover:border-slate-400'
+                        : `bg-white border border-slate-300 text-transparent ${isDisabled ? '' : 'group-hover:border-slate-400'}`
                     }`}
                   >
                     {isSelected ? (
                       <Check className="h-3 w-3 stroke-[3]" />
                     ) : (
-                      <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-slate-400" />
+                      <div className={`h-1.5 w-1.5 rounded-full bg-slate-300 ${isDisabled ? '' : 'group-hover:bg-slate-400'}`} />
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className={`text-xs font-semibold truncate max-w-[180px] sm:max-w-[240px] leading-tight transition-colors ${
-                      isSelected ? 'text-white' : 'text-slate-700 group-hover:text-slate-900'
+                      isSelected 
+                        ? (isDisabled ? 'text-white/80' : 'text-white') 
+                        : (isDisabled ? 'text-slate-400' : 'text-slate-700 group-hover:text-slate-900')
                     }`}>
                       {event.event_name}
                     </span>
                     <span className={`text-[9px] mt-0.5 transition-colors ${
-                      isSelected ? 'text-white/80' : 'text-slate-400'
+                      isSelected 
+                        ? (isDisabled ? 'text-white/70' : 'text-white/80') 
+                        : 'text-slate-400'
                     }`}>
                       {formatDate(event.date_to_held || '')}
                       {event.location && ` • ${event.location}`}
@@ -744,8 +858,8 @@ const AdminAttendance: React.FC = () => {
                 </div>
 
                 {loadingRecords ? (
-                  <SkeletonTable rows={4} cols={4} />
-                ) : filteredRecords.length === 0 ? (
+                  <SkeletonTable rows={4} cols={2} />
+                ) : filteredGroupedRecords.length === 0 ? (
                   <div className="p-8 text-center text-slate-400 text-sm">
                     No matching attendance records found.
                   </div>
@@ -754,31 +868,39 @@ const AdminAttendance: React.FC = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="px-6 py-3 text-left">Student</th>
-                          <th className="px-6 py-3 text-left">Session Label</th>
-                          <th className="px-6 py-3 text-left">Timestamp</th>
-                          <th className="px-6 py-3 text-right">Action</th>
+                          <th className="px-6 py-3 text-left w-1/3">Student</th>
+                          <th className="px-6 py-3 text-left">Sessions Attended</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                        {filteredRecords.map(record => {
-                          const profile = record.students as any;
-                          const name = profile?.name || 'Unknown Student';
+                        {filteredGroupedRecords.map(group => {
                           return (
-                            <tr key={record.$id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-6 py-3.5 font-medium text-slate-900">{name}</td>
-                              <td className="px-6 py-3.5 text-slate-500">{record.name_attendance || 'Attendance'}</td>
-                              <td className="px-6 py-3.5 text-xs text-slate-400">{formatDateTime(record.$createdAt)}</td>
-                              <td className="px-6 py-3.5 text-right">
-                                <button
-                                  onClick={() => setDeleteConfirm({ open: true, id: record.$id })}
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors"
-                                  title="Delete record"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
+                            <tr key={group.studentId} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-3.5 font-medium text-slate-900">{group.studentName}</td>
+                              <td className="px-6 py-3.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {group.records.map(r => {
+                                    const timeStr = new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    return (
+                                      <span 
+                                        key={r.id} 
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs text-slate-700 font-medium"
+                                      >
+                                        <span className="font-semibold text-slate-800">{r.sessionLabel}</span>
+                                        <span className="text-[10px] text-slate-400 font-mono">({timeStr})</span>
+                                        <button
+                                          onClick={() => setDeleteConfirm({ open: true, id: r.id })}
+                                          className="text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-200/50 p-0.5 transition-colors cursor-pointer"
+                                          title={`Remove ${r.sessionLabel}`}
+                                        >
+                                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
                               </td>
                             </tr>
                           );
