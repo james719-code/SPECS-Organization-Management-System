@@ -340,8 +340,6 @@ const AdminAnnouncements: React.FC = () => {
     }
 
     try {
-      setSending(true);
-      
       let action = 'send_announcement';
       const htmlBody = getAnnouncementHtml(subject, message, senderName, senderEmail);
       let payload: any = {
@@ -357,43 +355,60 @@ const AdminAnnouncements: React.FC = () => {
         payload.recipients = recipients;
       }
 
-      const response = await functions.createExecution(
-        EMAIL_FUNCTION_ID,
-        JSON.stringify({
-          action,
-          payload
-        })
-      );
-
-      let result;
-      try {
-        result = JSON.parse(response.responseBody);
-      } catch (e) {
-        result = { success: false, error: 'Failed to parse response body' };
-      }
-
-      if (response.status === 'failed' || !result.success) {
-        throw new Error(result.error || 'Execution failed');
-      }
-
-      addToast({ 
-        type: 'success', 
-        title: 'Sent Successfully', 
-        message: recipients === 'specific'
-          ? `Announcement successfully sent to ${selectedEmails.length} selected recipients.`
-          : `Announcement successfully dispatched to ${recipients} recipients.` 
-      });
+      // Close the modal, reset form, and display dispatching toast immediately
       setIsComposerOpen(false);
       resetForm();
+      addToast({ 
+        type: 'info', 
+        title: 'Sending Announcement', 
+        message: 'The announcement is being dispatched in the background...' 
+      });
+
+      // Run bulk email dispatch in background
+      (async () => {
+        try {
+          const response = await functions.createExecution(
+            EMAIL_FUNCTION_ID,
+            JSON.stringify({
+              action,
+              payload
+            })
+          );
+
+          let result;
+          try {
+            result = JSON.parse(response.responseBody);
+          } catch (e) {
+            result = { success: false, error: 'Failed to parse response body' };
+          }
+
+          if (response.status === 'failed' || !result.success) {
+            throw new Error(result.error || 'Execution failed');
+          }
+
+          addToast({ 
+            type: 'success', 
+            title: 'Sent Successfully', 
+            message: recipients === 'specific'
+              ? `Announcement successfully sent to ${selectedEmails.length} selected recipients.`
+              : `Announcement successfully dispatched to ${recipients} recipients.` 
+          });
+        } catch (err: any) {
+          console.error('Failed to send announcement via function:', err);
+          addToast({ 
+            type: 'error', 
+            title: 'Send Failed', 
+            message: err.message || 'Failed to dispatch email announcement.' 
+          });
+        }
+      })();
     } catch (err: any) {
-      console.error('Failed to send announcement via function:', err);
+      console.error('Failed to prepare announcement payload:', err);
       addToast({ 
         type: 'error', 
-        title: 'Send Failed', 
-        message: err.message || 'Failed to dispatch email announcement.' 
+        title: 'Preparation Failed', 
+        message: err.message || 'Failed to prepare announcement for dispatch.' 
       });
-    } finally {
-      setSending(false);
     }
   };
 

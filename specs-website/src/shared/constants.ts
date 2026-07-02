@@ -20,6 +20,7 @@ export const BUCKET_ID_SCHEDULES = import.meta.env.VITE_BUCKET_ID_SCHEDULES as s
 export const BUCKET_ID_EVENT_IMAGES = import.meta.env.VITE_BUCKET_ID_EVENT_IMAGES as string;
 export const BUCKET_ID_PUBLIC_FILES = import.meta.env.VITE_BUCKET_PUBLIC_FILES as string;
 export const BUCKET_ID_UPLOADS = import.meta.env.VITE_BUCKET_ID_UPLOADS as string;
+export const BUCKET_ID_PICTURES = import.meta.env.VITE_BUCKET_ID_PICTURES as string;
 
 export const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID as string;
 export const EMAIL_FUNCTION_ID = import.meta.env.VITE_EMAIL_FUNCTION_ID as string;

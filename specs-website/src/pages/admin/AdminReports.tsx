@@ -259,7 +259,7 @@ const AdminReports: React.FC = () => {
         setActiveChartOption('paidVsUnpaid');
 
       } else if (reportType === 'events') {
-        const response = await cachedApi.events.listAll({ orderDesc: 'date_to_held' }, 0);
+        const response = await cachedApi.events.listAll({ orderDesc: 'date_to_held', includeArchived: true }, 0);
         let filtered = response.documents;
 
         if (dateFrom) filtered = filtered.filter(e => new Date(e.date_to_held || '') >= new Date(dateFrom));

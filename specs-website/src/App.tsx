@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
 import { 
   LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings, 
-  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck
+  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2
 } from 'lucide-react';
 
 // Import Pages
@@ -13,6 +13,7 @@ import SignupPage from './pages/SignupPage';
 import PendingVerificationPage from './pages/PendingVerificationPage';
 import StoryPage from './pages/StoryPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import MaintenancePage from './pages/MaintenancePage';
 
 // Import Layout
 import DashboardLayout from './components/DashboardLayout';
@@ -39,12 +40,25 @@ import AdminFiles from './pages/admin/AdminFiles';
 import AdminAnnouncements from './pages/admin/AdminAnnouncements';
 import AdminStories from './pages/admin/AdminStories';
 import AdminReports from './pages/admin/AdminReports';
-import AdminActivityLogs from './pages/admin/AdminActivityLogs';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminOfficers from './pages/admin/AdminOfficers';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+  });
+
+  const location = useLocation();
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('appwrite_session');
+      if (stored) {
+        return JSON.parse(stored).role || null;
+      }
+    } catch (e) {}
+    return null;
   });
 
   useEffect(() => {
@@ -56,7 +70,101 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    const checkMaintenanceAndRole = async () => {
+      try {
+        const { databases, account } = await import('./shared/appwrite');
+        const { DATABASE_ID, COLLECTION_ID_ACCOUNTS } = await import('./shared/constants');
+
+        // Check if user is logged in
+        let loggedInUser: any = null;
+        try {
+          loggedInUser = await account.get();
+        } catch (e) {
+          // not logged in
+        }
+
+        // Fetch user role if logged in
+        if (loggedInUser) {
+          // Initial sync from localStorage if present to prevent flashes
+          const stored = localStorage.getItem('appwrite_session');
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed.userId === loggedInUser.$id && parsed.role) {
+                setUserRole(parsed.role);
+              }
+            } catch (e) {}
+          }
+
+          try {
+            const accDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, loggedInUser.$id);
+            const role = accDoc.type || null;
+            setUserRole(role);
+            localStorage.setItem('appwrite_session', JSON.stringify({
+              userId: loggedInUser.$id,
+              role: role,
+              username: accDoc.username || ''
+            }));
+          } catch (err) {
+            console.warn('Fallback: Failed to fetch account profile for role lookup, using local session:', err);
+            // Fallback to localStorage if document fetch fails due to collection permissions
+            const storedFallback = localStorage.getItem('appwrite_session');
+            if (storedFallback) {
+              try {
+                setUserRole(JSON.parse(storedFallback).role || null);
+              } catch (e) {
+                setUserRole(null);
+              }
+            } else {
+              setUserRole(null);
+            }
+          }
+        } else {
+          setUserRole(null);
+          localStorage.removeItem('appwrite_session');
+        }
+
+        // Fetch maintenance mode state
+        try {
+          const metaRes = await databases.listDocuments(DATABASE_ID, 'metadata');
+          if (metaRes.documents.length > 0) {
+            setIsMaintenance(!!metaRes.documents[0].ismaintenance);
+          } else {
+            setIsMaintenance(false);
+          }
+        } catch (err) {
+          console.warn('Failed to load system metadata collection:', err);
+          setIsMaintenance(false);
+        }
+      } catch (err) {
+        console.error('State load error:', err);
+      } finally {
+        setLoadingMaintenance(false);
+      }
+    };
+
+    checkMaintenanceAndRole();
+  }, [location.pathname]);
+
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
+  if (loadingMaintenance) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0d6b66]" />
+      </div>
+    );
+  }
+
+  if (isMaintenance && userRole !== 'admin') {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
+        <Route path="*" element={<MaintenancePage theme={theme} toggleTheme={toggleTheme} isLoggedIn={!!userRole} />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
@@ -195,6 +303,7 @@ export default function App() {
                   items: [
                     { to: '/dashboard/admin/accounts', label: 'System Accounts', icon: <Users className="h-4 w-4" /> },
                     { to: '/dashboard/admin/students', label: 'Student Profiles', icon: <UserCheck className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/officers', label: 'Officers Control', icon: <Users className="h-4 w-4" /> },
                     { to: '/dashboard/admin/volunteers', label: 'Volunteers Control', icon: <Users className="h-4 w-4" /> }
                   ]
                 },
@@ -219,7 +328,6 @@ export default function App() {
                     { to: '/dashboard/admin/files', label: 'Document Files', icon: <FileText className="h-4 w-4" /> },
                     { to: '/dashboard/admin/stories', label: 'Student Stories', icon: <Award className="h-4 w-4" /> },
                     { to: '/dashboard/admin/reports', label: 'Reports Generator', icon: <FileSpreadsheet className="h-4 w-4" /> },
-                    { to: '/dashboard/admin/activity-logs', label: 'Activity Logs', icon: <Activity className="h-4 w-4" /> },
                     { to: '/dashboard/admin/settings', label: 'System Settings', icon: <Settings className="h-4 w-4" /> }
                   ]
                 }
@@ -231,6 +339,7 @@ export default function App() {
         <Route index element={<AdminOverview />} />
         <Route path="accounts" element={<AdminAccounts />} />
         <Route path="students" element={<AdminStudents />} />
+        <Route path="officers" element={<AdminOfficers />} />
         <Route path="events" element={<AdminEvents />} />
         <Route path="attendance" element={<AdminAttendance />} />
         <Route path="payments" element={<AdminPayments />} />
@@ -243,7 +352,6 @@ export default function App() {
         <Route path="stories" element={<AdminStories />} />
         <Route path="announcements" element={<AdminAnnouncements />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="activity-logs" element={<AdminActivityLogs />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
 

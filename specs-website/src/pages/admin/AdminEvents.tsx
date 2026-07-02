@@ -44,7 +44,7 @@ const AdminEvents: React.FC = () => {
       else setLoading(true);
 
       // Fetch all events
-      const res = await cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000);
+      const res = await cachedApi.events.listAll({ orderDesc: 'date_to_held', includeArchived: true }, isRefresh ? 0 : 2 * 60 * 1000);
       setEvents(res.documents);
 
       // Fetch accounts to build user lookup for creator names
@@ -186,12 +186,15 @@ const AdminEvents: React.FC = () => {
       const isPast = eventDate < now;
 
       if (filter === 'upcoming') {
-        return !isEnded && !isPast;
+        return !isEnded && !isPast && !event.archived;
       }
       if (filter === 'past') {
-        return isEnded || isPast;
+        return (isEnded || isPast) && !event.archived;
       }
-      return true;
+      if (filter === 'archived') {
+        return !!event.archived;
+      }
+      return !event.archived;
     });
   }, [events, filter]);
 
@@ -222,6 +225,12 @@ const AdminEvents: React.FC = () => {
               className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${filter === 'past' ? 'bg-[#0d6b66] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
               Past
+            </button>
+            <button
+              onClick={() => setFilter('archived')}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${filter === 'archived' ? 'bg-[#0d6b66] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Archived
             </button>
           </div>
           <button
@@ -289,13 +298,14 @@ const AdminEvents: React.FC = () => {
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-base font-bold text-slate-800 line-clamp-1">{event.event_name}</h3>
-                          {isEnded ? (
+                          {event.archived && (
                             <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 border border-slate-200">
-                              Ended
+                              Archived
                             </span>
-                          ) : isPast ? (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
-                              Past - Not Ended
+                          )}
+                          {isEnded ? (
+                            <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 border border-slate-200">
+                              Ended
                             </span>
                           ) : (
                             <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
@@ -306,15 +316,36 @@ const AdminEvents: React.FC = () => {
 
                         {/* Top quick actions */}
                         <div className="flex items-center gap-1.5">
-                          {!isEnded && (
+                          {event.archived ? (
                             <button
-                              onClick={() => setEndConfirm({ open: true, event })}
-                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-xs"
+                              disabled={actionLoading}
+                              onClick={() => handleToggleArchive(event, false)}
+                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition-colors shadow-xs"
                             >
-                              End
+                              Restore
                             </button>
+                          ) : (
+                            <>
+                              {!isEnded && (
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => setEndConfirm({ open: true, event })}
+                                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-colors shadow-xs"
+                                >
+                                  End
+                                </button>
+                              )}
+                              <button
+                                disabled={actionLoading}
+                                onClick={() => handleToggleArchive(event, true)}
+                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-xs"
+                              >
+                                Archive
+                              </button>
+                            </>
                           )}
                           <button
+                            disabled={actionLoading}
                             onClick={() => setDeleteConfirm({ open: true, event })}
                             className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-100 transition-colors shadow-xs"
                             title="Delete Event"

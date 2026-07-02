@@ -35,6 +35,8 @@ export interface OfficerDoc extends ModelsDocument {
   students?: StudentDoc | string | null;
   isSchedule: boolean;
   scheduleId?: string | null;
+  position?: string | null;
+  pictureId?: string | null;
 }
 
 export interface AdminDoc extends ModelsDocument {
@@ -50,11 +52,13 @@ export interface EventDoc extends ModelsDocument {
   image_file?: string | null;
   description?: string | null;
   event_ended: boolean;
+  archived?: boolean | null;
   collab?: string[] | null;
   related_links?: string[] | null;
   meaning?: string[] | null;
   location?: string | null;
   rating_links?: string | null;
+  related_links_name?: string[] | null;
 }
 
 export interface AttendanceDoc extends ModelsDocument {
@@ -78,6 +82,7 @@ export interface PaymentDoc extends ModelsDocument {
   non_bscs_name?: string | null;
   is_paid: boolean;
   modal_paid?: string | null;
+  verified_by_name?: string | null;
 }
 
 export interface ExpenseDoc extends ModelsDocument {
@@ -88,6 +93,7 @@ export interface ExpenseDoc extends ModelsDocument {
   isEvent: boolean;
   activity_name?: string | null;
   events?: EventDoc | string | null;
+  recorder?: string | null;
 }
 
 export interface RevenueDoc extends ModelsDocument {

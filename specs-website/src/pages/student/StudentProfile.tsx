@@ -152,6 +152,44 @@ const StudentProfile: React.FC = () => {
     }
   };
 
+  const handleCancelVolunteerRequest = async () => {
+    if (!studentData) return;
+    if (!window.confirm('Are you sure you want to cancel your volunteer request?')) {
+      return;
+    }
+    setSubmittingVolunteerAction(true);
+    try {
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+        volunteer_request_status: 'none'
+      });
+      setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'none' }));
+      addToast({ type: 'success', title: 'Cancelled', message: 'Volunteer request cancelled.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to cancel request.' });
+    } finally {
+      setSubmittingVolunteerAction(false);
+    }
+  };
+
+  const handleCancelLeaveRequest = async () => {
+    if (!studentData) return;
+    if (!window.confirm('Are you sure you want to cancel your request to leave the volunteer program?')) {
+      return;
+    }
+    setSubmittingVolunteerAction(true);
+    try {
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+        volunteer_request_status: 'approved'
+      });
+      setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'approved' }));
+      addToast({ type: 'success', title: 'Cancelled', message: 'Leave request cancelled. You remain an active volunteer.' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to cancel leave request.' });
+    } finally {
+      setSubmittingVolunteerAction(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-20">
@@ -293,9 +331,18 @@ const StudentProfile: React.FC = () => {
                     <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                       Leave Request Pending
                     </span>
-                    <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                      Awaiting Review
-                    </button>
+                    <div className="flex gap-2 w-full md:w-auto">
+                      <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
+                        Awaiting Review
+                      </button>
+                      <button
+                        onClick={handleCancelLeaveRequest}
+                        disabled={submittingVolunteerAction}
+                        className="w-full md:w-auto rounded-lg border border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 text-slate-600 dark:text-slate-300 py-1.5 px-4 text-xs font-semibold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </>
                 ) : studentData?.is_volunteer ? (
                   <>
@@ -315,9 +362,18 @@ const StudentProfile: React.FC = () => {
                     <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                       Request Pending
                     </span>
-                    <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                      Awaiting Review
-                    </button>
+                    <div className="flex gap-2 w-full md:w-auto">
+                      <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
+                        Awaiting Review
+                      </button>
+                      <button
+                        onClick={handleCancelVolunteerRequest}
+                        disabled={submittingVolunteerAction}
+                        className="w-full md:w-auto rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-4 text-xs font-semibold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </>
                 ) : studentData?.volunteer_request_status === 'rejected' ? (
                   <>

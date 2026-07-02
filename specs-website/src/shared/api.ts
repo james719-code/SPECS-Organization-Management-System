@@ -10,6 +10,7 @@ import {
     COLLECTION_ID_EXPENSES,
     COLLECTION_ID_STORIES,
     COLLECTION_ID_FILES,
+    COLLECTION_ID_OFFICERS,
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';
@@ -24,7 +25,8 @@ import {
   RevenueDoc, 
   ExpenseDoc, 
   StoryDoc, 
-  FileDoc 
+  FileDoc,
+  OfficerDoc
 } from '../types/database';
 
 export { ApiError, ErrorCodes };
@@ -57,6 +59,7 @@ export interface ListOptions {
   limit?: number;
   offset?: number;
   orderDesc?: boolean | string;
+  includeArchived?: boolean;
 }
 
 function createPaginatedResponse<T>(result: any, limit: number, offset: number): PaginatedResponse<T> {
@@ -125,10 +128,13 @@ export const api = {
     events: {
         async list(options: ListOptions = {}): Promise<PaginatedResponse<EventDoc>> {
             try {
-                const { limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true } = normalizeListOptions(options);
+                const { limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, includeArchived = false } = normalizeListOptions(options);
                 const pageSize = clampPageSize(limit);
                 const queries = [Query.limit(pageSize), Query.offset(offset)];
                 if (orderDesc) queries.push(Query.orderDesc('date_to_held'));
+                if (!includeArchived) {
+                    queries.push(Query.notEqual('archived', true));
+                }
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, queries);
                 return createPaginatedResponse<EventDoc>(result, pageSize, offset);
             } catch (error) {
@@ -142,10 +148,13 @@ export const api = {
                 throw createApiError(error, `Failed to get event ${eventId}`);
             }
         },
-        async listAll({ orderDesc = 'date_to_held', maxPages = 10 } = {}): Promise<PaginatedResponse<EventDoc>> {
+        async listAll({ orderDesc = 'date_to_held', maxPages = 10, includeArchived = false } = {}): Promise<PaginatedResponse<EventDoc>> {
             try {
                 const queries: any[] = [];
                 if (orderDesc) queries.push(Query.orderDesc(orderDesc));
+                if (!includeArchived) {
+                    queries.push(Query.notEqual('archived', true));
+                }
                 return await listAllDocuments<EventDoc>(COLLECTION_ID_EVENTS, queries, { maxPages });
             } catch (error) {
                 throw createApiError(error, 'Failed to list all events');
@@ -185,6 +194,15 @@ export const api = {
                 return result;
             } catch (error) {
                 throw createApiError(error, `Failed to mark event ${eventId} as ended`);
+            }
+        },
+        async archive(eventId: string, archived = true): Promise<EventDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, { archived });
+                dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to archive event ${eventId}`);
             }
         }
     },
@@ -240,6 +258,36 @@ export const api = {
         },
         async delete(paymentId: string): Promise<any> {
             try {
+                // Fetch the payment document first to check if it was paid
+                const payment = await databases.getDocument<PaymentDoc>(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId);
+                
+                if (payment.is_paid) {
+                    // Fetch student name to match the revenue document label
+                    let studentName = 'Student';
+                    if (payment.students) {
+                        const sId = typeof payment.students === 'object' ? payment.students.$id : payment.students;
+                        try {
+                            const student = await databases.getDocument<StudentDoc>(DATABASE_ID, COLLECTION_ID_STUDENTS, sId);
+                            studentName = student.name;
+                        } catch (err) {
+                            console.warn('Failed to fetch student profile for revenue deletion lookup:', err);
+                        }
+                    }
+
+                    // Query the revenue collection to locate the connected finance record
+                    const targetName = `${payment.item_name} (Paid by ${studentName})`;
+                    const revenues = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
+                        Query.equal('name', targetName),
+                        Query.equal('price', payment.price),
+                        Query.equal('quantity', payment.quantity)
+                    ]);
+
+                    if (revenues.documents.length > 0) {
+                        // Delete the connected revenue document
+                        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_REVENUE, revenues.documents[0].$id);
+                    }
+                }
+
                 const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId);
                 dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 return result;
@@ -247,7 +295,7 @@ export const api = {
                 throw createApiError(error, `Failed to delete payment ${paymentId}`);
             }
         },
-        async markPaid(payment: PaymentDoc, recorderId: string, studentName: string, modalPaid?: 'cash' | 'gcash' | null, officerId?: string | null): Promise<PaymentDoc> {
+        async markPaid(payment: PaymentDoc, recorderId: string, studentName: string, modalPaid?: 'cash' | 'gcash' | null, officerId?: string | null, verifierName?: string | null): Promise<PaymentDoc> {
             try {
                 await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
                     name: `${payment.item_name} (Paid by ${studentName})`,
@@ -263,7 +311,8 @@ export const api = {
                     is_paid: true, 
                     date_paid: new Date().toISOString(),
                     modal_paid: modalPaid || null,
-                    officers: officerId || null
+                    officers: officerId || null,
+                    verified_by_name: verifierName || null
                 });
                 dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 return result;
@@ -540,6 +589,25 @@ export const api = {
         }
     },
 
+    officers: {
+        async listAll(): Promise<PaginatedResponse<OfficerDoc>> {
+            try {
+                return await listAllDocuments<OfficerDoc>(COLLECTION_ID_OFFICERS, []);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list officers');
+            }
+        },
+        async update(officerId: string, data: Partial<OfficerDoc>): Promise<OfficerDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, officerId, data);
+                dataCache.invalidateTags([CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update officer ${officerId}`);
+            }
+        }
+    },
+
     cache: {
         clearAll(): void {
             dataCache.clear();
@@ -739,6 +807,17 @@ export const cachedApi = {
                 ttl,
                 staleTtl: 5 * 60 * 1000,
                 tags: [CacheTags.STORIES]
+            });
+        }
+    },
+
+    officers: {
+        async listAll(ttl = 2 * 60 * 1000): Promise<PaginatedResponse<OfficerDoc>> {
+            const cacheKey = generateCacheKey('officers_all', {});
+            return dataCache.getOrFetch(cacheKey, () => api.officers.listAll(), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.DASHBOARD]
             });
         }
     }

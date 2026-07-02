@@ -22,6 +22,9 @@ const AdminStories: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'pending' | 'published' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Viewing state
+  const [viewingStory, setViewingStory] = useState<StoryDoc | null>(null);
+
   // Editing state
   const [editingStory, setEditingStory] = useState<StoryDoc | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -331,18 +334,21 @@ const AdminStories: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredStories.map(story => {
             const studentId = story.students?.$id || story.students || '';
-            const authorName = studentLookup[studentId] || 'Unknown Student';
+            const authorName = story.author || (story.students as any)?.name || studentLookup[studentId] || 'SPECS Contributor';
             
             // Get cover image URL
             const imageUrl = story.image_bucket ? storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket, 400, 250) : null;
 
-            return (
+             return (
               <div key={story.$id} className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between">
-                <div>
+                <div 
+                  onClick={() => setViewingStory(story)} 
+                  className="cursor-pointer group"
+                >
                   {imageUrl ? (
-                    <img src={imageUrl} alt={story.title || ''} className="w-full h-44 object-cover border-b" />
+                    <img src={imageUrl} alt={story.title || ''} className="w-full h-44 object-cover border-b group-hover:opacity-95 transition-opacity" />
                   ) : (
-                    <div className="w-full h-44 bg-slate-50 border-b flex flex-col items-center justify-center text-slate-300 gap-1.5">
+                    <div className="w-full h-44 bg-slate-50 border-b flex flex-col items-center justify-center text-slate-300 gap-1.5 group-hover:bg-slate-100/50 transition-colors">
                       <svg className="h-8 w-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
@@ -361,7 +367,7 @@ const AdminStories: React.FC = () => {
                       </span>
                     )}
 
-                    <h3 className="font-bold text-slate-800 text-base line-clamp-1">{story.title || 'Untitled'}</h3>
+                    <h3 className="font-bold text-slate-800 text-base line-clamp-1 group-hover:text-[#0d6b66] transition-colors">{story.title || 'Untitled'}</h3>
                     <span className="text-xs text-slate-400 block font-medium">By: {authorName}</span>
                     <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mt-2">{story.post_description || 'No description provided.'}</p>
                   </div>
@@ -495,6 +501,113 @@ const AdminStories: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Story Modal */}
+      {viewingStory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setViewingStory(null)}>
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">View Story Preview</h2>
+              <button onClick={() => setViewingStory(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4">
+              {viewingStory.image_bucket && (
+                <img 
+                  src={storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, viewingStory.image_bucket, 800, 400)} 
+                  alt={viewingStory.title || ''} 
+                  className="w-full h-64 object-cover rounded-xl border shadow-xs" 
+                />
+              )}
+              
+              <div className="space-y-1">
+                <h1 className="text-2xl font-extrabold text-slate-900">{viewingStory.title || 'Untitled'}</h1>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                  <span>By {viewingStory.author || 'SPECS Contributor'}</span>
+                  <span>•</span>
+                  <span>{new Date(viewingStory.$createdAt).toLocaleDateString()}</span>
+                  <span>•</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    viewingStory.isAccepted 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                      : 'bg-amber-50 text-amber-700 border border-amber-100'
+                  }`}>
+                    {viewingStory.isAccepted ? 'Published' : 'Pending Approval'}
+                  </span>
+                </div>
+              </div>
+
+              {viewingStory.post_description && (
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 italic text-slate-600 text-sm">
+                  {viewingStory.post_description}
+                </div>
+              )}
+
+              <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-normal">
+                {viewingStory.post_details || 'No detail content provided.'}
+              </div>
+
+              {viewingStory.related_links && viewingStory.related_links.length > 0 && (
+                <div className="pt-4 border-t space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Related Links</h4>
+                  <div className="flex flex-col gap-1.5">
+                    {viewingStory.related_links.map((link: string, idx: number) => {
+                      const label = (viewingStory.meaning && viewingStory.meaning[idx]) || link;
+                      return (
+                        <a 
+                          key={idx} 
+                          href={link} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-[#0d6b66] hover:underline text-xs font-semibold flex items-center gap-1"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          {label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
+              {!viewingStory.isAccepted && (
+                <button
+                  onClick={() => {
+                    setPublishConfirm({ open: true, id: viewingStory.$id });
+                    setViewingStory(null);
+                  }}
+                  className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                >
+                  Publish Story
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  handleOpenEdit(viewingStory);
+                  setViewingStory(null);
+                }}
+                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 text-xs font-semibold transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => setViewingStory(null)}
+                className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

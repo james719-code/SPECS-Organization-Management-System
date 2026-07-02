@@ -80,6 +80,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   const [notifying, setNotifying] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<AccountDoc | null>(null);
   const [modalPaid, setModalPaid] = useState<'cash' | 'gcash'>('cash');
+  const [confirmRecipient, setConfirmRecipient] = useState(false);
 
   const { addToast } = useToast();
 
@@ -221,13 +222,20 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
     setSubmitting(true);
     try {
-      const officerId = currentUserProfile && currentUserProfile.type === 'officer'
-        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
-        : null;
-
-      const recorderId = currentUserProfile
-        ? (currentUserProfile.$id.substring(0, 30))
-        : 'admin';
+      let verifierName = 'Admin';
+      if (currentUserProfile) {
+        if (currentUserProfile.type === 'admin') {
+          verifierName = currentUserProfile.admins && typeof currentUserProfile.admins === 'object'
+            ? (currentUserProfile.admins as any).fullName
+            : currentUserProfile.username;
+        } else if (currentUserProfile.students) {
+          verifierName = typeof currentUserProfile.students === 'object'
+            ? (currentUserProfile.students as any).name
+            : currentUserProfile.username;
+        } else {
+          verifierName = currentUserProfile.username;
+        }
+      }
 
       const payload: Partial<PaymentDoc> = {
         students: null,
@@ -242,7 +250,8 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         is_outside_bscs: true,
         non_bscs_name: nonBscsName,
         is_paid: true,
-        modal_paid: modality
+        modal_paid: modality,
+        verified_by_name: verifierName
       };
 
       // 1. Create payment document
@@ -262,39 +271,41 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
       addToast({ type: 'success', title: 'Success', message: 'Outside payment collection recorded.' });
 
-      // 3. Optional Email Receipt
+      // 3. Optional Email Receipt (Background)
       if (payerEmail.trim()) {
-        try {
-          const datePaidStr = new Date(datePaid).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-          });
-          const htmlBody = getReceiptHtml(
-            nonBscsName,
-            itemName,
-            price,
-            quantity,
-            datePaidStr,
-            paymentDoc.$id
-          );
-          await functions.createExecution(
-            EMAIL_FUNCTION_ID,
-            JSON.stringify({
-              action: 'send_email',
-              payload: {
-                to: payerEmail,
-                subject: `Payment Receipt: ${itemName}`,
-                body: htmlBody,
-                html: true
-              }
-            })
-          );
-          addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${payerEmail}.` });
-        } catch (emailErr: any) {
-          console.error('[AdminPayments] Failed to send email receipt:', emailErr);
-          addToast({ type: 'warning', title: 'Receipt Not Sent', message: 'Recorded successfully, but email dispatch failed.' });
-        }
+        const datePaidStr = new Date(datePaid).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const htmlBody = getReceiptHtml(
+          nonBscsName,
+          itemName,
+          price,
+          quantity,
+          datePaidStr,
+          paymentDoc.$id
+        );
+        (async () => {
+          try {
+            await functions.createExecution(
+              EMAIL_FUNCTION_ID,
+              JSON.stringify({
+                action: 'send_email',
+                payload: {
+                  to: payerEmail,
+                  subject: `Payment Receipt: ${itemName}`,
+                  body: htmlBody,
+                  html: true
+                }
+              })
+            );
+            addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${payerEmail}.` });
+          } catch (emailErr: any) {
+            console.error('[AdminPayments] Failed to send email receipt:', emailErr);
+            addToast({ type: 'warning', title: 'Receipt Not Sent', message: 'Recorded successfully, but email dispatch failed.' });
+          }
+        })();
       }
 
       // Reset states & navigate back to outside tab
@@ -371,48 +382,62 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
         : null;
 
-      const recorderId = currentUserProfile
-        ? (currentUserProfile.$id.substring(0, 30))
-        : 'admin';
+      let verifierName = 'Admin';
+      if (currentUserProfile) {
+        if (currentUserProfile.type === 'admin') {
+          verifierName = currentUserProfile.admins && typeof currentUserProfile.admins === 'object'
+            ? (currentUserProfile.admins as any).fullName
+            : currentUserProfile.username;
+        } else if (currentUserProfile.students) {
+          verifierName = typeof currentUserProfile.students === 'object'
+            ? (currentUserProfile.students as any).name
+            : currentUserProfile.username;
+        } else {
+          verifierName = currentUserProfile.username;
+        }
+      }
 
-      await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId);
+      await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId, verifierName);
       addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
       
-      // Send Email Receipt if student email exists
+      // Send Email Receipt if student email exists (Background)
       const sEmail = studentProfile?.email;
       if (sEmail) {
-        try {
-          const datePaidStr = new Date().toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-          const htmlBody = getReceiptHtml(
-            sName,
-            payment.item_name,
-            payment.price,
-            payment.quantity,
-            datePaidStr,
-            payment.$id
-          );
-          await functions.createExecution(
-            EMAIL_FUNCTION_ID,
-            JSON.stringify({
-              action: 'send_email',
-              payload: {
-                to: sEmail,
-                subject: `Payment Receipt: ${payment.item_name}`,
-                body: htmlBody,
-                html: true
-              }
-            })
-          );
-          addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${sEmail}.` });
-        } catch (emailErr: any) {
-          console.error('[AdminPayments] Failed to send email receipt:', emailErr);
-        }
+        (async () => {
+          try {
+            const datePaidStr = new Date().toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            const htmlBody = getReceiptHtml(
+              sName,
+              payment.item_name,
+              payment.price,
+              payment.quantity,
+              datePaidStr,
+              payment.$id
+            );
+            await functions.createExecution(
+              EMAIL_FUNCTION_ID,
+              JSON.stringify({
+                action: 'send_email',
+                payload: {
+                  to: sEmail,
+                  subject: `Payment Receipt: ${payment.item_name}`,
+                  body: htmlBody,
+                  html: true
+                }
+              })
+            );
+            addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${sEmail}.` });
+          } catch (emailErr: any) {
+            console.error('[AdminPayments] Failed to send email receipt:', emailErr);
+            addToast({ type: 'warning', title: 'Receipt Not Sent', message: `Payment marked paid, but email receipt failed to send to ${sEmail}.` });
+          }
+        })();
       }
 
       setPaidConfirm({ open: false, payment: null });
@@ -459,53 +484,59 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       return;
     }
 
-    setNotifying(true);
-    try {
-      const formattedDues = pendingDues.map(p => {
-        const linkedEvent = p.is_event && p.events
-          ? (events.find(e => e.$id === p.events || e.$id === (p.events as any).$id)?.event_name || 'Linked Event')
-          : p.activity;
-        return {
-          itemName: p.item_name,
-          price: p.price,
-          quantity: p.quantity,
-          activity: linkedEvent || 'General Collection'
-        };
-      });
+    // Immediately show info toast and run the execution in the background
+    addToast({ 
+      type: 'info', 
+      title: 'Sending Notification', 
+      message: `Outstanding dues notification is being sent to ${sEmail} in the background.` 
+    });
 
-      const htmlBody = getPaymentReminderHtml(sName, formattedDues, window.location.origin);
-
-      const response = await functions.createExecution(
-        EMAIL_FUNCTION_ID,
-        JSON.stringify({
-          action: 'send_email',
-          payload: {
-            to: sEmail,
-            subject: 'Action Required: Outstanding Dues Notice',
-            body: htmlBody,
-            html: true
-          }
-        })
-      );
-
-      let result;
+    (async () => {
       try {
-        result = JSON.parse(response.responseBody);
-      } catch (e) {
-        result = { success: false, error: 'Failed to parse response body' };
-      }
+        const formattedDues = pendingDues.map(p => {
+          const linkedEvent = p.is_event && p.events
+            ? (events.find(e => e.$id === p.events || e.$id === (p.events as any).$id)?.event_name || 'Linked Event')
+            : p.activity;
+          return {
+            itemName: p.item_name,
+            price: p.price,
+            quantity: p.quantity,
+            activity: linkedEvent || 'General Collection'
+          };
+        });
 
-      if (response.status === 'failed' || !result.success) {
-        throw new Error(result.error || 'Execution failed');
-      }
+        const htmlBody = getPaymentReminderHtml(sName, formattedDues, window.location.origin);
 
-      addToast({ type: 'success', title: 'Dues Notified', message: `Email notifications successfully dispatched to ${sEmail}.` });
-    } catch (err: any) {
-      console.error('[AdminPayments] Failed to notify student dues:', err);
-      addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to dispatch email notice.' });
-    } finally {
-      setNotifying(false);
-    }
+        const response = await functions.createExecution(
+          EMAIL_FUNCTION_ID,
+          JSON.stringify({
+            action: 'send_email',
+            payload: {
+              to: sEmail,
+              subject: 'Action Required: Outstanding Dues Notice',
+              body: htmlBody,
+              html: true
+            }
+          })
+        );
+
+        let result;
+        try {
+          result = JSON.parse(response.responseBody);
+        } catch (e) {
+          result = { success: false, error: 'Failed to parse response body' };
+        }
+
+        if (response.status === 'failed' || !result.success) {
+          throw new Error(result.error || 'Execution failed');
+        }
+
+        addToast({ type: 'success', title: 'Dues Notified', message: `Email notifications successfully dispatched to ${sEmail}.` });
+      } catch (err: any) {
+        console.error('[AdminPayments] Failed to notify student dues:', err);
+        addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to dispatch email notice.' });
+      }
+    })();
   };
 
   // Metrics computation
@@ -1375,6 +1406,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                           <button
                             onClick={() => {
                               setModalPaid('cash');
+                              setConfirmRecipient(false);
                               setPaidConfirm({ open: true, payment: p });
                             }}
                             className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-2.5 py-1.5 shadow-xs transition-colors"
@@ -1420,16 +1452,52 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                       ? (events.find(e => e.$id === p.events || e.$id === (p.events as any).$id)?.event_name || 'Linked Event')
                       : p.activity;
 
+                    const authorizingUser = (() => {
+                      const officerId = p.officers ? (typeof p.officers === 'object' ? p.officers.$id : p.officers) : null;
+                      if (!officerId) return 'Admin';
+                      const foundAccount = students.find(acc => {
+                        if (acc.type !== 'officer' || !acc.officers) return false;
+                        const accOfficerId = typeof acc.officers === 'object' ? acc.officers.$id : acc.officers;
+                        return accOfficerId === officerId;
+                      });
+                      if (foundAccount) {
+                        return (foundAccount.students as any)?.name || foundAccount.username || 'Officer';
+                      }
+                      return 'Officer';
+                    })();
+
                     return (
                       <div key={p.$id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
                         <div>
                           <h4 className="text-sm font-bold text-slate-800">{p.item_name}</h4>
                           <span className="text-xs text-slate-400 mt-0.5 block">{linkedEvent || 'General Collection'}</span>
                           <span className="text-[10px] font-semibold text-slate-500 mt-1 block">Qty: {p.quantity} x {formatCurrency(p.price)}</span>
+                          
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                              p.modal_paid === 'gcash'
+                                ? 'bg-blue-50/50 border-blue-100 text-blue-700'
+                                : 'bg-emerald-50/50 border-emerald-100 text-emerald-700'
+                            }`}>
+                              {p.modal_paid || 'Cash'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Authorized by: <span className="font-bold text-slate-600">{authorizingUser}</span>
+                            </span>
+                          </div>
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                          Paid
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                            Paid
+                          </span>
+                          <button
+                            onClick={() => setDeleteConfirm({ open: true, payment: p })}
+                            className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500 hover:bg-red-50 transition-colors"
+                            title="Delete paid transaction record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -1666,6 +1734,20 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 </div>
               </div>
 
+              {/* Recipient Verification Checkbox */}
+              <div className="flex items-start gap-3 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="confirmRecipientCheck"
+                  checked={confirmRecipient}
+                  onChange={e => setConfirmRecipient(e.target.checked)}
+                  className="h-4.5 w-4.5 rounded border-amber-300 text-[#0d6b66] focus:ring-[#0d6b66] mt-0.5 cursor-pointer"
+                />
+                <label htmlFor="confirmRecipientCheck" className="text-xs font-semibold text-amber-800 cursor-pointer select-none leading-relaxed">
+                  I confirm that this payment of {formatCurrency(paidConfirm.payment.price * paidConfirm.payment.quantity)} is indeed being recorded for student: <span className="font-bold underline">{(selectedStudent?.students as any)?.name || selectedStudent?.username}</span>.
+                </label>
+              </div>
+
               {/* Actions */}
               <div className="flex w-full gap-3 pt-2">
                 <button
@@ -1677,7 +1759,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 </button>
                 <button
                   onClick={handleMarkPaid}
-                  disabled={actionLoading}
+                  disabled={actionLoading || !confirmRecipient}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {actionLoading ? (

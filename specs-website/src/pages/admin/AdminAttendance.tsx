@@ -178,52 +178,57 @@ const AdminAttendance: React.FC = () => {
       await api.attendance.create(selectedEventId, selectedStudent.id, recorderId || 'admin', attendanceLabel);
       addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
       
-      // Dispatch email notification if toggled and email is present
+      // Dispatch email notification if toggled and email is present (Background)
       if (notifyViaEmail && selectedStudent.email) {
-        try {
-          const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-          const dateStr = selectedEvent?.date_to_held 
-            ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
+        const studentEmail = selectedStudent.email;
+        const studentName = selectedStudent.name;
+        (async () => {
+          try {
+            const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+            const dateStr = selectedEvent?.date_to_held 
+              ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              : new Date().toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+                });
+
+            const timeStr = new Date().toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+
+            const htmlBody = getAttendanceHtml(
+              studentName,
+              selectedEvent?.event_name || 'Organization Event',
+              dateStr,
+              'Present',
+              timeStr,
+              window.location.origin
+            );
+
+            await functions.createExecution(
+              EMAIL_FUNCTION_ID,
+              JSON.stringify({
+                action: 'send_email',
+                payload: {
+                  to: studentEmail,
+                  subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                  body: htmlBody,
+                  html: true
+                }
               })
-            : new Date().toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              });
-
-          const timeStr = new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-
-          const htmlBody = getAttendanceHtml(
-            selectedStudent.name,
-            selectedEvent?.event_name || 'Organization Event',
-            dateStr,
-            'Present',
-            timeStr,
-            window.location.origin
-          );
-
-          await functions.createExecution(
-            EMAIL_FUNCTION_ID,
-            JSON.stringify({
-              action: 'send_email',
-              payload: {
-                to: selectedStudent.email,
-                subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
-                body: htmlBody,
-                html: true
-              }
-            })
-          );
-          addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${selectedStudent.email}.` });
-        } catch (emailErr: any) {
-          console.error('[AdminAttendance] Failed to send email notification:', emailErr);
-        }
+            );
+            addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${studentEmail}.` });
+          } catch (emailErr: any) {
+            console.error('[AdminAttendance] Failed to send email notification:', emailErr);
+            addToast({ type: 'warning', title: 'Notification Failed', message: `Recorded, but failed to send email to ${studentEmail}.` });
+          }
+        })();
       }
 
       // Reset form
@@ -273,6 +278,42 @@ const AdminAttendance: React.FC = () => {
     const scannedStudentId = decodedText.split(':')[1];
     if (!scannedStudentId) return;
 
+    // Check for duplicate scan using 1-day localStorage cache
+    const cacheKey = 'specs_scanned_qrs';
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let cache: Record<string, number> = {};
+    let isChanged = false;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const tempCache = JSON.parse(raw);
+        for (const [k, v] of Object.entries(tempCache)) {
+          if (now - (v as number) < oneDayMs) {
+            cache[k] = v as number;
+          } else {
+            isChanged = true;
+          }
+        }
+      }
+    } catch (e) {}
+
+    if (isChanged) {
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(cache));
+      } catch (e) {}
+    }
+
+    const scanKey = `${selectedEventId}:${scannedStudentId}`;
+    if (cache[scanKey]) {
+      addToast({ 
+        type: 'warning', 
+        title: 'Duplicate Scan', 
+        message: 'This member has already been recorded for this event in the last 24 hours.' 
+      });
+      return;
+    }
+
     setScanCooldown(true);
     setTimeout(() => setScanCooldown(false), 2500); // 2.5 second cooldown
 
@@ -302,42 +343,55 @@ const AdminAttendance: React.FC = () => {
         : 'admin';
 
       await api.attendance.create(selectedEventId, scannedStudentId, recorderId || 'admin', attendanceLabel);
+      
+      // Cache successful scan
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        const currentCache = raw ? JSON.parse(raw) : {};
+        currentCache[scanKey] = Date.now();
+        localStorage.setItem(cacheKey, JSON.stringify(currentCache));
+      } catch (e) {}
+
       playBeep();
       addToast({ type: 'success', title: 'Recorded via QR', message: `Attendance marked for ${attendeeName}.` });
 
       if (notifyViaEmail && attendeeEmail) {
-        try {
-          const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-          const dateStr = selectedEvent?.date_to_held 
-            ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-            : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        (async () => {
+          try {
+            const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+            const dateStr = selectedEvent?.date_to_held 
+              ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+              : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-          const htmlBody = getAttendanceHtml(
-            attendeeName,
-            selectedEvent?.event_name || 'Organization Event',
-            dateStr,
-            'Present',
-            timeStr,
-            window.location.origin
-          );
+            const htmlBody = getAttendanceHtml(
+              attendeeName,
+              selectedEvent?.event_name || 'Organization Event',
+              dateStr,
+              'Present',
+              timeStr,
+              window.location.origin
+            );
 
-          await functions.createExecution(
-            EMAIL_FUNCTION_ID,
-            JSON.stringify({
-              action: 'send_email',
-              payload: {
-                to: attendeeEmail,
-                subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
-                body: htmlBody,
-                html: true
-              }
-            })
-          );
-        } catch (emailErr) {
-          console.error('[AdminAttendance QR] Failed to send email:', emailErr);
-        }
+            await functions.createExecution(
+              EMAIL_FUNCTION_ID,
+              JSON.stringify({
+                action: 'send_email',
+                payload: {
+                  to: attendeeEmail,
+                  subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                  body: htmlBody,
+                  html: true
+                }
+              })
+            );
+            addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${attendeeEmail}.` });
+          } catch (emailErr) {
+            console.error('[AdminAttendance QR] Failed to send email:', emailErr);
+            addToast({ type: 'warning', title: 'Notification Failed', message: `Attendance recorded, but email to ${attendeeEmail} failed.` });
+          }
+        })();
       }
 
       loadAttendanceRecords(selectedEventId);

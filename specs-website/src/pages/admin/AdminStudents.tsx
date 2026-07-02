@@ -45,6 +45,26 @@ const AdminStudents: React.FC = () => {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
+  const [promoteConfirmOpen, setPromoteConfirmOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState('');
+
+  const OFFICER_POSITIONS = [
+    { value: 'president', label: 'President' },
+    { value: 'vice-president-internal', label: 'Vice-President Internal Affairs' },
+    { value: 'vice-president-external', label: 'Vice-President External Affairs' },
+    { value: 'secretary', label: 'Secretary' },
+    { value: 'asst-secretary', label: 'Assistant Secretary' },
+    { value: 'treasurer', label: 'Treasurer' },
+    { value: 'asst-treasurer', label: 'Assistant Treasurer' },
+    { value: 'auditor', label: 'Auditor' },
+    { value: 'p.i.o', label: 'P.I.O' },
+    { value: 'business-mngr-1', label: 'Business Manager (1)' },
+    { value: 'business-mngr-2', label: 'Business Manager (2)' },
+    { value: 'srgt-arms-1', label: 'Sergeant at Arms (1)' },
+    { value: 'sgrt-arms-2', label: 'Sergeant at Arms (2)' },
+    { value: 'representative', label: 'Representative' }
+  ];
+
   // Fetch linked account when student drawer details open
   useEffect(() => {
     if (!detailStudent) {
@@ -73,7 +93,7 @@ const AdminStudents: React.FC = () => {
   }, [detailStudent]);
 
   const handlePromoteOfficer = async () => {
-    if (!linkedAccount || !detailStudent) return;
+    if (!linkedAccount || !detailStudent || !selectedPosition) return;
     const studentId = detailStudent.$id;
     const accId = linkedAccount.$id;
     const studentName = detailStudent.name || 'Student';
@@ -89,12 +109,13 @@ const AdminStudents: React.FC = () => {
           FUNCTION_ID,
           JSON.stringify({
             action: 'promote_officer',
-            payload: { userId: accId },
+            payload: { userId: accId, position: selectedPosition },
             requestingUserId: currentUser?.$id
           }),
           false
         );
         addToast({ type: 'success', title: 'Promoted', message: `"${studentName}" has been promoted to Officer.` });
+        setSelectedPosition('');
         api.cache.clearTags(['accounts', 'students', 'dashboard']);
         fetchStudents(true);
       } catch (err: any) {
@@ -585,7 +606,7 @@ const AdminStudents: React.FC = () => {
                   {linkedAccount.type === 'student' && linkedAccount.verified && (
                     <button
                       type="button"
-                      onClick={handlePromoteOfficer}
+                      onClick={() => setPromoteConfirmOpen(true)}
                       disabled={actionLoading}
                       className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
                     >
@@ -650,6 +671,60 @@ const AdminStudents: React.FC = () => {
         variant="danger"
         loading={false}
       />
+
+      {/* Promote Position Assignment Modal */}
+      {promoteConfirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden p-6 animate-in zoom-in-95">
+            <h3 className="text-base font-bold text-slate-900 mb-2">Assign Officer Position</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Select the position to be assigned to <strong>{detailStudent?.name}</strong> upon promotion.
+            </p>
+            <div className="mb-6">
+              <label htmlFor="officer-position" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Position
+              </label>
+              <select
+                id="officer-position"
+                value={selectedPosition}
+                onChange={(e) => setSelectedPosition(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 p-2.5 text-sm font-semibold text-slate-700 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+              >
+                <option value="">-- Choose Position --</option>
+                {OFFICER_POSITIONS.map((pos) => (
+                  <option key={pos.value} value={pos.value}>
+                    {pos.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPromoteConfirmOpen(false);
+                  setSelectedPosition('');
+                }}
+                className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedPosition) return;
+                  setPromoteConfirmOpen(false);
+                  handlePromoteOfficer();
+                }}
+                disabled={!selectedPosition}
+                className="flex-1 rounded-lg bg-[#0d6b66] text-white py-2 text-sm font-semibold hover:bg-[#0b5c58] transition-colors disabled:opacity-50"
+              >
+                Promote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
