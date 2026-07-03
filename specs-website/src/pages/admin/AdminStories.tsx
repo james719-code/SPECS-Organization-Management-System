@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { RotateCw } from 'lucide-react';
-import { cachedApi, api } from '../../shared/api';
+import { RotateCw, BookOpen, Clock, Globe, Award, CheckCircle2, UserCheck, ShieldAlert, ShieldCheck, Eye, Trash2, Edit3, Search, Calendar, User, FileText, Check, X, ExternalLink, RefreshCw } from 'lucide-react';
+import { cachedApi } from '../../shared/api';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -11,6 +11,11 @@ import { Query, ID } from 'appwrite';
 import type { StoryDoc } from '../../types/database';
 
 const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES || 'highlight-images';
+
+interface StoryLink {
+  url: string;
+  label: string;
+}
 
 const AdminStories: React.FC = () => {
   const [stories, setStories] = useState<StoryDoc[]>([]);
@@ -35,6 +40,7 @@ const AdminStories: React.FC = () => {
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
+  const [editLinks, setEditLinks] = useState<StoryLink[]>([]);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   // Confirmations
@@ -118,6 +124,15 @@ const AdminStories: React.FC = () => {
     setEditImageFile(null);
     setRemoveExistingImage(false);
 
+    // Map related links and meanings
+    const urls = story.related_links || [];
+    const meanings = story.meaning || [];
+    const mappedLinks = urls.map((url: string, index: number) => ({
+      url,
+      label: meanings[index] || ''
+    }));
+    setEditLinks(mappedLinks.length > 0 ? mappedLinks : [{ url: '', label: '' }]);
+
     if (story.image_bucket) {
       try {
         const previewUrl = storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket, 600, 320);
@@ -161,11 +176,17 @@ const AdminStories: React.FC = () => {
         imageId = uploaded.$id;
       }
 
+      const filteredLinks = editLinks.filter(l => l.url.trim() !== '');
+      const urls = filteredLinks.map(l => l.url.trim());
+      const meanings = filteredLinks.map(l => l.label.trim() || l.url.trim());
+
       await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, editingStory.$id, {
         title: editTitle.trim(),
         post_description: editDesc.trim(),
         post_details: editContent.trim(),
-        image_bucket: imageId
+        image_bucket: imageId,
+        related_links: urls,
+        meaning: meanings
       });
 
       addToast({ type: 'success', title: 'Story Updated', message: 'Modifications saved successfully.' });
@@ -291,71 +312,153 @@ const AdminStories: React.FC = () => {
   }, [stories, statusFilter, searchQuery]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-200 min-h-screen pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Manage Stories</h1>
-          <p className="text-sm text-slate-500 mt-1">Approve, edit, and publish highlight stories.</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 pb-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0d6b66]/10 text-[#0d6b66] dark:bg-teal-500/10 dark:text-teal-400">
+            <BookOpen className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Manage Stories</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Approve, edit, and publish volunteer highlight stories.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as any)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
-          >
-            <option value="pending_officer">Pending Officer Review</option>
-            <option value="pending_admin">Pending Admin Review</option>
-            <option value="published">Published Only</option>
-            <option value="all">All Stories</option>
-          </select>
-
-          <div className="relative w-full sm:max-w-xs">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        
+        {/* Controls: Search, Reload */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Search stories..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-[#0d6b66] dark:focus:border-teal-500 focus:ring-1 focus:ring-[#0d6b66] outline-none transition-all duration-200"
             />
           </div>
           
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-850 disabled:opacity-50 transition-all shadow-xs cursor-pointer active:scale-95"
+            title="Reload Stories Log"
           >
-            <RotateCw className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
+            <RotateCw className={`h-4 w-4 text-slate-500 dark:text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Sync Stories</span>
           </button>
         </div>
       </div>
 
       {/* Stats Counters */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <span className="text-xl font-bold text-amber-500 block">{stats.pendingOfficer}</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Pending Officer</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Pending Officer */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex items-center justify-between group hover:-translate-y-0.5">
+          <div className="space-y-1.5 text-left">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Pending Officer</span>
+            <span className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight block">{stats.pendingOfficer}</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 flex items-center justify-center shadow-xs">
+            <Clock className="h-5 w-5" />
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <span className="text-xl font-bold text-indigo-500 block">{stats.pendingAdmin}</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Pending Admin</span>
+
+        {/* Card 2: Pending Admin */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex items-center justify-between group hover:-translate-y-0.5">
+          <div className="space-y-1.5 text-left">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Pending Admin</span>
+            <span className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight block">{stats.pendingAdmin}</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 flex items-center justify-center shadow-xs">
+            <ShieldAlert className="h-5 w-5" />
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <span className="text-xl font-bold text-emerald-600 block">{stats.published}</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Published Highlights</span>
+
+        {/* Card 3: Published */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex items-center justify-between group hover:-translate-y-0.5">
+          <div className="space-y-1.5 text-left">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Published</span>
+            <span className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight block">{stats.published}</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 flex items-center justify-center shadow-xs">
+            <Globe className="h-5 w-5" />
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <span className="text-xl font-bold text-[#0d6b66] block">{stats.total}</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Total Stories</span>
+
+        {/* Card 4: Total Stories */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex items-center justify-between group hover:-translate-y-0.5">
+          <div className="space-y-1.5 text-left">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Total Stories</span>
+            <span className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight block">{stats.total}</span>
+          </div>
+          <div className="h-10 w-10 rounded-xl bg-[#0d6b66]/10 dark:bg-teal-500/10 text-[#0d6b66] dark:text-teal-400 flex items-center justify-center shadow-xs">
+            <BookOpen className="h-5 w-5" />
+          </div>
         </div>
+      </div>
+
+      {/* Pill-Based Status Switcher Tabs */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100/60 dark:bg-slate-900 border border-slate-200/30 dark:border-slate-800/40 w-fit">
+        <button
+          onClick={() => setStatusFilter('pending_officer')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            statusFilter === 'pending_officer'
+              ? 'bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-sm shadow-[#0d6b66]/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/40 dark:hover:bg-slate-850'
+          }`}
+        >
+          <span>Pending Officer Review</span>
+          <span className={`px-2 py-0.5 text-[9px] rounded-full font-extrabold ${
+            statusFilter === 'pending_officer' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+          }`}>{stats.pendingOfficer}</span>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('pending_admin')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            statusFilter === 'pending_admin'
+              ? 'bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-sm shadow-[#0d6b66]/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/40 dark:hover:bg-slate-850'
+          }`}
+        >
+          <span>Pending Admin Review</span>
+          <span className={`px-2 py-0.5 text-[9px] rounded-full font-extrabold ${
+            statusFilter === 'pending_admin' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+          }`}>{stats.pendingAdmin}</span>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('published')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            statusFilter === 'published'
+              ? 'bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-sm shadow-[#0d6b66]/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/40 dark:hover:bg-slate-850'
+          }`}
+        >
+          <span>Published Only</span>
+          <span className={`px-2 py-0.5 text-[9px] rounded-full font-extrabold ${
+            statusFilter === 'published' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+          }`}>{stats.published}</span>
+        </button>
+
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            statusFilter === 'all'
+              ? 'bg-[#0d6b66] hover:bg-[#0b5c58] text-white shadow-sm shadow-[#0d6b66]/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/40 dark:hover:bg-slate-850'
+          }`}
+        >
+          <span>All Stories</span>
+          <span className={`px-2 py-0.5 text-[9px] rounded-full font-extrabold ${
+            statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+          }`}>{stats.total}</span>
+        </button>
       </div>
 
       {/* Grid listing */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : filteredStories.length === 0 ? (
@@ -364,7 +467,7 @@ const AdminStories: React.FC = () => {
           description={searchQuery ? `No stories match search term "${searchQuery}".` : 'No stories found in the selected category.'}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStories.map(story => {
             const studentId = story.students?.$id || story.students || '';
             const authorName = story.author || (story.students as any)?.name || studentLookup[studentId] || 'SPECS Contributor';
@@ -372,82 +475,157 @@ const AdminStories: React.FC = () => {
             // Get cover image URL
             const imageUrl = story.image_bucket ? storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket, 400, 250) : null;
 
-             return (
-              <div key={story.$id} className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between">
+            return (
+              <div key={story.$id} className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden hover:shadow-xl hover:shadow-slate-100/50 dark:hover:shadow-black/20 hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between">
                 <div 
                   onClick={() => setViewingStory(story)} 
-                  className="cursor-pointer group"
+                  className="cursor-pointer group flex-1"
                 >
                   {imageUrl ? (
-                    <img src={imageUrl} alt={story.title || ''} className="w-full h-44 object-cover border-b group-hover:opacity-95 transition-opacity" />
+                    <img src={imageUrl} alt={story.title || ''} className="w-full h-44 object-cover border-b border-slate-100 dark:border-slate-800 group-hover:opacity-95 transition-opacity" />
                   ) : (
-                    <div className="w-full h-44 bg-slate-50 border-b flex flex-col items-center justify-center text-slate-300 gap-1.5 group-hover:bg-slate-100/50 transition-colors">
-                      <svg className="h-8 w-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                      <span className="text-[10px] font-bold tracking-widest uppercase">SPECS STORY</span>
+                    <div className="w-full h-44 bg-slate-50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center text-slate-350 dark:text-slate-650 gap-1.5 group-hover:bg-slate-100/50 transition-colors">
+                      <BookOpen className="h-8 w-8 text-slate-350 dark:text-slate-655 opacity-60" />
+                      <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">SPECS STORY</span>
                     </div>
                   )}
 
                   <div className="p-5 space-y-2">
-                    {story.isAccepted ? (
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">
-                        Published
-                      </span>
-                    ) : story.officerApproval ? (
-                      <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[9px] font-semibold text-indigo-700 uppercase tracking-wide">
-                        Pending Admin Review
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-2 py-0.5 text-[9px] font-semibold text-amber-700 uppercase tracking-wide">
-                        Pending Officer Review
-                      </span>
-                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      {story.isAccepted ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 px-2.5 py-0.5 text-[9px] font-extrabold text-emerald-700 dark:text-emerald-450 uppercase tracking-wide">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Published
+                        </span>
+                      ) : story.officerApproval ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 px-2.5 py-0.5 text-[9px] font-extrabold text-indigo-700 dark:text-indigo-455 uppercase tracking-wide">
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                          Pending Admin
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 px-2.5 py-0.5 text-[9px] font-extrabold text-amber-700 dark:text-amber-455 uppercase tracking-wide">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Pending Officer
+                        </span>
+                      )}
+                      
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
+                        <Calendar className="h-3 w-3" />
+                        <span>{new Date(story.$createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    </div>
 
-                    <h3 className="font-bold text-slate-800 text-base line-clamp-1 group-hover:text-[#0d6b66] transition-colors">{story.title || 'Untitled'}</h3>
-                    <span className="text-xs text-slate-400 block font-medium">By: {authorName}</span>
-                    <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mt-2">{story.post_description || 'No description provided.'}</p>
+                    <h3 className="font-extrabold text-slate-800 dark:text-white text-base line-clamp-1 group-hover:text-[#0d6b66] dark:group-hover:text-teal-400 transition-colors leading-snug tracking-tight">{story.title || 'Untitled'}</h3>
+                    
+                    <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 font-bold">
+                      <User className="h-3 w-3 text-slate-350 dark:text-slate-655" />
+                      <span>{authorName}</span>
+                    </div>
+                    
+                    <p className="text-xs text-slate-550 dark:text-slate-400 line-clamp-3 leading-relaxed mt-2.5 font-medium">{story.post_description || 'No description provided.'}</p>
                   </div>
                 </div>
 
-                <div className="p-5 pt-0 border-t border-slate-50 flex flex-col gap-2 mt-4">
+                {/* Progress Stepper Timeline inside AdminStories card */}
+                <div className="px-5 pb-4">
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between relative px-3 z-0">
+                      {/* Connecting Line Track */}
+                      <div className="absolute top-[10px] left-5 right-5 h-[2px] bg-slate-100 dark:bg-slate-850 rounded-full" />
+                      {/* Active Track Highlight */}
+                      <div 
+                        className="absolute top-[10px] left-5 h-[2px] bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all duration-500" 
+                        style={{ width: story.isAccepted ? '86%' : story.officerApproval ? '43%' : '0%' }}
+                      />
+
+                      {/* Step 1: Submitted */}
+                      <div className="flex flex-col items-center relative z-10">
+                        <div className="h-5 w-5 rounded-full bg-[#0d6b66] dark:bg-teal-500 text-white flex items-center justify-center text-[9px] font-black border-2 border-white dark:border-slate-900 shadow-sm">
+                          <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
+                        </div>
+                        <span className="text-[8px] font-bold text-slate-500 mt-1">Submitted</span>
+                      </div>
+
+                      {/* Step 2: Officer */}
+                      <div className="flex flex-col items-center relative z-10">
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold border-2 shadow-xs transition-all duration-300 ${
+                          story.officerApproval || story.isAccepted
+                            ? 'bg-[#0d6b66] dark:bg-teal-500 border-white dark:border-slate-900 text-white' 
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-400'
+                        }`}>
+                          {story.officerApproval || story.isAccepted ? (
+                            <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
+                          ) : (
+                            <UserCheck className="h-2.5 w-2.5" />
+                          )}
+                        </div>
+                        <span className={`text-[8px] font-bold mt-1 transition-colors ${
+                          story.officerApproval || story.isAccepted ? 'text-[#0d6b66] dark:text-teal-400' : 'text-slate-400'
+                        }`}>Officer</span>
+                      </div>
+
+                      {/* Step 3: Admin */}
+                      <div className="flex flex-col items-center relative z-10">
+                        <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold border-2 shadow-xs transition-all duration-300 ${
+                          story.isAccepted 
+                            ? 'bg-emerald-600 dark:bg-emerald-500 border-white dark:border-slate-900 text-white' 
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-855 text-slate-400'
+                        }`}>
+                          {story.isAccepted ? (
+                            <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
+                          ) : (
+                            <ShieldCheck className="h-2.5 w-2.5" />
+                          )}
+                        </div>
+                        <span className={`text-[8px] font-bold mt-1 transition-colors ${
+                          story.isAccepted ? 'text-emerald-600 dark:text-emerald-450' : 'text-slate-400'
+                        }`}>Admin</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Administrative Approvals & Modification Actions */}
+                <div className="p-5 pt-0 border-t border-slate-100/50 dark:border-slate-800/40 flex flex-col gap-2.5 mt-2">
                   {!story.isAccepted && (
                     userRole === 'admin' ? (
                       <button
                         onClick={() => setPublishConfirm({ open: true, id: story.$id })}
-                        className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-xs py-2 shadow-xs transition-colors"
+                        className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-600 dark:hover:to-teal-600 text-white font-bold text-xs py-2.5 transition-all duration-200 hover:scale-[1.02] shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        {story.officerApproval ? 'Publish Story' : 'Publish Story (Override)'}
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {story.officerApproval ? 'Publish Story' : 'Publish (Override)'}
                       </button>
                     ) : userRole === 'officer' ? (
                       !story.officerApproval ? (
                         <button
                           onClick={() => setPublishConfirm({ open: true, id: story.$id })}
-                          className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-semibold text-xs py-2 shadow-xs transition-colors"
+                          className="w-full rounded-xl bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-bold text-xs py-2.5 transition-all duration-200 hover:scale-[1.02] shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
                         >
+                          <UserCheck className="h-3.5 w-3.5" />
                           Officer Approve
                         </button>
                       ) : (
-                        <button
-                          disabled
-                          className="w-full rounded-lg bg-slate-100 text-slate-400 font-semibold text-xs py-2 cursor-not-allowed"
-                        >
-                          Awaiting Admin Final Review
-                        </button>
+                        <div className="w-full rounded-xl bg-slate-100/60 dark:bg-slate-850/60 text-slate-400 dark:text-slate-500 font-bold text-center text-xs py-2.5 flex items-center justify-center gap-1.5 select-none border border-slate-200/20 dark:border-slate-800/20">
+                          <Clock className="h-3.5 w-3.5 animate-pulse text-amber-500" />
+                          Awaiting Admin Final
+                        </div>
                       )
                     ) : null
                   )}
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleOpenEdit(story)}
-                      className="flex-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 py-1.5 text-xs font-semibold transition-colors"
+                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-[#0d6b66]/30 dark:hover:border-teal-500/30 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 py-2.5 text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-xs"
                     >
+                      <Edit3 className="h-3.5 w-3.5 text-slate-450" />
                       Edit
                     </button>
                     <button
                       onClick={() => setDeleteConfirm({ open: true, id: story.$id })}
-                      className="flex-1 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 text-xs font-semibold transition-colors"
+                      className="flex-1 rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20 text-red-650 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 py-2.5 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.02]"
                     >
+                      <Trash2 className="h-3.5 w-3.5" />
                       Delete
                     </button>
                   </div>
@@ -460,63 +638,61 @@ const AdminStories: React.FC = () => {
 
       {/* Edit Story Dialog Modal */}
       {editingStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setEditingStory(null)}>
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">Edit highlight Story</h2>
-              <button onClick={() => setEditingStory(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setEditingStory(null)}>
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white">Edit Highlight Story</h2>
+              <button onClick={() => setEditingStory(null)} className="text-slate-450 hover:text-slate-655 dark:text-slate-500 dark:hover:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer" aria-label="Close">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Title</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Title</label>
                 <input
                   type="text"
                   required
                   maxLength={200}
                   value={editTitle}
                   onChange={e => setEditTitle(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-[#0d6b66] dark:focus:border-teal-500 focus:ring-1 focus:ring-[#0d6b66]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Description</label>
                 <textarea
                   required
                   rows={2}
                   value={editDesc}
                   onChange={e => setEditDesc(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-[#0d6b66] dark:focus:border-teal-500 focus:ring-1 focus:ring-[#0d6b66]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Full Content details</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Full Content Details</label>
                 <textarea
                   required
                   rows={5}
                   value={editContent}
                   onChange={e => setEditContent(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66]"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-[#0d6b66] dark:focus:border-teal-500 focus:ring-1 focus:ring-[#0d6b66]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Cover Image</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Cover Image</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
-                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100 cursor-pointer"
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-55 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-350 hover:file:bg-slate-100 cursor-pointer"
                 />
                 
                 {imagePreviewUrl && (
-                  <div className="mt-3 relative inline-block rounded-lg overflow-hidden border">
+                  <div className="mt-3 relative inline-block rounded-lg overflow-hidden border dark:border-slate-800">
                     <img src={imagePreviewUrl} alt="Preview" className="max-h-40 max-w-full object-cover" />
                     <button
                       type="button"
@@ -525,7 +701,7 @@ const AdminStories: React.FC = () => {
                         setEditImageFile(null);
                         setRemoveExistingImage(true);
                       }}
-                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-lg p-1.5 shadow-sm text-xs"
+                      className="absolute top-2 right-2 bg-red-650 hover:bg-red-700 text-white rounded-lg p-1.5 shadow-xs text-xs font-bold"
                     >
                       Remove cover
                     </button>
@@ -533,22 +709,87 @@ const AdminStories: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t justify-end">
+              {/* Dynamic Related Links Editor */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Related Links</label>
+                  <button
+                    type="button"
+                    onClick={() => setEditLinks([...editLinks, { url: '', label: '' }])}
+                    className="text-xs font-bold text-[#0d6b66] dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Reference URL
+                  </button>
+                </div>
+                
+                {editLinks.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">No links attached.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {editLinks.map((link, index) => (
+                      <div key={index} className="flex gap-2 items-center bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <div className="flex-1 space-y-1.5">
+                          <input
+                            type="url"
+                            placeholder="https://example.com"
+                            value={link.url}
+                            onChange={e => {
+                              const newLinks = [...editLinks];
+                              newLinks[index].url = e.target.value;
+                              setEditLinks(newLinks);
+                            }}
+                            className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Friendly Label (e.g. Documentation)"
+                            value={link.label}
+                            onChange={e => {
+                              const newLinks = [...editLinks];
+                              newLinks[index].label = e.target.value;
+                              setEditLinks(newLinks);
+                            }}
+                            className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newLinks = editLinks.filter((_, idx) => idx !== index);
+                            setEditLinks(newLinks);
+                          }}
+                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                          title="Remove reference"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 justify-end">
                 <button
                   type="button"
                   onClick={() => setEditingStory(null)}
-                  className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingEdit}
-                  className="rounded-lg bg-[#0d6b66] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center gap-2"
+                  className="rounded-lg bg-[#0d6b66] dark:bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] dark:hover:bg-teal-700 disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   {submittingEdit && (
                     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                   )}
@@ -562,14 +803,12 @@ const AdminStories: React.FC = () => {
 
       {/* View Story Modal */}
       {viewingStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setViewingStory(null)}>
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">View Story Preview</h2>
-              <button onClick={() => setViewingStory(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setViewingStory(null)}>
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white">View Story Preview</h2>
+              <button onClick={() => setViewingStory(null)} className="text-slate-450 hover:text-slate-655 dark:text-slate-500 dark:hover:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-lg transition-colors cursor-pointer" aria-label="Close">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -578,21 +817,21 @@ const AdminStories: React.FC = () => {
                 <img 
                   src={storage.getFilePreview(BUCKET_ID_HIGHLIGHT_IMAGES, viewingStory.image_bucket, 800, 400)} 
                   alt={viewingStory.title || ''} 
-                  className="w-full h-64 object-cover rounded-xl border shadow-xs" 
+                  className="w-full h-64 object-cover rounded-xl border dark:border-slate-800 shadow-xs" 
                 />
               )}
               
               <div className="space-y-1">
-                <h1 className="text-2xl font-extrabold text-slate-900">{viewingStory.title || 'Untitled'}</h1>
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">{viewingStory.title || 'Untitled'}</h1>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-450 dark:text-slate-500">
                   <span>By {viewingStory.author || 'SPECS Contributor'}</span>
                   <span>•</span>
                   <span>{new Date(viewingStory.$createdAt).toLocaleDateString()}</span>
                   <span>•</span>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     viewingStory.isAccepted 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                      : 'bg-amber-50 text-amber-700 border border-amber-100'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30' 
+                      : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30'
                   }`}>
                     {viewingStory.isAccepted ? 'Published' : 'Pending Approval'}
                   </span>
@@ -600,18 +839,18 @@ const AdminStories: React.FC = () => {
               </div>
 
               {viewingStory.post_description && (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 italic text-slate-600 text-sm">
+                <div className="p-4 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800/80 italic text-slate-600 dark:text-slate-400 text-sm">
                   {viewingStory.post_description}
                 </div>
               )}
 
-              <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-normal">
+              <div className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed whitespace-pre-wrap font-normal">
                 {viewingStory.post_details || 'No detail content provided.'}
               </div>
 
               {viewingStory.related_links && viewingStory.related_links.length > 0 && (
-                <div className="pt-4 border-t space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Related Links</h4>
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Related Links</h4>
                   <div className="flex flex-col gap-1.5">
                     {viewingStory.related_links.map((link: string, idx: number) => {
                       const label = (viewingStory.meaning && viewingStory.meaning[idx]) || link;
@@ -621,11 +860,9 @@ const AdminStories: React.FC = () => {
                           href={link} 
                           target="_blank" 
                           rel="noreferrer" 
-                          className="text-[#0d6b66] hover:underline text-xs font-semibold flex items-center gap-1"
+                          className="text-[#0d6b66] dark:text-teal-400 hover:underline text-xs font-bold flex items-center gap-1"
                         >
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
+                          <ExternalLink className="h-3.5 w-3.5" />
                           {label}
                         </a>
                       );
@@ -635,7 +872,7 @@ const AdminStories: React.FC = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex justify-end gap-2">
               {!viewingStory.isAccepted && (
                 userRole === 'admin' ? (
                   <button
@@ -643,9 +880,9 @@ const AdminStories: React.FC = () => {
                       setPublishConfirm({ open: true, id: viewingStory.$id });
                       setViewingStory(null);
                     }}
-                    className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                    className="rounded-lg bg-[#0d6b66] dark:bg-teal-600 hover:bg-[#0b5c58] dark:hover:bg-teal-700 text-white px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
                   >
-                    {viewingStory.officerApproval ? 'Publish Story' : 'Publish Story (Override)'}
+                    {viewingStory.officerApproval ? 'Publish Story' : 'Publish (Override)'}
                   </button>
                 ) : userRole === 'officer' && !viewingStory.officerApproval ? (
                   <button
@@ -653,7 +890,7 @@ const AdminStories: React.FC = () => {
                       setPublishConfirm({ open: true, id: viewingStory.$id });
                       setViewingStory(null);
                     }}
-                    className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                    className="rounded-lg bg-[#0d6b66] dark:bg-teal-600 hover:bg-[#0b5c58] dark:hover:bg-teal-700 text-white px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
                   >
                     Officer Approve
                   </button>
@@ -664,13 +901,13 @@ const AdminStories: React.FC = () => {
                   handleOpenEdit(viewingStory);
                   setViewingStory(null);
                 }}
-                className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 text-xs font-semibold transition-colors"
+                className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
               >
                 Edit
               </button>
               <button
                 onClick={() => setViewingStory(null)}
-                className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer"
+                className="rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-350 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 text-xs font-bold transition-colors cursor-pointer"
               >
                 Close
               </button>

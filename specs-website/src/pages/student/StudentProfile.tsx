@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { showToast } from '../../shared/toast';
 import { account, databases, Query } from '../../shared/appwrite';
-import { Loader2 } from 'lucide-react';
+import { 
+  Loader2, Heart, Award, CheckCircle2, XCircle, Clock, Send, PenTool, ShieldAlert,
+  BookOpen, Globe, LayoutGrid
+} from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
@@ -414,111 +417,234 @@ const StudentProfile: React.FC = () => {
 
         {/* Volunteer program info card */}
         {accountType === 'student' && (
-          <div className="col-span-1 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-              Volunteer Program
-            </h3>
+          <div className="col-span-1 lg:col-span-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-6 shadow-xs hover:shadow-md transition-all duration-300 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                <Heart className="h-5 w-5 text-rose-500 fill-rose-500/10 animate-pulse animate-duration-1000" />
+                SPECS Volunteer Program
+              </h3>
+              {studentData?.is_volunteer && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  Active Writer
+                </span>
+              )}
+            </div>
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-800">Join the SPECS Volunteer Team</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Contribute to the SPECS community by creating/sharing stories and experiences with fellow student portals.
-                </p>
-                
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  <span className="inline-flex items-center rounded-full bg-[#0d6b66]/10 px-2 py-0.5 text-[9px] font-bold text-[#0d6b66]">
-                    Create Posts
-                  </span>
-                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
-                    Share Stories
-                  </span>
-                  <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-bold text-purple-700">
-                    Build Portfolio
-                  </span>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Feature/Intro Column */}
+              <div className="lg:col-span-3 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">Join the SPECS Volunteer Team</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                    Contribute to the SPECS community by creating, editing, and sharing stories, event highlights, and achievements directly on the student portal's public landing page.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 hover:scale-[1.02] hover:bg-white dark:hover:bg-slate-900 transition-all duration-200 shadow-xs">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0d6b66]/10 text-[#0d6b66] dark:text-[#128a83]">
+                      <PenTool className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Create Posts</p>
+                      <p className="text-[10px] text-slate-400">Write drafts</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 hover:scale-[1.02] hover:bg-white dark:hover:bg-slate-900 transition-all duration-200 shadow-xs">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400">
+                      <Globe className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Share Stories</p>
+                      <p className="text-[10px] text-slate-400">Publish online</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 hover:scale-[1.02] hover:bg-white dark:hover:bg-slate-900 transition-all duration-200 shadow-xs">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400">
+                      <Award className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Build Portfolio</p>
+                      <p className="text-[10px] text-slate-400">Gain experience</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0">
-                {/* Volunteer status badges & actions */}
+              {/* Status Display Panel */}
+              <div className="lg:col-span-2 flex flex-col justify-center w-full">
                 {studentData?.is_volunteer && studentData?.volunteer_request_status === 'backout_pending' ? (
-                  <>
-                    <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                      Leave Request Pending
-                    </span>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                        Awaiting Review
-                      </button>
+                  <div className="flex flex-col space-y-4 w-full bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/60 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Resignation Progress</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
+                        <Clock className="h-3 w-3" />
+                        Leave Pending
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-sm shadow-emerald-500/20">
+                          <CheckCircle2 className="h-3 w-3" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Resignation Submitted</p>
+                          <p className="text-[10px] text-slate-400">Request to leave has been logged</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold shadow-sm shadow-amber-500/20">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Officer Verification</p>
+                          <p className="text-[10px] text-slate-400">An officer is checking your draft assignments</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50 flex gap-2">
                       <button
                         onClick={handleCancelLeaveRequest}
                         disabled={submittingVolunteerAction}
-                        className="w-full md:w-auto rounded-lg border border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 text-slate-600 dark:text-slate-300 py-1.5 px-4 text-xs font-semibold transition-colors"
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-350 py-2 text-xs font-bold transition-all duration-200 hover:scale-[1.02] cursor-pointer disabled:opacity-50"
                       >
-                        Cancel
+                        Cancel Leave Request
                       </button>
                     </div>
-                  </>
+                  </div>
                 ) : studentData?.is_volunteer ? (
-                  <>
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                      Active Volunteer
-                    </span>
-                    <button
-                      onClick={handleRequestLeaveVolunteer}
-                      disabled={submittingVolunteerAction}
-                      className="w-full md:w-auto rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-4 text-xs font-semibold transition-colors"
-                    >
-                      Leave Volunteer Program
-                    </button>
-                  </>
-                ) : studentData?.volunteer_request_status === 'pending' ? (
-                  <>
-                    <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                      Request Pending
-                    </span>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      <button disabled className="w-full md:w-auto rounded-lg bg-slate-100 text-slate-400 py-1.5 px-4 text-xs font-semibold border">
-                        Awaiting Review
+                  <div className="flex flex-col space-y-4 w-full bg-emerald-50/20 dark:bg-emerald-950/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/20 shadow-xs animate-in fade-in zoom-in-95">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/30">
+                        <Award className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-emerald-850 dark:text-emerald-450">Active Volunteer Writer</p>
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-500/80">You can now compile stories for the landing page!</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={() => navigate('/dashboard/student/posts')}
+                        className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <PenTool className="h-3.5 w-3.5" />
+                        Create Story Post
                       </button>
+                      <button
+                        onClick={handleRequestLeaveVolunteer}
+                        disabled={submittingVolunteerAction}
+                        className="w-full text-[10px] text-red-500 hover:text-red-650 hover:underline py-1 mt-1 text-center font-bold bg-transparent border-0 cursor-pointer transition-colors"
+                      >
+                        Leave Volunteer Program
+                      </button>
+                    </div>
+                  </div>
+                ) : studentData?.volunteer_request_status === 'pending' ? (
+                  <div className="flex flex-col space-y-4 w-full bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/60 shadow-xs animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Application Progress</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
+                        <Clock className="h-3 w-3" />
+                        Awaiting Review
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-sm shadow-emerald-500/20">
+                          <CheckCircle2 className="h-3 w-3" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Application Submitted</p>
+                          <p className="text-[10px] text-slate-400">Your request to join has been logged</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold shadow-sm shadow-amber-500/20">
+                          <Loader2 className="h-3 w-3 animate-spin text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Officer Verification</p>
+                          <p className="text-[10px] text-slate-400">An officer is reviewing your credentials</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 opacity-40">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold">
+                          <Award className="h-3 w-3" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-600 dark:text-slate-450">Access Granted</p>
+                          <p className="text-[10px] text-slate-400">Unlock volunteer writing tools</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50 flex gap-2">
                       <button
                         onClick={handleCancelVolunteerRequest}
                         disabled={submittingVolunteerAction}
-                        className="w-full md:w-auto rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-4 text-xs font-semibold transition-colors"
+                        className="w-full rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:text-red-400 py-2 text-xs font-bold transition-all duration-200 hover:scale-[1.02] cursor-pointer disabled:opacity-50"
                       >
-                        Cancel
+                        Cancel Request
                       </button>
                     </div>
-                  </>
+                  </div>
                 ) : studentData?.volunteer_request_status === 'rejected' ? (
-                  <>
-                    <span className="inline-flex items-center rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                      Request Declined
-                    </span>
-                    <button
-                      onClick={handleRequestVolunteer}
-                      disabled={submittingVolunteerAction}
-                      className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
-                    >
-                      Request to Join Again
-                    </button>
-                  </>
+                  <div className="flex flex-col space-y-4 w-full bg-red-50/20 dark:bg-red-950/5 p-4 rounded-xl border border-red-100 dark:border-red-900/20 shadow-xs animate-in fade-in zoom-in-95">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-450 shadow-sm shadow-red-500/20">
+                        <XCircle className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Request Declined</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Your application to join was declined.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={handleRequestVolunteer}
+                        disabled={submittingVolunteerAction}
+                        className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Reapply to Join
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <span className="badge bg-slate-50 border text-slate-500 rounded-pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
-                      Not a Volunteer
-                    </span>
-                    <button
-                      onClick={handleRequestVolunteer}
-                      disabled={submittingVolunteerAction}
-                      className="w-full md:w-auto rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-1.5 px-4 text-xs font-semibold transition-colors shadow-sm"
-                    >
-                      Request to Join
-                    </button>
-                  </>
+                  <div className="flex flex-col space-y-4 w-full bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/60 shadow-xs animate-in fade-in zoom-in-95">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border dark:border-slate-700 shadow-xs">
+                        <Heart className="h-5 w-5 text-[#0d6b66]" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Become a Volunteer</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">Submit application for posting privileges</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={handleRequestVolunteer}
+                        disabled={submittingVolunteerAction}
+                        className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.02] shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Apply to Join
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

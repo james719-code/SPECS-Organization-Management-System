@@ -10,7 +10,7 @@ import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { databases, functions } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, FUNCTION_ID } from '../../shared/constants';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, FUNCTION_ID } from '../../shared/constants';
 import { Query } from 'appwrite';
 import type { StudentDoc, AccountDoc } from '../../types/database';
 
@@ -47,6 +47,18 @@ const AdminStudents: React.FC = () => {
 
   const [promoteConfirmOpen, setPromoteConfirmOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState('');
+
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Edit Profile States
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editStudentId, setEditStudentId] = useState('');
+  const [editYearLevel, setEditYearLevel] = useState('');
+  const [editSection, setEditSection] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editEmail, setEditEmail] = useState('');
 
   const OFFICER_POSITIONS = [
     { value: 'president', label: 'President' },
@@ -182,6 +194,81 @@ const AdminStudents: React.FC = () => {
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  useEffect(() => {
+    const loadUserRole = async () => {
+      try {
+        const stored = localStorage.getItem('appwrite_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.role) {
+            setUserRole(parsed.role);
+            return;
+          }
+        }
+        const currentUser = await cachedApi.users.getCurrent();
+        if (currentUser) {
+          const accDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, currentUser.$id);
+          setUserRole(accDoc.type || null);
+        }
+      } catch (err) {
+        console.error('Failed to resolve current user role:', err);
+      }
+    };
+    loadUserRole();
+  }, []);
+
+  const handleOpenEditModal = () => {
+    if (!detailStudent) return;
+    setEditName(detailStudent.name || '');
+    setEditStudentId(String(detailStudent.student_id || ''));
+    setEditYearLevel(String(detailStudent.yearLevel || ''));
+    setEditSection(detailStudent.section || '');
+    setEditAddress(detailStudent.address || '');
+    setEditEmail(detailStudent.email || '');
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailStudent) return;
+
+    const stdIdNum = parseInt(editStudentId, 10);
+    if (isNaN(stdIdNum) || stdIdNum <= 0) {
+      addToast({ type: 'error', title: 'Validation Error', message: 'Student ID must be a positive number.' });
+      return;
+    }
+
+    if (!editName.trim()) {
+      addToast({ type: 'error', title: 'Validation Error', message: 'Name cannot be empty.' });
+      return;
+    }
+
+    setSavingStudent(true);
+    try {
+      const updated: Partial<StudentDoc> = {
+        name: editName.trim(),
+        student_id: stdIdNum,
+        yearLevel: editYearLevel ? parseInt(editYearLevel, 10) : null,
+        section: editSection.trim() || null,
+        address: editAddress.trim() || null,
+        email: editEmail.trim() || null,
+      };
+
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, detailStudent.$id, updated);
+      
+      const updatedDoc = { ...detailStudent, ...updated } as StudentDoc;
+      setDetailStudent(updatedDoc);
+      setStudents(prev => prev.map(s => s.$id === detailStudent.$id ? updatedDoc : s));
+      setEditModalOpen(false);
+      api.cache.clearTags(['students', 'dashboard']);
+      addToast({ type: 'success', title: 'Profile Updated', message: `"${editName}" has been updated successfully.` });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update student profile.' });
+    } finally {
+      setSavingStudent(false);
+    }
+  };
 
   const getAvatarStyle = (name: string) => {
     const code = name.charCodeAt(0) || 0;
@@ -406,7 +493,7 @@ const AdminStudents: React.FC = () => {
       </div>
 
       {/* Bulk Action Bar */}
-      {selectedIds.size > 0 && (
+      {userRole === 'admin' && selectedIds.size > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-l-4 border-l-[#0d6b66] border-slate-200 bg-white px-4 py-3 shadow-sm animate-in fade-in slide-in-from-top-4">
           <div className="flex items-center gap-3">
             <input
@@ -478,24 +565,26 @@ const AdminStudents: React.FC = () => {
                   )}
 
                   {/* Select Checkbox */}
-                  <div
-                    className="absolute top-4 left-4 z-10"
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (!isProcessing) handleSelectOne(student.$id);
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      disabled={isProcessing}
-                      onChange={() => {}} // handled by click
-                      className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
+                  {userRole === 'admin' && (
+                    <div
+                      className="absolute top-4 left-4 z-10"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!isProcessing) handleSelectOne(student.$id);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={isProcessing}
+                        onChange={() => {}} // handled by click
+                        className="h-4.5 w-4.5 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  )}
 
                   {/* Inline delete */}
-                  {!isProcessing && (
+                  {!isProcessing && userRole === 'admin' && (
                     <button
                       onClick={e => {
                         e.stopPropagation();
@@ -601,7 +690,7 @@ const AdminStudents: React.FC = () => {
 
             {/* Actions */}
             <div className="space-y-3 pt-6 border-t mt-8">
-              {linkedAccount && (
+              {userRole === 'admin' && linkedAccount && (
                 <>
                   {linkedAccount.type === 'student' && linkedAccount.verified && (
                     <button
@@ -628,22 +717,31 @@ const AdminStudents: React.FC = () => {
               <div className="flex gap-3">
                 <button
                   type="button"
+                  onClick={handleOpenEditModal}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-2.5 text-sm font-semibold transition-colors shadow-sm"
+                >
+                  Edit Details
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setDetailStudent(null);
-                    navigate('/dashboard/admin/payments');
+                    navigate(`/dashboard/${userRole || 'admin'}/payments`);
                   }}
                   className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                 >
                   View Payments
                 </button>
+              </div>
+              {userRole === 'admin' && (
                 <button
                   type="button"
                   onClick={() => setDeleteConfirm({ open: true, student: detailStudent })}
-                  className="flex-1 rounded-lg bg-red-50 border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm"
+                  className="w-full rounded-lg bg-red-50 border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm"
                 >
                   Delete Record
                 </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -673,7 +771,7 @@ const AdminStudents: React.FC = () => {
       />
 
       {/* Promote Position Assignment Modal */}
-      {promoteConfirmOpen && (
+      {promoteConfirmOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden p-6 animate-in zoom-in-95">
             <h3 className="text-base font-bold text-slate-900 mb-2">Assign Officer Position</h3>
@@ -724,7 +822,129 @@ const AdminStudents: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
+
+      {/* Edit Student Profile Modal */}
+      {editModalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-6 animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Edit Student Details</h3>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Student ID
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editStudentId}
+                    onChange={e => setEditStudentId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Year Level
+                  </label>
+                  <select
+                    value={editYearLevel}
+                    onChange={e => setEditYearLevel(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  >
+                    <option value="">N/A</option>
+                    <option value="1">Year 1</option>
+                    <option value="2">Year 2</option>
+                    <option value="3">Year 3</option>
+                    <option value="4">Year 4</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Section
+                  </label>
+                  <input
+                    type="text"
+                    value={editSection}
+                    onChange={e => setEditSection(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    placeholder="e.g. A, B"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={e => setEditEmail(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    placeholder="student@example.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Address
+                </label>
+                <textarea
+                  value={editAddress}
+                  onChange={e => setEditAddress(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none resize-none"
+                  placeholder="Complete Address"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  disabled={savingStudent}
+                  className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingStudent}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white py-2.5 text-sm font-semibold transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingStudent ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      , document.body)}
     </div>
   );
 };

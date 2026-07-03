@@ -114,11 +114,13 @@ Officers represent the executive team, possessing dashboard management tools to 
   * Add external links and edit description timelines.
 
 ### 📇 Student Directory
-* **View File:** [students.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-officer/views/students.js)
-* **Description:** Filterable register of all students linked to the system.
+* **View File:** [AdminStudents.tsx](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/pages/admin/AdminStudents.tsx)
+* **Description:** Filterable register of all students linked to the system (shared with Admin view).
 * **Key Features:**
   * Search by name, section, or student ID.
-  * Toggle student verification state (approve pending registrations).
+  * View detailed student profile records and financials.
+  * Update student details (Full Name, Student ID, Year, Section, Address, Email).
+  * **Role Restriction:** Officers can only view and update profiles. Promotion, demotion, and deletion are restricted to Admins.
 
 ### 💳 Payment Management
 * **View File:** [payments.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-officer/views/payments.js)
@@ -202,11 +204,13 @@ Admins hold the highest privilege, controlling accounts, databases, global setti
   * Modify or remove financial logs to balance registers.
 
 ### 📇 Student Directory (Comprehensive)
-* **View File:** [students.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/students.js)
+* **View File:** [AdminStudents.tsx](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/pages/admin/AdminStudents.tsx)
 * **Description:** Master record of students.
 * **Key Features:**
-  * Create, edit, and delete student records.
-  * Directly modify student metadata (year level, section, volunteer flags).
+  * View student details and history logs.
+  * Edit and update student profile metadata (year level, section, address, email).
+  * Promote student to Officer or demote back to Student.
+  * Cascade deletion of student records and linked user accounts (single or bulk).
 
 ### 📂 File Management (Override)
 * **View File:** [files.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/files.js)

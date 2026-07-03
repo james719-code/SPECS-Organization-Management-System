@@ -116,4 +116,41 @@ if (DEV_BYPASS) {
     functions = new Functions(client);
 }
 
-export { client, account, databases, storage, Query, ID, functions };
+import { globalLoadingTracker } from './pendingTracker.js';
+
+const trackedDatabases = new Proxy(databases, {
+    get(target, prop, receiver) {
+        const val = Reflect.get(target, prop, receiver);
+        if (typeof val === 'function' && ['createDocument', 'updateDocument', 'deleteDocument'].includes(prop as string)) {
+            return async (...args: any[]) => {
+                globalLoadingTracker.startRequest();
+                try {
+                    return await val.apply(target, args);
+                } finally {
+                    globalLoadingTracker.endRequest();
+                }
+            };
+        }
+        return val;
+    }
+});
+
+const trackedFunctions = new Proxy(functions, {
+    get(target, prop, receiver) {
+        const val = Reflect.get(target, prop, receiver);
+        if (typeof val === 'function' && prop === 'createExecution') {
+            return async (...args: any[]) => {
+                globalLoadingTracker.startRequest();
+                try {
+                    return await val.apply(target, args);
+                } finally {
+                    globalLoadingTracker.endRequest();
+                }
+            };
+        }
+        return val;
+    }
+});
+
+export { client, account, trackedDatabases as databases, storage, Query, ID, trackedFunctions as functions };
+

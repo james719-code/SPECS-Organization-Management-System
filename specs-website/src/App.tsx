@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
+import { useGlobalLoading } from './shared/pendingTracker';
 import { 
   LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings, 
   Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2
@@ -45,6 +46,7 @@ import AdminOfficers from './pages/admin/AdminOfficers';
 import AdminTasks from './pages/admin/AdminTasks';
 
 export default function App() {
+  const isPending = useGlobalLoading();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
@@ -168,7 +170,8 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/story/:id" element={<StoryPage />} />
       <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
@@ -235,7 +238,8 @@ export default function App() {
                   groupName: 'General',
                   items: [
                     { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/my-attendance', label: 'My Attendance', icon: <CheckSquare className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -269,6 +273,7 @@ export default function App() {
       >
         <Route index element={<AdminOverview />} />
         <Route path="profile" element={<StudentProfile />} />
+        <Route path="my-attendance" element={<StudentAttendance />} />
         <Route path="attendance" element={<AdminAttendance />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="finance/details/:name" element={<AdminFinance isDetailsView={true} />} />
@@ -362,5 +367,18 @@ export default function App() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
+    {isPending && (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="flex flex-col items-center p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-800/50 max-w-xs animate-in zoom-in-95 duration-200">
+          <div className="relative flex items-center justify-center mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
+            <div className="h-12 w-12 rounded-full border-4 border-t-[#0d6b66] border-r-[#0d6b66]/30 border-b-transparent border-l-transparent animate-spin" />
+          </div>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">Saving Changes</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 text-center font-medium">Please do not close this window or navigate away...</p>
+        </div>
+      </div>
+    )}
+  </>
+);
 }
