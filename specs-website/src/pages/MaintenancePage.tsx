@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldAlert, Sun, Moon, LogOut, Loader2 } from 'lucide-react';
+import { account } from '../shared/appwrite';
 
 interface MaintenancePageProps {
   theme: 'light' | 'dark';
@@ -14,7 +15,6 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ theme, toggleTheme, i
   const handleLogout = async () => {
     try {
       setLoggingOut(true);
-      const { account } = await import('../shared/appwrite');
       await account.deleteSession('current');
       localStorage.removeItem('appwrite_session');
       // Reload the application to reset state and re-trigger check

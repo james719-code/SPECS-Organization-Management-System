@@ -75,15 +75,6 @@ export default defineConfig({
         main: resolve(__dirname, 'src/index.html'),
       },
       output: {
-        // Single vendor chunk — keeps all node_modules in one file so Rollup
-        // can guarantee module initialization order. Splitting vendor further
-        // causes runtime errors because the browser may load parallel chunks
-        // in any order, breaking React's internal bootstrapping.
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
       },
     },
   }

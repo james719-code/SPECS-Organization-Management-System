@@ -1,6 +1,4 @@
 import { Client, Account, Databases, Storage, Query, ID, Functions } from "appwrite";
-// @ts-ignore
-import { mockApi } from './mock/mockApiService.js';
 import { dataCache } from './cache.js';
 
 const IS_DEV = import.meta.env.DEV;
@@ -16,39 +14,46 @@ let databases: any;
 let storage: any;
 let functions: any;
 
+const getMockApi = async () => {
+    // @ts-ignore
+    const { mockApi } = await import('./mock/mockApiService.js');
+    return mockApi;
+};
+
 if (DEV_BYPASS) {
     console.log('[DEV] Using mock Appwrite SDK');
     client = null;
 
     account = {
-        get: () => mockApi.getCurrentUser(),
-        createEmailPasswordSession: (email: string, password: string) => mockApi.login(email, password),
+        get: async () => (await getMockApi()).getCurrentUser(),
+        createEmailPasswordSession: async (email: string, password: string) => (await getMockApi()).login(email, password),
         deleteSession: async (sessionId = 'current') => {
-            const res = await mockApi.logout(sessionId);
+            const mock = await getMockApi();
+            const res = await mock.logout(sessionId);
             dataCache.clear();
             return res;
         },
-        createRecovery: (email: string, _url: string) => mockApi.sendPasswordResetEmail(email),
-        updateRecovery: (userId: string, secret: string, password: string) => mockApi.confirmPasswordRecovery(userId, secret, password),
-        create: (_userId: string, email: string, password: string, name: string) => mockApi.register(email, password, name),
-        createVerification: (_url: string) => mockApi.sendVerificationEmail()
+        createRecovery: async (email: string, _url: string) => (await getMockApi()).sendPasswordResetEmail(email),
+        updateRecovery: async (userId: string, secret: string, password: string) => (await getMockApi()).confirmPasswordRecovery(userId, secret, password),
+        create: async (_userId: string, email: string, password: string, name: string) => (await getMockApi()).register(email, password, name),
+        createVerification: async (_url: string) => (await getMockApi()).sendVerificationEmail()
     };
 
     databases = {
-        listDocuments: (dbId: string, collectionId: string, queries?: any[]) => mockApi.listDocuments(dbId, collectionId, queries),
-        getDocument: (dbId: string, collectionId: string, docId: string) => mockApi.getDocument(dbId, collectionId, docId),
-        createDocument: (dbId: string, collectionId: string, docId: string, data: any, _permissions?: any[]) => mockApi.createDocument(dbId, collectionId, docId, data),
-        updateDocument: (dbId: string, collectionId: string, docId: string, data: any) => mockApi.updateDocument(dbId, collectionId, docId, data),
-        deleteDocument: (dbId: string, collectionId: string, docId: string) => mockApi.deleteDocument(dbId, collectionId, docId)
+        listDocuments: async (dbId: string, collectionId: string, queries?: any[]) => (await getMockApi()).listDocuments(dbId, collectionId, queries),
+        getDocument: async (dbId: string, collectionId: string, docId: string) => (await getMockApi()).getDocument(dbId, collectionId, docId),
+        createDocument: async (dbId: string, collectionId: string, docId: string, data: any, _permissions?: any[]) => (await getMockApi()).createDocument(dbId, collectionId, docId, data),
+        updateDocument: async (dbId: string, collectionId: string, docId: string, data: any) => (await getMockApi()).updateDocument(dbId, collectionId, docId, data),
+        deleteDocument: async (dbId: string, collectionId: string, docId: string) => (await getMockApi()).deleteDocument(dbId, collectionId, docId)
     };
 
     storage = {
-        listFiles: (bucketId: string, queries?: any[]) => mockApi.listFiles(bucketId, queries),
-        getFile: (_bucketId: string, fileId: string) => mockApi.getDocument('files', 'files', fileId),
-        createFile: (bucketId: string, fileId: string, file: any, _permissions?: any[]) => mockApi.createFile(bucketId, fileId, file),
-        deleteFile: (bucketId: string, fileId: string) => mockApi.deleteFile(bucketId, fileId),
-        getFileView: (bucketId: string, fileId: string) => mockApi.getFileView(bucketId, fileId),
-        getFileDownload: (bucketId: string, fileId: string) => mockApi.getFileDownload(bucketId, fileId)
+        listFiles: async (bucketId: string, queries?: any[]) => (await getMockApi()).listFiles(bucketId, queries),
+        getFile: async (_bucketId: string, fileId: string) => (await getMockApi()).getDocument('files', 'files', fileId),
+        createFile: async (bucketId: string, fileId: string, file: any, _permissions?: any[]) => (await getMockApi()).createFile(bucketId, fileId, file),
+        deleteFile: async (bucketId: string, fileId: string) => (await getMockApi()).deleteFile(bucketId, fileId),
+        getFileView: (bucketId: string, fileId: string) => `https://mock-storage.local/buckets/${bucketId}/files/${fileId}/view`,
+        getFileDownload: (bucketId: string, fileId: string) => `https://mock-storage.local/buckets/${bucketId}/files/${fileId}/download`
     };
 
     functions = {
@@ -56,15 +61,16 @@ if (DEV_BYPASS) {
             try {
                 const parsed = typeof body === 'string' ? JSON.parse(body) : body;
                 const { action, payload } = parsed;
+                const mock = await getMockApi();
                 if (action === 'promote_officer') {
-                    await mockApi.updateAccountType(payload.userId, 'officer');
+                    await mock.updateAccountType(payload.userId, 'officer');
                     return {
                         $id: `execution-${Date.now()}`,
                         status: 'completed',
                         responseBody: JSON.stringify({ success: true })
                     };
                 } else if (action === 'demote_officer') {
-                    await mockApi.updateAccountType(payload.userId, 'student');
+                    await mock.updateAccountType(payload.userId, 'student');
                     return {
                         $id: `execution-${Date.now()}`,
                         status: 'completed',

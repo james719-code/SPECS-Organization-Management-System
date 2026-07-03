@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
@@ -7,43 +7,47 @@ import {
   Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2
 } from 'lucide-react';
 
-// Import Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import PendingVerificationPage from './pages/PendingVerificationPage';
-import StoryPage from './pages/StoryPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import MaintenancePage from './pages/MaintenancePage';
+// Core imports
+import { databases, account } from './shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants';
 
 // Import Layout
 import DashboardLayout from './components/DashboardLayout';
 
+// Lazy-load Pages
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const PendingVerificationPage = lazy(() => import('./pages/PendingVerificationPage'));
+const StoryPage = lazy(() => import('./pages/StoryPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
+
 // Student Pages
-import StudentProfile from './pages/student/StudentProfile';
-import StudentAttendance from './pages/student/StudentAttendance';
-import StudentEvents from './pages/student/StudentEvents';
-import StudentPayments from './pages/student/StudentPayments';
-import StudentPosts from './pages/student/StudentPosts';
+const StudentProfile = lazy(() => import('./pages/student/StudentProfile'));
+const StudentAttendance = lazy(() => import('./pages/student/StudentAttendance'));
+const StudentEvents = lazy(() => import('./pages/student/StudentEvents'));
+const StudentPayments = lazy(() => import('./pages/student/StudentPayments'));
+const StudentPosts = lazy(() => import('./pages/student/StudentPosts'));
 
 // Admin / Officer Shared Pages
-import VolunteersManagement from './pages/shared/VolunteersManagement';
+const VolunteersManagement = lazy(() => import('./pages/shared/VolunteersManagement'));
 
 // Admin Pages
-import AdminOverview from './pages/admin/AdminOverview';
-import AdminAccounts from './pages/admin/AdminAccounts';
-import AdminStudents from './pages/admin/AdminStudents';
-import AdminEvents from './pages/admin/AdminEvents';
-import AdminAttendance from './pages/admin/AdminAttendance';
-import AdminPayments from './pages/admin/AdminPayments';
-import AdminFinance from './pages/admin/AdminFinance';
-import AdminFiles from './pages/admin/AdminFiles';
-import AdminAnnouncements from './pages/admin/AdminAnnouncements';
-import AdminStories from './pages/admin/AdminStories';
-import AdminReports from './pages/admin/AdminReports';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminOfficers from './pages/admin/AdminOfficers';
-import AdminTasks from './pages/admin/AdminTasks';
+const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
+const AdminAccounts = lazy(() => import('./pages/admin/AdminAccounts'));
+const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
+const AdminEvents = lazy(() => import('./pages/admin/AdminEvents'));
+const AdminAttendance = lazy(() => import('./pages/admin/AdminAttendance'));
+const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
+const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'));
+const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'));
+const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
+const AdminStories = lazy(() => import('./pages/admin/AdminStories'));
+const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminOfficers = lazy(() => import('./pages/admin/AdminOfficers'));
+const AdminTasks = lazy(() => import('./pages/admin/AdminTasks'));
 
 export default function App() {
   const isPending = useGlobalLoading();
@@ -76,9 +80,6 @@ export default function App() {
   useEffect(() => {
     const checkMaintenanceAndRole = async () => {
       try {
-        const { databases, account } = await import('./shared/appwrite');
-        const { DATABASE_ID, COLLECTION_ID_ACCOUNTS } = await import('./shared/constants');
-
         // Check if user is logged in
         let loggedInUser: any = null;
         try {
@@ -152,25 +153,29 @@ export default function App() {
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
+  const fallbackSpinner = (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <Loader2 className="h-8 w-8 animate-spin text-[#0d6b66]" />
+    </div>
+  );
+
   if (loadingMaintenance) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0d6b66]" />
-      </div>
-    );
+    return fallbackSpinner;
   }
 
   if (isMaintenance && userRole !== 'admin') {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
-        <Route path="*" element={<MaintenancePage theme={theme} toggleTheme={toggleTheme} isLoggedIn={!!userRole} />} />
-      </Routes>
+      <Suspense fallback={fallbackSpinner}>
+        <Routes>
+          <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
+          <Route path="*" element={<MaintenancePage theme={theme} toggleTheme={toggleTheme} isLoggedIn={!!userRole} />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   return (
-    <>
+    <Suspense fallback={fallbackSpinner}>
       <Routes>
       <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/story/:id" element={<StoryPage />} />
@@ -367,18 +372,18 @@ export default function App() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    {isPending && (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="flex flex-col items-center p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-800/50 max-w-xs animate-in zoom-in-95 duration-200">
-          <div className="relative flex items-center justify-center mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
-            <div className="h-12 w-12 rounded-full border-4 border-t-[#0d6b66] border-r-[#0d6b66]/30 border-b-transparent border-l-transparent animate-spin" />
+      {isPending && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex flex-col items-center p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-800/50 max-w-xs animate-in zoom-in-95 duration-200">
+            <div className="relative flex items-center justify-center mb-4">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
+              <div className="h-12 w-12 rounded-full border-4 border-t-[#0d6b66] border-r-[#0d6b66]/30 border-b-transparent border-l-transparent animate-spin" />
+            </div>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">Saving Changes</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 text-center font-medium">Please do not close this window or navigate away...</p>
           </div>
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">Saving Changes</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 text-center font-medium">Please do not close this window or navigate away...</p>
         </div>
-      </div>
-    )}
-  </>
-);
+      )}
+    </Suspense>
+  );
 }

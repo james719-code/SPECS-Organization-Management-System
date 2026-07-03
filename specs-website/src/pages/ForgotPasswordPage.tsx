@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { account } from '../shared/appwrite';
+import { account, databases } from '../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle, CheckCircle2, ArrowLeft, Sparkles } from 'lucide-react';
 
 interface ForgotPasswordPageProps {
@@ -37,8 +38,6 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
         const user = await account.get();
         if (user) {
           // Fetch user profile to route appropriately
-          const { databases } = await import('../shared/appwrite');
-          const { DATABASE_ID, COLLECTION_ID_ACCOUNTS } = await import('../shared/constants');
           const profile = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
           if (!profile.deactivated) {
             if (!profile.verified && profile.type !== 'admin') {

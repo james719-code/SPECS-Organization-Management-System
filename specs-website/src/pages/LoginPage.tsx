@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { account } from '../shared/appwrite';
+import { account, databases } from '../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
@@ -68,8 +69,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
 
   // Quick helper to fetch account profile manually
   const apiGetAccountProfile = async (userId: string) => {
-    const { databases } = await import('../shared/appwrite');
-    const { DATABASE_ID, COLLECTION_ID_ACCOUNTS } = await import('../shared/constants');
     return await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, userId);
   };
 
