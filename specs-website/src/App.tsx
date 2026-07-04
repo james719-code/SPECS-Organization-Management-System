@@ -14,8 +14,10 @@ import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants';
 // Import Layout
 import DashboardLayout from './components/DashboardLayout';
 
+// Static import for LandingPage to optimize critical render path
+import LandingPage from './pages/LandingPage';
+
 // Lazy-load Pages
-const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 const PendingVerificationPage = lazy(() => import('./pages/PendingVerificationPage'));
