@@ -52,6 +52,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
       const profile = await apiGetAccountProfile(user.$id);
       
       if (profile.deactivated) {
+        await account.deleteSession('current');
         throw new Error('This account has been deactivated.');
       }
 

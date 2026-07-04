@@ -41,9 +41,9 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
   // Add Payment View State
   const isAddView = isCreateView;
-  const [itemName, setItemName] = useState('');
-  const [price, setPrice] = useState<number>(0);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [dynamicItems, setDynamicItems] = useState<{ id: string; name: string; price: number; quantity: number }[]>([
+    { id: '1', name: '', price: 0, quantity: 1 }
+  ]);
   const [isEventLink, setIsEventLink] = useState(false);
   const [activityName, setActivityName] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -89,6 +89,22 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   const activitiesList = useMemo(() => {
     const groups = new Set<string>();
     payments.filter(p => !p.is_outside_bscs).forEach(p => {
+      let actName = 'General Collection';
+      if (p.is_event && p.events) {
+        const evId = typeof p.events === 'object' ? p.events.$id : p.events;
+        const ev = events.find(e => e.$id === evId);
+        actName = ev?.event_name || 'Linked Event';
+      } else if (p.activity) {
+        actName = p.activity;
+      }
+      groups.add(actName);
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b));
+  }, [payments, events]);
+
+  const outsideActivitiesList = useMemo(() => {
+    const groups = new Set<string>();
+    payments.filter(p => p.is_outside_bscs).forEach(p => {
       let actName = 'General Collection';
       if (p.is_event && p.events) {
         const evId = typeof p.events === 'object' ? p.events.$id : p.events;
@@ -173,8 +189,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   // Assign payment logic
   const handleCreatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!itemName.trim() || price < 0 || quantity < 1) {
-      addToast({ type: 'warning', title: 'Invalid inputs', message: 'Please review payment details.' });
+    
+    const invalidItem = dynamicItems.find(item => !item.name.trim() || item.price < 0 || item.quantity < 1);
+    if (invalidItem) {
+      addToast({ type: 'warning', title: 'Invalid inputs', message: 'Each item must have a name, non-negative price, and quantity of at least 1.' });
       return;
     }
 
@@ -185,41 +203,46 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
     setSubmitting(true);
     try {
-      const payload: Partial<PaymentDoc> = {
-        item_name: itemName,
-        price,
-        quantity,
-        is_event: isEventLink,
-        events: isEventLink ? selectedEventId : null,
-        activity: isEventLink ? null : activityName,
-        is_paid: false,
-        date_paid: new Date(0).toISOString(),
-        is_outside_bscs: false
-      };
+      // Loop over each item and insert them
+      for (const item of dynamicItems) {
+        const payload: Partial<PaymentDoc> = {
+          item_name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          is_event: isEventLink,
+          events: isEventLink ? selectedEventId : null,
+          activity: isEventLink ? null : activityName,
+          is_paid: false,
+          date_paid: new Date(0).toISOString(),
+          is_outside_bscs: false
+        };
+
+        if (assignAll) {
+          // Create payment document for all students
+          await Promise.all(
+            students.map(async (std) => {
+              const profile = std.students as any;
+              const pId = profile?.$id || std.$id;
+              await api.payments.create({ ...payload, students: pId });
+            })
+          );
+        } else if (selectedAssigneeIds.length > 0) {
+          await Promise.all(
+            selectedAssigneeIds.map(async (id) => {
+              await api.payments.create({ ...payload, students: id });
+            })
+          );
+        }
+      }
 
       if (assignAll) {
-        // Create payment document for all students
-        await Promise.all(
-          students.map(async (std) => {
-            const profile = std.students as any;
-            const pId = profile?.$id || std.$id;
-            await api.payments.create({ ...payload, students: pId });
-          })
-        );
         addToast({ type: 'success', title: 'Assigned All', message: `Outstanding dues assigned to ${students.length} students.` });
-      } else if (selectedAssigneeIds.length > 0) {
-        await Promise.all(
-          selectedAssigneeIds.map(async (id) => {
-            await api.payments.create({ ...payload, students: id });
-          })
-        );
+      } else {
         addToast({ type: 'success', title: 'Assigned', message: `Outstanding dues assigned to ${selectedAssigneeIds.length} students.` });
       }
 
       navigate(window.location.pathname.split('/create')[0]);
-      setItemName('');
-      setPrice(0);
-      setQuantity(1);
+      setDynamicItems([{ id: Date.now().toString(), name: '', price: 0, quantity: 1 }]);
       setIsEventLink(false);
       setActivityName('');
       setSelectedEventId('');
@@ -237,8 +260,14 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
   const handleRecordOutsidePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nonBscsName.trim() || !itemName.trim() || price <= 0 || quantity < 1) {
-      addToast({ type: 'warning', title: 'Invalid inputs', message: 'Please review payment details.' });
+    if (!nonBscsName.trim()) {
+      addToast({ type: 'warning', title: 'Invalid inputs', message: 'Please enter payer name / organization.' });
+      return;
+    }
+
+    const invalidItem = dynamicItems.find(item => !item.name.trim() || item.price <= 0 || item.quantity < 1);
+    if (invalidItem) {
+      addToast({ type: 'warning', title: 'Invalid inputs', message: 'Each item must have a name, price greater than 0, and quantity of at least 1.' });
       return;
     }
 
@@ -264,75 +293,78 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         }
       }
 
-      const payload: Partial<PaymentDoc> = {
-        students: null,
-        is_event: isEventLink,
-        events: isEventLink ? selectedEventId : null,
-        activity: isEventLink ? null : activityName,
-        price,
-        item_name: itemName,
-        quantity,
-        date_paid: new Date(datePaid).toISOString(),
-        officers: officerId,
-        is_outside_bscs: true,
-        non_bscs_name: nonBscsName,
-        is_paid: true,
-        modal_paid: modality,
-        verified_by_name: verifierName
-      };
+      for (const item of dynamicItems) {
+        const payload: Partial<PaymentDoc> = {
+          students: null,
+          is_event: isEventLink,
+          events: isEventLink ? selectedEventId : null,
+          activity: isEventLink ? null : activityName,
+          price: item.price,
+          item_name: item.name,
+          quantity: item.quantity,
+          date_paid: new Date(datePaid).toISOString(),
+          officers: officerId,
+          is_outside_bscs: true,
+          non_bscs_name: nonBscsName,
+          is_paid: true,
+          modal_paid: modality,
+          verified_by_name: verifierName
+        };
 
-      // 1. Create payment document
-      const paymentDoc = await api.payments.create(payload);
+        // 1. Create payment document
+        const paymentDoc = await api.payments.create(payload);
 
-      // 2. Create revenue document
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
-        name: `${itemName} (Paid by ${nonBscsName}) [Outside Civilian]`,
-        isEvent: isEventLink,
-        event: (isEventLink && selectedEventId) ? selectedEventId : null,
-        activity: isEventLink ? null : activityName,
-        quantity: quantity,
-        price: price,
-        date_earned: new Date(datePaid).toISOString(),
-        recorder: recorderId
-      });
-
-      addToast({ type: 'success', title: 'Success', message: 'Outside payment collection recorded.' });
-
-      // 3. Optional Email Receipt (Background)
-      if (payerEmail.trim()) {
-        const datePaidStr = new Date(datePaid).toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric'
+        // 2. Create revenue document
+        await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
+          name: `${item.name} (Paid by ${nonBscsName}) [Outside Civilian]`,
+          isEvent: isEventLink,
+          event: (isEventLink && selectedEventId) ? selectedEventId : null,
+          activity: isEventLink ? null : activityName,
+          quantity: item.quantity,
+          price: item.price,
+          date_earned: new Date(datePaid).toISOString(),
+          recorder: recorderId
         });
-        const htmlBody = getReceiptHtml(
-          nonBscsName,
-          itemName,
-          price,
-          quantity,
-          datePaidStr,
-          paymentDoc.$id
-        );
-        (async () => {
-          try {
-            await functions.createExecution(
-              EMAIL_FUNCTION_ID,
-              JSON.stringify({
-                action: 'send_email',
-                payload: {
-                  to: payerEmail,
-                  subject: `Payment Receipt: ${itemName}`,
-                  body: htmlBody,
-                  html: true
-                }
-              })
-            );
-            addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${payerEmail}.` });
-          } catch (emailErr: any) {
-            console.error('[AdminPayments] Failed to send email receipt:', emailErr);
-            addToast({ type: 'warning', title: 'Receipt Not Sent', message: 'Recorded successfully, but email dispatch failed.' });
-          }
-        })();
+
+        // 3. Optional Email Receipt (Background)
+        if (payerEmail.trim()) {
+          const datePaidStr = new Date(datePaid).toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          const htmlBody = getReceiptHtml(
+            nonBscsName,
+            item.name,
+            item.price,
+            item.quantity,
+            datePaidStr,
+            paymentDoc.$id
+          );
+          (async () => {
+            try {
+              await functions.createExecution(
+                EMAIL_FUNCTION_ID,
+                JSON.stringify({
+                  action: 'send_email',
+                  payload: {
+                    to: payerEmail,
+                    subject: `Payment Receipt: ${item.name}`,
+                    body: htmlBody,
+                    html: true
+                  }
+                })
+              );
+            } catch (emailErr: any) {
+              console.error('[AdminPayments] Failed to send email receipt:', emailErr);
+            }
+          })();
+        }
+      }
+
+      addToast({ type: 'success', title: 'Success', message: 'Outside payment collections recorded.' });
+      if (payerEmail.trim()) {
+        addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt(s) dispatched to ${payerEmail}.` });
       }
 
       // Reset states & navigate back to outside tab
@@ -340,9 +372,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       setActiveTab('outside');
       
       setNonBscsName('');
-      setItemName('');
-      setPrice(0);
-      setQuantity(1);
+      setDynamicItems([{ id: Date.now().toString(), name: '', price: 0, quantity: 1 }]);
       setPayerEmail('');
       setIsEventLink(false);
       setActivityName('');
@@ -930,6 +960,350 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     printWindow.document.close();
   };
 
+  const handlePrintOutsideActivityLedger = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
+    const origin = window.location.origin;
+
+    // Group outside payments by activity
+    const activityGroups: Record<string, PaymentDoc[]> = {};
+    payments.filter(p => p.is_outside_bscs).forEach(p => {
+      let actName = 'General Collection';
+      if (p.is_event && p.events) {
+        const evId = typeof p.events === 'object' ? p.events.$id : p.events;
+        const ev = events.find(e => e.$id === evId);
+        actName = ev?.event_name || 'Linked Event';
+      } else if (p.activity) {
+        actName = p.activity;
+      }
+      if (!activityGroups[actName]) {
+        activityGroups[actName] = [];
+      }
+      activityGroups[actName].push(p);
+    });
+
+    const activitiesList = Object.keys(activityGroups).sort((a, b) => a.localeCompare(b));
+
+    const getOfficerDetails = (positionCode: string, defaultTitle: string) => {
+      const officer = officersList.find(o => o.position === positionCode);
+      if (officer && officer.students) {
+        const student = typeof officer.students === 'object' ? (officer.students as StudentDoc) : null;
+        if (student?.name) {
+          return {
+            name: student.name.toUpperCase(),
+            title: `${defaultTitle}, SPECS`
+          };
+        }
+      }
+      return {
+        name: '_______________________',
+        title: `${defaultTitle}, SPECS`
+      };
+    };
+
+    const presidentDetails = getOfficerDetails('president', 'President');
+    const auditorDetails = getOfficerDetails('auditor', 'Auditor');
+    
+    // For Treasurer/Prep by: resolved based on selection
+    const treasurerDetails = selectedRole === 'treasurer'
+      ? getOfficerDetails('treasurer', 'Treasurer')
+      : getOfficerDetails('asst-treasurer', 'Assistant Treasurer');
+
+    const adviserDetails = {
+      name: 'NICOLAS A. PURA',
+      title: 'Adviser, SPECS'
+    };
+
+    const activitiesToPrint = selectedScope === 'all'
+      ? activitiesList
+      : activitiesList.filter(a => a === selectedScope);
+
+    const pagesHtml = activitiesToPrint.map((activityName, index) => {
+      const actPayments = activityGroups[activityName];
+      const sortedPayments = [...actPayments].sort((a, b) => {
+        const nameA = a.non_bscs_name || 'Unknown';
+        const nameB = b.non_bscs_name || 'Unknown';
+        return nameA.localeCompare(nameB);
+      });
+
+      const totalPaid = sortedPayments.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      const paidCount = sortedPayments.length;
+
+      const rows = sortedPayments.map((p, idx) => {
+        const payerName = p.non_bscs_name || 'Unknown Payer';
+        const total = p.price * p.quantity;
+        const dateStr = p.date_paid && p.date_paid !== new Date(0).toISOString()
+          ? new Date(p.date_paid).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '—';
+        const recorderName = p.verified_by_name || 'Admin';
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td style="font-weight: bold;">${payerName}</td>
+            <td>${p.item_name}</td>
+            <td>₱${p.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${p.quantity}</td>
+            <td style="font-weight: bold;">₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${recorderName}</td>
+            <td>${dateStr}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const pageBreakHtml = index < activitiesToPrint.length - 1 ? '<div class="page-break"></div>' : '';
+
+      return `
+        <div class="activity-report-page">
+          <h2 class="report-title">Outside Payments Ledger Report</h2>
+          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
+            Activity / Event: ${activityName}
+          </h3>
+
+          <div class="meta-section">
+            <p class="meta-item"><strong>Activity Name:</strong> ${activityName}</p>
+            <p class="meta-item"><strong>Collected Amount:</strong> <span style="color: #059669; font-weight: bold;">₱${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+            <p class="meta-item"><strong>Transactions:</strong> <span>${paidCount}</span></p>
+          </div>
+
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 25%;">Payer / Organization Name</th>
+                <th style="width: 20%;">Item</th>
+                <th style="width: 10%;">Price</th>
+                <th style="width: 5%;">Qty</th>
+                <th style="width: 12%;">Total</th>
+                <th style="width: 13%;">Recorded By</th>
+                <th style="width: 10%;">Date Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No payment records found for this activity.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="signature-section" style="margin-top: 50px; page-break-inside: avoid;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px 80px;">
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${treasurerDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${treasurerDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">AUDITED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${auditorDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${auditorDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${adviserDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${adviserDetails.title.toUpperCase()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${pageBreakHtml}
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SPECS Outside Payments Ledger by Activity</title>
+          <style>
+            @page {
+              size: 8.5in 13in;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              line-height: 1.5;
+            }
+            .activity-report-page {
+              width: 100%;
+            }
+            .print-header {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 5cm;
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+              z-index: 1000;
+            }
+            .print-header img {
+              width: 100%;
+              height: auto;
+              max-height: 5cm;
+              object-fit: contain;
+              display: block;
+            }
+            .print-footer {
+              position: fixed;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              height: 3cm;
+              display: flex;
+              align-items: flex-end;
+              justify-content: center;
+              z-index: 1000;
+            }
+            .print-footer img {
+              width: 100%;
+              height: auto;
+              max-height: 3cm;
+              object-fit: contain;
+              display: block;
+            }
+            .print-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none !important;
+            }
+            .print-layout-table > thead > tr > td,
+            .print-layout-table > tbody > tr > td,
+            .print-layout-table > tfoot > tr > td {
+              padding-left: 2.54cm;
+              padding-right: 2.54cm;
+              border: none !important;
+              background: transparent !important;
+            }
+            .header-spacer {
+              height: 5cm;
+            }
+            .footer-spacer {
+              height: 3cm;
+            }
+            thead {
+              display: table-header-group;
+            }
+            tfoot {
+              display: table-footer-group;
+            }
+            .report-title {
+              text-align: center;
+              font-size: 20px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 20px 0 10px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 24px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px 30px;
+              font-size: 13px;
+            }
+            .meta-item {
+              margin: 0;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 16px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #e2e8f0;
+              padding: 10px 12px;
+              text-align: left;
+              font-size: 12px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 11px;
+              letter-spacing: 0.5px;
+            }
+            .report-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+
+            .page-break {
+              page-break-after: always;
+              break-after: page;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <img src="${origin}/header.png" alt="Header" />
+          </div>
+          <div class="print-footer">
+            <img src="${origin}/footer.png" alt="Footer" />
+          </div>
+
+          <table class="print-layout-table">
+            <thead>
+              <tr>
+                <td>
+                  <div class="header-spacer"></div>
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  ${pagesHtml || '<div style="text-align: center; padding: 40px; color: #94a3b8;">No payment activities available to print.</div>'}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>
+                  <div class="footer-spacer"></div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Metrics computation
   const summary = useMemo(() => {
     const memberPayments = payments.filter(p => !p.is_outside_bscs);
@@ -1085,42 +1459,83 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Item Name / Description</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Registration Fee, Entrance Pass"
-                  value={itemName}
-                  onChange={e => setItemName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Price (PHP)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={price || ''}
-                    onChange={e => setPrice(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                  />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Items to Collect ({dynamicItems.length})</label>
+                  <button
+                    type="button"
+                    onClick={() => setDynamicItems(prev => [...prev, { id: Date.now().toString(), name: '', price: 0, quantity: 1 }])}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] hover:text-[#0b5c58] transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Item
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={quantity}
-                    onChange={e => setQuantity(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                  />
+
+                <div className="space-y-3">
+                  {dynamicItems.map((item, idx) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3 relative group">
+                      {dynamicItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setDynamicItems(prev => prev.filter(i => i.id !== item.id))}
+                          className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-slate-100"
+                          title="Remove item"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Item #${idx + 1}</div>
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Item Name / Description</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Registration Fee, Entrance Pass"
+                          value={item.name}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, name: val } : i));
+                          }}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price (PHP)</label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.price || ''}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, price: val } : i));
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            value={item.quantity}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: val } : i));
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1249,42 +1664,83 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
           <form onSubmit={handleCreatePayment} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Column - Form Fields */}
             <div className="lg:col-span-5 space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Item Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Membership Fee 2026"
-                  value={itemName}
-                  onChange={e => setItemName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Price (PHP)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={price || ''}
-                    onChange={e => setPrice(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                  />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Dues Items ({dynamicItems.length})</label>
+                  <button
+                    type="button"
+                    onClick={() => setDynamicItems(prev => [...prev, { id: Date.now().toString(), name: '', price: 0, quantity: 1 }])}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] hover:text-[#0b5c58] transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Item
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={quantity}
-                    onChange={e => setQuantity(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                  />
+
+                <div className="space-y-3">
+                  {dynamicItems.map((item, idx) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3 relative group">
+                      {dynamicItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setDynamicItems(prev => prev.filter(i => i.id !== item.id))}
+                          className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-slate-100"
+                          title="Remove item"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Item #${idx + 1}</div>
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Item Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Membership Fee 2026"
+                          value={item.name}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, name: val } : i));
+                          }}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price (PHP)</label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.price || ''}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, price: val } : i));
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            value={item.quantity}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              setDynamicItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: val } : i));
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#0d6b66] bg-white transition-colors"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1537,7 +1993,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   />
                 </div>
                 <button
-                  onClick={() => setPrintModalOpen(true)}
+                  onClick={() => {
+                    setPrintScope('all');
+                    setPrintModalOpen(true);
+                  }}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
                   title="Print Payment Ledger grouped by Activity"
                 >
@@ -1646,13 +2105,26 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                     className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none transition-colors"
                   />
                 </div>
-                <button
-                  onClick={() => navigate('outside')}
-                  className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Record Outside Payment
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setPrintScope('all');
+                      setPrintModalOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
+                    title="Print Outside Payment Ledger grouped by Activity"
+                  >
+                    <Printer className="h-4 w-4 text-slate-500" />
+                    Print Outside Report
+                  </button>
+                  <button
+                    onClick={() => navigate('outside')}
+                    className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Record Outside Payment
+                  </button>
+                </div>
               </div>
 
               {/* Outside Payments Table */}
@@ -2210,7 +2682,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
                   >
                     <option value="all">All Activities & Events</option>
-                    {activitiesList.map(actName => (
+                    {(activeTab === 'outside' ? outsideActivitiesList : activitiesList).map(actName => (
                       <option key={actName} value={actName}>{actName}</option>
                     ))}
                   </select>
@@ -2262,7 +2734,11 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                     }
                     setPrintModalOpen(false);
                     setTimeout(() => {
-                      handlePrintActivityLedger(printSignatory, printScope);
+                      if (activeTab === 'outside') {
+                        handlePrintOutsideActivityLedger(printSignatory, printScope);
+                      } else {
+                        handlePrintActivityLedger(printSignatory, printScope);
+                      }
                     }, 50);
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"

@@ -45,6 +45,10 @@ export const ErrorCodes = {
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
 
 export function mapAppwriteError(error: any): ErrorCode {
+  if (error?.message?.includes('missing scopes') || error?.message?.includes('guests')) {
+    return ErrorCodes.NOT_AUTHENTICATED;
+  }
+
   const code = error?.code || error?.type;
 
   switch (code) {
@@ -79,6 +83,23 @@ export function mapAppwriteError(error: any): ErrorCode {
 
 export function createApiError(error: any, operation: string): ApiError {
   const code = mapAppwriteError(error);
+
+  if (code === ErrorCodes.NOT_AUTHENTICATED) {
+    // Clear caches
+    try {
+      localStorage.removeItem('specs_data_cache');
+      localStorage.removeItem('specs_image_cache');
+    } catch (e) {
+      console.warn('Failed to clear cache on auth failure', e);
+    }
+    
+    // Redirect to login page
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      console.warn('[API] Unauthenticated request detected. Redirecting to /login.');
+      window.location.href = '/login';
+    }
+  }
+
   const message = `${operation}: ${error?.message || 'Unknown error'}`;
   return new ApiError(code, message, error);
 }

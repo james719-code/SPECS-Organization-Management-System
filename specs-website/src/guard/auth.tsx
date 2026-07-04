@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { cachedApi } from '../shared/api.js';
+import { account } from '../shared/appwrite.js';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -36,6 +37,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
             setAuthenticated(true);
             setUserProfile(profile);
           } else {
+            try {
+              await account.deleteSession('current');
+            } catch (err) {
+              console.warn('[AuthGuard] Failed to delete session on deactivation:', err);
+            }
             setAuthenticated(false);
           }
           setLoading(false);
