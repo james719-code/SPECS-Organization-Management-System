@@ -1177,26 +1177,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
             <h4 className="text-xs font-bold tracking-widest uppercase text-slate-400 dark:text-slate-505 mb-2">OFFICIAL CHAPTER</h4>
             <p className="text-xl font-bold text-slate-905 dark:text-white max-w-lg">
-              Aligned with the College of Engineering and Computational Sciences.
+              Aligned with the College of Engineering and Computational Sciences of Partido State University.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center md:justify-end gap-6 md:gap-8 opacity-75 dark:opacity-60 transition-all duration-300">
-            {/* PSU Logo Placeholder */}
+            {/* PSU Logo */}
             <div className="flex flex-col items-center text-center">
-              <div className="h-10 w-10 border border-dashed border-slate-350 dark:border-slate-650 rounded-xl bg-slate-105/50 dark:bg-slate-800/30 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 select-none" title="Partido State University Logo Placeholder">
-                Logo
+              <div className="h-24 w-24 flex items-center justify-center rounded-2xl shadow-md border border-slate-100 dark:border-slate-800/40 mb-3 overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
+                <img src="/parsu_logo.png" alt="Partido State University Logo" className="h-full w-full object-contain p-2.5" />
               </div>
-              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">Partido State University</span>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">Partido State University</span>
             </div>
 
-            <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+            <div className="hidden sm:block h-16 w-px bg-slate-200 dark:bg-slate-800"></div>
 
-            {/* College Logo Placeholder */}
+            {/* College Logo */}
             <div className="flex flex-col items-center text-center">
-              <div className="h-10 w-10 border border-dashed border-slate-350 dark:border-slate-650 rounded-xl bg-slate-105/50 dark:bg-slate-800/30 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 select-none" title="College Logo Placeholder">
-                Logo
+              <div className="h-24 w-24 flex items-center justify-center rounded-2xl shadow-md border border-slate-100 dark:border-slate-800/40 mb-3 overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
+                <img src="/cec_logo.png" alt="College Logo" className="h-full w-full object-contain p-1.5 scale-110" />
               </div>
-              <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">College of Engineering & Comp. Sciences</span>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">College of Engineering & Comp. Sciences</span>
             </div>
 
 

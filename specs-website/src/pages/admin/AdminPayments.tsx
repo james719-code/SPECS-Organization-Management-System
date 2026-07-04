@@ -9,7 +9,7 @@ import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, PaymentDoc, AccountDoc } from '../../types/database';
-import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail } from 'lucide-react';
+import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail, Printer } from 'lucide-react';
 import { functions, databases } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID, DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
 import { ID } from 'appwrite';
@@ -222,6 +222,11 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
     setSubmitting(true);
     try {
+      const officerId = currentUserProfile && currentUserProfile.type === 'officer'
+        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+        : null;
+      const recorderId = officerId;
+
       let verifierName = 'Admin';
       if (currentUserProfile) {
         if (currentUserProfile.type === 'admin') {
@@ -373,37 +378,41 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   const handleMarkPaid = async () => {
     if (!paidConfirm.payment) return;
     const payment = paidConfirm.payment;
-    setActionLoading(true);
-    try {
-      const studentProfile = selectedStudent?.students as any;
-      const sName = studentProfile?.name || selectedStudent?.username || 'Student';
+    const studentProfile = selectedStudent?.students as any;
+    const sName = studentProfile?.name || selectedStudent?.username || 'Student';
 
-      const officerId = currentUserProfile && currentUserProfile.type === 'officer'
-        ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
-        : null;
+    const officerId = currentUserProfile && currentUserProfile.type === 'officer'
+      ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+      : null;
+    const recorderId = officerId;
 
-      let verifierName = 'Admin';
-      if (currentUserProfile) {
-        if (currentUserProfile.type === 'admin') {
-          verifierName = currentUserProfile.admins && typeof currentUserProfile.admins === 'object'
-            ? (currentUserProfile.admins as any).fullName
-            : currentUserProfile.username;
-        } else if (currentUserProfile.students) {
-          verifierName = typeof currentUserProfile.students === 'object'
-            ? (currentUserProfile.students as any).name
-            : currentUserProfile.username;
-        } else {
-          verifierName = currentUserProfile.username;
-        }
+    let verifierName = 'Admin';
+    if (currentUserProfile) {
+      if (currentUserProfile.type === 'admin') {
+        verifierName = currentUserProfile.admins && typeof currentUserProfile.admins === 'object'
+          ? (currentUserProfile.admins as any).fullName
+          : currentUserProfile.username;
+      } else if (currentUserProfile.students) {
+        verifierName = typeof currentUserProfile.students === 'object'
+          ? (currentUserProfile.students as any).name
+          : currentUserProfile.username;
+      } else {
+        verifierName = currentUserProfile.username;
       }
+    }
 
-      await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId, verifierName);
-      addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
-      
-      // Send Email Receipt if student email exists (Background)
-      const sEmail = studentProfile?.email;
-      if (sEmail) {
-        (async () => {
+    // Close modal immediately to avoid UI blocking
+    setPaidConfirm({ open: false, payment: null });
+    addToast({ type: 'info', title: 'Processing Payment', message: 'Recording payment in the background...' });
+
+    (async () => {
+      try {
+        await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId, verifierName);
+        addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
+        
+        // Send Email Receipt if student email exists (Background)
+        const sEmail = studentProfile?.email;
+        if (sEmail) {
           try {
             const datePaidStr = new Date().toLocaleDateString('en-US', {
               month: 'long',
@@ -437,33 +446,32 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
             console.error('[AdminPayments] Failed to send email receipt:', emailErr);
             addToast({ type: 'warning', title: 'Receipt Not Sent', message: `Payment marked paid, but email receipt failed to send to ${sEmail}.` });
           }
-        })();
+        }
+        loadData(true);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to process payment.' });
       }
-
-      setPaidConfirm({ open: false, payment: null });
-      loadData(true);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to process payment.' });
-    } finally {
-      setActionLoading(false);
-    }
+    })();
   };
 
   // Delete payment due
   const handleDeletePayment = async () => {
     if (!deleteConfirm.payment) return;
     const payment = deleteConfirm.payment;
-    setActionLoading(true);
-    try {
-      await api.payments.delete(payment.$id);
-      addToast({ type: 'success', title: 'Deleted', message: 'Dues item removed from logs.' });
-      setDeleteConfirm({ open: false, payment: null });
-      loadData(true);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete record.' });
-    } finally {
-      setActionLoading(false);
-    }
+    
+    // Close modal immediately to avoid UI blocking
+    setDeleteConfirm({ open: false, payment: null });
+    addToast({ type: 'info', title: 'Deleting Dues', message: `Removing due "${payment.item_name}" in the background...` });
+    
+    (async () => {
+      try {
+        await api.payments.delete(payment.$id);
+        addToast({ type: 'success', title: 'Deleted', message: 'Dues item removed from logs.' });
+        loadData(true);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete record.' });
+      }
+    })();
   };
 
   // Send Outstanding Dues Notification
@@ -537,6 +545,290 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to dispatch email notice.' });
       }
     })();
+  };
+
+  const handlePrintActivityLedger = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
+    const origin = window.location.origin;
+
+    const getStudentName = (studentIdOrDoc: any) => {
+      if (!studentIdOrDoc) return 'Unknown Member';
+      const id = typeof studentIdOrDoc === 'object' ? studentIdOrDoc.$id : studentIdOrDoc;
+      const studentAcc = students.find(s => {
+        const profile = s.students as any;
+        const sId = profile?.$id || s.$id;
+        return sId === id;
+      });
+      if (studentAcc) {
+        const profile = studentAcc.students as any;
+        return profile?.name || studentAcc.username || 'Unknown Member';
+      }
+      return 'Unknown Member';
+    };
+
+    // Group payments by activity
+    const activityGroups: Record<string, PaymentDoc[]> = {};
+    payments.filter(p => !p.is_outside_bscs).forEach(p => {
+      let actName = 'General Collection';
+      if (p.is_event && p.events) {
+        const evId = typeof p.events === 'object' ? p.events.$id : p.events;
+        const ev = events.find(e => e.$id === evId);
+        actName = ev?.event_name || 'Linked Event';
+      } else if (p.activity) {
+        actName = p.activity;
+      }
+      if (!activityGroups[actName]) {
+        activityGroups[actName] = [];
+      }
+      activityGroups[actName].push(p);
+    });
+
+    const activitiesList = Object.keys(activityGroups).sort((a, b) => a.localeCompare(b));
+
+    const pagesHtml = activitiesList.map((activityName, index) => {
+      const actPayments = activityGroups[activityName];
+      const sortedPayments = [...actPayments].sort((a, b) => {
+        const nameA = getStudentName(a.students);
+        const nameB = getStudentName(b.students);
+        return nameA.localeCompare(nameB);
+      });
+
+      const totalPaid = sortedPayments.filter(p => p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      const totalOutstanding = sortedPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      const paidCount = sortedPayments.filter(p => p.is_paid).length;
+      const totalCount = sortedPayments.length;
+      const rate = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
+
+      const rows = sortedPayments.map((p, idx) => {
+        const studentName = getStudentName(p.students);
+        const total = p.price * p.quantity;
+        const dateStr = p.is_paid && p.date_paid && p.date_paid !== new Date(0).toISOString()
+          ? new Date(p.date_paid).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '—';
+        const recorderName = p.is_paid ? (p.verified_by_name || 'Admin') : '—';
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td style="font-weight: bold;">${studentName}</td>
+            <td>${p.item_name}</td>
+            <td>₱${p.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${p.quantity}</td>
+            <td style="font-weight: bold;">₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${recorderName}</td>
+            <td>${dateStr}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const pageBreakHtml = index < activitiesList.length - 1 ? '<div class="page-break"></div>' : '';
+
+      return `
+        <div class="activity-report-page">
+          <div class="header-container">
+            <div class="logo-container">
+              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
+            </div>
+            <div class="header-text">
+              <div class="university">Partido State University</div>
+              <div class="college">College of Engineering and Computational Sciences</div>
+              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
+            </div>
+            <div class="logo-container">
+              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
+            </div>
+          </div>
+
+          <h2 class="report-title">Payment Ledger Report</h2>
+          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
+            Activity: ${activityName}
+          </h3>
+
+          <div class="meta-section">
+            <p class="meta-item"><strong>Activity Name:</strong> ${activityName}</p>
+            <p class="meta-item"><strong>Collected Amount:</strong> <span style="color: #059669; font-weight: bold;">₱${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
+          </div>
+
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 25%;">Student Name</th>
+                <th style="width: 20%;">Item</th>
+                <th style="width: 10%;">Price</th>
+                <th style="width: 5%;">Qty</th>
+                <th style="width: 12%;">Total</th>
+                <th style="width: 13%;">Recorded By</th>
+                <th style="width: 10%;">Date Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No payment records found for this activity.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="footer-notes">
+            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal.
+          </div>
+        </div>
+        ${pageBreakHtml}
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SPECS Payment Ledger by Activity</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              margin: 40px;
+              line-height: 1.5;
+            }
+            .activity-report-page {
+              min-height: 90vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .header-container {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              border-bottom: 3px solid #0d6b66;
+              padding-bottom: 16px;
+              margin-bottom: 24px;
+            }
+            .logo-container {
+              width: 80px;
+              height: 80px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background-color: #ffffff;
+              border-radius: 12px;
+              padding: 4px;
+            }
+            .logo {
+              max-height: 100%;
+              max-width: 100%;
+              object-fit: contain;
+            }
+            .header-text {
+              text-align: center;
+              flex-grow: 1;
+              padding: 0 20px;
+            }
+            .university {
+              font-size: 16px;
+              font-weight: 800;
+              text-transform: uppercase;
+              color: #0f172a;
+              letter-spacing: 0.5px;
+            }
+            .college {
+              font-size: 12px;
+              font-weight: 600;
+              color: #475569;
+              margin-top: 2px;
+              text-transform: uppercase;
+            }
+            .org {
+              font-size: 11px;
+              font-weight: 700;
+              color: #0d6b66;
+              margin-top: 4px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .report-title {
+              text-align: center;
+              font-size: 20px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 20px 0 10px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 24px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px 30px;
+              font-size: 13px;
+            }
+            .meta-item {
+              margin: 0;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 16px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #e2e8f0;
+              padding: 10px 12px;
+              text-align: left;
+              font-size: 12px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 11px;
+              letter-spacing: 0.5px;
+            }
+            .report-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .footer-notes {
+              margin-top: auto;
+              padding-top: 20px;
+              font-size: 11px;
+              color: #64748b;
+              text-align: center;
+              border-top: 1px solid #e2e8f0;
+            }
+            .page-break {
+              page-break-after: always;
+              break-after: page;
+            }
+            @media print {
+              body {
+                margin: 20px;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${pagesHtml || '<div style="text-align: center; padding: 40px; color: #94a3b8;">No payment activities available to print.</div>'}
+
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   // Metrics computation
@@ -1133,16 +1425,26 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 </div>
               </div>
 
-              {/* Search bar */}
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search ledger..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none transition-colors"
-                />
+              {/* Search bar & Action row */}
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                <div className="relative max-w-sm flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search ledger..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handlePrintActivityLedger}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
+                  title="Print Payment Ledger grouped by Activity"
+                >
+                  <Printer className="h-4 w-4 text-slate-500" />
+                  Print Activity Report
+                </button>
               </div>
 
               {/* Student Grid */}

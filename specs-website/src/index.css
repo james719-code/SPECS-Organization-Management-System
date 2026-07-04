@@ -95,11 +95,24 @@
       opacity: 1;
     }
   }
+  @keyframes shimmer-loading {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
   .animate-slide-up {
     animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
   .animate-fade-in {
     animation: fade-in 0.2s ease-out forwards;
+  }
+  .animate-shimmer-loading {
+    background: linear-gradient(90deg, #0d6b66 0%, #14b8a6 50%, #0d6b66 100%);
+    background-size: 200% 100%;
+    animation: shimmer-loading 1.5s infinite linear;
   }
 }
 

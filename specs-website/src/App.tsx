@@ -4,7 +4,7 @@ import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
 import { 
   LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings, 
-  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2
+  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2, BookOpen
 } from 'lucide-react';
 
 // Core imports
@@ -34,6 +34,8 @@ const StudentPosts = lazy(() => import('./pages/student/StudentPosts'));
 
 // Admin / Officer Shared Pages
 const VolunteersManagement = lazy(() => import('./pages/shared/VolunteersManagement'));
+const StudentConstitution = lazy(() => import('./pages/student/StudentConstitution'));
+const OfficerConstitution = lazy(() => import('./pages/shared/OfficerConstitution'));
 
 // Admin Pages
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
@@ -200,7 +202,8 @@ export default function App() {
                 {
                   groupName: 'General',
                   items: [
-                    { to: '/dashboard/student', label: 'My Profile', icon: <User className="h-4 w-4" /> }
+                    { to: '/dashboard/student', label: 'My Profile', icon: <User className="h-4 w-4" /> },
+                    { to: '/dashboard/student/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -227,6 +230,7 @@ export default function App() {
         <Route path="payments" element={<StudentPayments />} />
         <Route path="attendance" element={<StudentAttendance />} />
         <Route path="posts" element={<StudentPosts />} />
+        <Route path="constitution" element={<StudentConstitution />} />
         <Route path="profile" element={<Navigate to="/dashboard/student" replace />} />
       </Route>
 
@@ -246,7 +250,8 @@ export default function App() {
                   items: [
                     { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
                     { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/my-attendance', label: 'My Attendance', icon: <CheckSquare className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/my-attendance', label: 'My Attendance', icon: <CheckSquare className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -293,6 +298,7 @@ export default function App() {
         <Route path="events" element={<AdminEvents />} />
         <Route path="stories" element={<AdminStories />} />
         <Route path="tasks" element={<AdminTasks />} />
+        <Route path="constitution" element={<OfficerConstitution />} />
       </Route>
 
       {/* Role-Guarded Admin Routes */}
@@ -342,7 +348,7 @@ export default function App() {
                   items: [
                     { to: '/dashboard/admin/files', label: 'Document Files', icon: <FileText className="h-4 w-4" /> },
                     { to: '/dashboard/admin/stories', label: 'Student Stories', icon: <Award className="h-4 w-4" /> },
-                    { to: '/dashboard/admin/reports', label: 'Reports Generator', icon: <FileSpreadsheet className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> },
                     { to: '/dashboard/admin/settings', label: 'System Settings', icon: <Settings className="h-4 w-4" /> }
                   ]
                 }
@@ -367,24 +373,29 @@ export default function App() {
         <Route path="stories" element={<AdminStories />} />
         <Route path="tasks" element={<AdminTasks />} />
         <Route path="announcements" element={<AdminAnnouncements />} />
-        <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="constitution" element={<OfficerConstitution />} />
       </Route>
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
       {isPending && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="flex flex-col items-center p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-800/50 max-w-xs animate-in zoom-in-95 duration-200">
-            <div className="relative flex items-center justify-center mb-4">
-              <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
-              <div className="h-12 w-12 rounded-full border-4 border-t-[#0d6b66] border-r-[#0d6b66]/30 border-b-transparent border-l-transparent animate-spin" />
+        <>
+          {/* Top progress line */}
+          <div className="fixed top-0 left-0 right-0 h-1 z-[9999] animate-shimmer-loading" />
+          
+          {/* Corner glassmorphic status indicator */}
+          <div className="fixed bottom-4 right-4 z-[9999] pointer-events-none animate-slide-up">
+            <div className="flex items-center gap-3 p-3 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md rounded-xl border border-slate-200/50 dark:border-slate-800/50 shadow-lg max-w-xs pointer-events-auto">
+              <Loader2 className="h-4 w-4 animate-spin text-[#0d6b66] dark:text-teal-500 shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Saving Changes</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Updating database...</span>
+              </div>
             </div>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">Saving Changes</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 text-center font-medium">Please do not close this window or navigate away...</p>
           </div>
-        </div>
+        </>
       )}
     </Suspense>
   );

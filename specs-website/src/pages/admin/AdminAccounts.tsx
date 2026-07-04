@@ -12,6 +12,22 @@ import type { AccountDoc } from '../../types/database';
 
 const PAGE_SIZE = 20;
 
+const getAccountRealName = (acc: AccountDoc): string | null => {
+  if (acc.students && typeof acc.students === 'object') {
+    return (acc.students as any).name || null;
+  }
+  if (acc.officers && typeof acc.officers === 'object') {
+    const officer = acc.officers as any;
+    if (officer.students && typeof officer.students === 'object') {
+      return officer.students.name || null;
+    }
+  }
+  if (acc.admins && typeof acc.admins === 'object') {
+    return (acc.admins as any).name || null;
+  }
+  return null;
+};
+
 const AdminAccounts: React.FC = () => {
   const [accounts, setAccounts] = useState<AccountDoc[]>([]);
   const [total, setTotal] = useState(0);
@@ -19,6 +35,7 @@ const AdminAccounts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; account: AccountDoc | null; action: string }>({ open: false, account: null, action: '' });
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
@@ -29,6 +46,17 @@ const AdminAccounts: React.FC = () => {
       setLoading(true);
       const opts: any = { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, orderDesc: '$createdAt' };
       if (typeFilter !== 'all') opts.type = typeFilter;
+      
+      if (statusFilter === 'active') {
+        opts.verified = true;
+        opts.deactivated = false;
+      } else if (statusFilter === 'pending') {
+        opts.verified = false;
+        opts.deactivated = false;
+      } else if (statusFilter === 'deactivated') {
+        opts.deactivated = true;
+      }
+
       const res = await cachedApi.users.listAccounts(opts);
       setAccounts(res.documents);
       setTotal(res.total);
@@ -39,7 +67,7 @@ const AdminAccounts: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchAccounts(); }, [page, typeFilter]);
+  useEffect(() => { fetchAccounts(); }, [page, typeFilter, statusFilter]);
 
   const filteredAccounts = search
     ? accounts.filter(a => a.username?.toLowerCase().includes(search.toLowerCase()))
@@ -350,6 +378,16 @@ const AdminAccounts: React.FC = () => {
           <option value="officer">Officers</option>
           <option value="admin">Admins</option>
         </select>
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+        >
+          <option value="all">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending Verification</option>
+          <option value="deactivated">Deactivated</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -441,7 +479,15 @@ const AdminAccounts: React.FC = () => {
                         <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#0d6b66] to-[#149a93] text-white flex items-center justify-center text-xs font-semibold uppercase flex-shrink-0">
                           {(acc.username || 'U')[0]}
                         </div>
-                        <span className="text-sm font-medium text-slate-900">{acc.username || 'N/A'}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium text-slate-900 truncate">{acc.username || 'N/A'}</span>
+                          {(() => {
+                            const realName = getAccountRealName(acc);
+                            return realName ? (
+                              <span className="text-xs text-slate-500 font-normal truncate mt-0.5">{realName}</span>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">

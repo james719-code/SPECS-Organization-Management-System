@@ -10,7 +10,7 @@ import { databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_REVENUE, COLLECTION_ID_EXPENSES, COLLECTION_ID_EVENTS } from '../../shared/constants';
 import { ID, Query } from 'appwrite';
 import type { RevenueDoc, ExpenseDoc, PaymentDoc, EventDoc } from '../../types/database';
-import { RotateCw, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import { RotateCw, Trash2, Loader2, ArrowLeft, Printer } from 'lucide-react';
 import {
   ResponsiveContainer,
   PieChart,
@@ -58,7 +58,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const [customRevActivityName, setCustomRevActivityName] = useState('');
 
   // Delete Action states
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null; type: 'revenue' | 'expense' | null }>({ open: false, id: null, type: null });
   const [actionLoading, setActionLoading] = useState(false);
 
   const { addToast } = useToast();
@@ -213,20 +213,37 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     }
   };
 
-  // Delete expense record
-  const handleDeleteExpense = async () => {
-    if (!deleteConfirm.id) return;
-    setActionLoading(true);
-    try {
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, deleteConfirm.id);
-      addToast({ type: 'success', title: 'Success', message: 'Expense entry deleted successfully.' });
-      setDeleteConfirm({ open: false, id: null });
-      loadData(true);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete expense entry.' });
-    } finally {
-      setActionLoading(false);
-    }
+  // Delete finance record (revenue/expense)
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.id || !deleteConfirm.type) return;
+    const { id, type } = deleteConfirm;
+    
+    // Close modal immediately to avoid UI blocking
+    setDeleteConfirm({ open: false, id: null, type: null });
+    addToast({ 
+      type: 'info', 
+      title: type === 'revenue' ? 'Deleting Revenue' : 'Deleting Expense', 
+      message: 'Removing transaction entry in the background...' 
+    });
+
+    (async () => {
+      try {
+        if (type === 'revenue') {
+          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_REVENUE, id);
+          addToast({ type: 'success', title: 'Success', message: 'Revenue entry deleted successfully.' });
+        } else {
+          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, id);
+          addToast({ type: 'success', title: 'Success', message: 'Expense entry deleted successfully.' });
+        }
+        loadData(true);
+      } catch (err: any) {
+        addToast({ 
+          type: 'error', 
+          title: 'Error', 
+          message: err.message || `Failed to delete ${type} entry.` 
+        });
+      }
+    })();
   };
 
   // Export finance stats to CSV
@@ -258,6 +275,739 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     } catch (err) {
       addToast({ type: 'error', title: 'Export Failed', message: 'Could not export finance logs.' });
     }
+  };
+
+  const handlePrintCombinedReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
+    const origin = window.location.origin;
+
+    const groups: Record<string, {
+      name: string;
+      isEvent: boolean;
+      revenues: RevenueDoc[];
+      expenses: ExpenseDoc[];
+      totalRev: number;
+      totalExp: number;
+      netBalance: number;
+    }> = {};
+
+    const getRevenueGroupName = (r: RevenueDoc) => {
+      let groupName = 'General Revenue';
+      if (r.isEvent && r.event) {
+        const matchedEvent = eventsList.find(e => e.$id === r.event);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        } else {
+          groupName = 'Event Payments';
+        }
+      } else if (r.activity) {
+        groupName = r.activity;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      }
+      return groupName;
+    };
+
+    const getExpenseGroupName = (e: ExpenseDoc) => {
+      let groupName = 'General Expenses';
+      if (e.isEvent) {
+        if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
+          groupName = (e.events as any).event_name;
+        } else if (e.events && typeof e.events === 'string') {
+          const matchedEvent = eventsList.find(ev => ev.$id === e.events);
+          if (matchedEvent && matchedEvent.event_name) {
+            groupName = matchedEvent.event_name;
+          } else {
+            groupName = 'Event Expenses';
+          }
+        } else {
+          groupName = 'Event Expenses';
+        }
+      } else if (e.activity_name) {
+        groupName = e.activity_name;
+      } else if (e.name) {
+        groupName = e.name;
+      }
+      return groupName;
+    };
+
+    revenue.forEach(r => {
+      const gName = getRevenueGroupName(r);
+      if (!groups[gName]) {
+        groups[gName] = { name: gName, isEvent: r.isEvent || false, revenues: [], expenses: [], totalRev: 0, totalExp: 0, netBalance: 0 };
+      }
+      groups[gName].revenues.push(r);
+      groups[gName].totalRev += (r.price || 0) * (r.quantity || 1);
+    });
+
+    expenses.forEach(e => {
+      const gName = getExpenseGroupName(e);
+      if (!groups[gName]) {
+        groups[gName] = { name: gName, isEvent: e.isEvent || false, revenues: [], expenses: [], totalRev: 0, totalExp: 0, netBalance: 0 };
+      }
+      groups[gName].expenses.push(e);
+      groups[gName].totalExp += (e.price || 0) * (e.quantity || 1);
+    });
+
+    Object.keys(groups).forEach(gName => {
+      const g = groups[gName];
+      g.netBalance = g.totalRev - g.totalExp;
+      g.isEvent = g.revenues.some(r => r.isEvent) || g.expenses.some(e => e.isEvent);
+    });
+
+    const groupsList = Object.values(groups).sort((a, b) => b.totalRev + b.totalExp - (a.totalRev + a.totalExp));
+
+    const overallRev = summaryMetrics.totalRev;
+    const overallExp = summaryMetrics.totalExp;
+    const overallBal = summaryMetrics.netBal;
+    
+    const totalTransactions = overallRev + overallExp;
+    const revPercent = totalTransactions > 0 ? Math.round((overallRev / totalTransactions) * 100) : 0;
+    const expPercent = totalTransactions > 0 ? 100 - revPercent : 0;
+
+    // Build timeline points for line graph
+    const allTransactions: { date: Date; amount: number; type: 'revenue' | 'expense' }[] = [];
+    
+    revenue.forEach(r => {
+      if (r.date_earned) {
+        allTransactions.push({
+          date: new Date(r.date_earned),
+          amount: (r.price || 0) * (r.quantity || 1),
+          type: 'revenue'
+        });
+      }
+    });
+    
+    expenses.forEach(e => {
+      if (e.date_buy) {
+        allTransactions.push({
+          date: new Date(e.date_buy),
+          amount: (e.price || 0) * (e.quantity || 1),
+          type: 'expense'
+        });
+      }
+    });
+    
+    // Sort transactions by date ascending
+    allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    let runningBal = 0;
+    const dailyBalances: Record<string, number> = {};
+    allTransactions.forEach(t => {
+      const key = t.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      runningBal += t.type === 'revenue' ? t.amount : -t.amount;
+      dailyBalances[key] = runningBal;
+    });
+    
+    const historyPoints = Object.entries(dailyBalances).map(([dateStr, bal]) => ({ dateStr, runningBal: bal }));
+
+    // Dynamic Graph Helpers
+    const CHART_COLORS = ['#0d6b66', '#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#6366f1'];
+
+    const generateSVGPieChart = (slices: { name: string; value: number }[]) => {
+      const total = slices.reduce((sum, s) => sum + s.value, 0);
+      if (total === 0) return `<div style="text-align: center; color: #94a3b8; font-size: 11px; padding: 20px;">No expense records</div>`;
+      
+      let accumulatedAngle = 0;
+      const cx = 100, cy = 100, r = 80;
+      let paths = '';
+      
+      slices.forEach((slice, i) => {
+        const percentage = slice.value / total;
+        if (percentage === 0) return;
+        
+        const angle = percentage * 360;
+        const startAngle = accumulatedAngle;
+        const endAngle = accumulatedAngle + angle;
+        accumulatedAngle = endAngle;
+        
+        const rad1 = (startAngle - 90) * Math.PI / 180;
+        const rad2 = (endAngle - 90) * Math.PI / 180;
+        
+        const x1 = cx + r * Math.cos(rad1);
+        const y1 = cy + r * Math.sin(rad1);
+        const x2 = cx + r * Math.cos(rad2);
+        const y2 = cy + r * Math.sin(rad2);
+        
+        const largeArcFlag = angle > 180 ? 1 : 0;
+        const color = CHART_COLORS[i % CHART_COLORS.length];
+        
+        paths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z" fill="${color}" stroke="#ffffff" stroke-width="1.5" />`;
+      });
+      
+      const legendItems = slices.map((slice, i) => {
+        const pct = ((slice.value / total) * 100).toFixed(1);
+        const color = CHART_COLORS[i % CHART_COLORS.length];
+        return `
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 10px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background-color: ${color}; flex-shrink: 0; display: inline-block;"></span>
+            <div style="display: flex; flex-direction: column; overflow: hidden; min-width: 0; text-align: left;">
+              <span style="font-weight: 700; color: #334155; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 9px;" title="${slice.name}">${slice.name}</span>
+              <span style="color: #64748b; font-size: 8px; margin-top: 1px;">₱${slice.value.toLocaleString()} (${pct}%)</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%;">
+          <svg width="180" height="180" viewBox="0 0 200 200" style="margin-bottom: 20px; margin-top: 5px;">${paths}</svg>
+          <div style="width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 20px; border-top: 1px dashed #e2e8f0; padding-top: 15px; margin-top: 10px;">
+            ${legendItems}
+          </div>
+        </div>
+      `;
+    };
+
+    const generateSVGBarChart = (activities: typeof groupsList) => {
+      const width = 450, height = 140, padding = 25;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+      
+      const maxVal = Math.max(...activities.map(a => Math.max(a.totalRev, a.totalExp)), 100);
+      
+      let content = '';
+      
+      // Draw grid lines
+      for (let i = 0; i <= 3; i++) {
+        const y = padding + chartHeight * (1 - i / 3);
+        const val = (maxVal * i) / 3;
+        content += `
+          <line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#e2e8f0" stroke-width="0.8" stroke-dasharray="3,3" />
+          <text x="${padding - 6}" y="${y + 3}" font-size="7" fill="#64748b" text-anchor="end">₱${Math.round(val).toLocaleString()}</text>
+        `;
+      }
+      
+      const barGroupWidth = chartWidth / activities.length;
+      const barWidth = barGroupWidth * 0.32;
+      
+      activities.forEach((act, idx) => {
+        const x = padding + idx * barGroupWidth;
+        
+        // Revenue bar
+        const revHeight = (act.totalRev / maxVal) * chartHeight;
+        const revY = padding + chartHeight - revHeight;
+        const revBarX = x + barGroupWidth * 0.15;
+        
+        // Expense bar
+        const expHeight = (act.totalExp / maxVal) * chartHeight;
+        const expY = padding + chartHeight - expHeight;
+        const expBarX = revBarX + barWidth + 2;
+        
+        content += `
+          <rect x="${revBarX}" y="${revY}" width="${barWidth}" height="${revHeight}" fill="#0d6b66" rx="1.5" />
+          <rect x="${expBarX}" y="${expY}" width="${barWidth}" height="${expHeight}" fill="#ef4444" rx="1.5" />
+          
+          <text x="${x + barGroupWidth / 2}" y="${height - padding + 12}" font-size="7" font-weight="700" fill="#334155" text-anchor="middle">
+            ${act.name.length > 10 ? act.name.slice(0, 8) + '..' : act.name}
+          </text>
+        `;
+      });
+      
+      return `<svg width="100%" height="140px" viewBox="0 0 ${width} ${height}">${content}</svg>`;
+    };
+
+    const generateSVGLineChart = (pointsList: typeof historyPoints) => {
+      const width = 500, height = 180, padding = 35;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+      
+      if (pointsList.length === 0) {
+        return `<div style="text-align: center; color: #94a3b8; font-size: 11px; padding: 50px 0;">No cash trend data available</div>`;
+      }
+      
+      const values = pointsList.map(t => t.runningBal);
+      const minVal = Math.min(...values, 0);
+      const maxVal = Math.max(...values, 100);
+      const range = maxVal - minVal;
+      
+      let content = '';
+      
+      // Draw grid lines
+      for (let i = 0; i <= 3; i++) {
+        const y = padding + chartHeight * (1 - i / 3);
+        const val = minVal + (range * i) / 3;
+        content += `
+          <line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#e2e8f0" stroke-width="0.8" />
+          <text x="${padding - 6}" y="${y + 3}" font-size="7" fill="#64748b" text-anchor="end">₱${Math.round(val).toLocaleString()}</text>
+        `;
+      }
+      
+      const points = pointsList.map((t, idx) => {
+        const x = padding + (idx / (pointsList.length - 1 || 1)) * chartWidth;
+        const y = padding + chartHeight * (1 - (t.runningBal - minVal) / range);
+        return { x, y, date: t.dateStr, val: t.runningBal };
+      });
+      
+      const pathD = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+      const areaD = `${pathD} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`;
+      
+      content += `
+        <path d="${areaD}" fill="url(#printLineGrad)" opacity="0.1" />
+        <path d="${pathD}" fill="none" stroke="#0d6b66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      `;
+      
+      const labelInterval = Math.max(Math.ceil(points.length / 5), 1);
+      points.forEach((p, idx) => {
+        content += `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#0d6b66" stroke="#ffffff" stroke-width="1" />`;
+        
+        if (idx % labelInterval === 0 || idx === points.length - 1) {
+          content += `
+            <text x="${p.x}" y="${height - padding + 12}" font-size="7" fill="#64748b" text-anchor="middle">${p.date}</text>
+            <line x1="${p.x}" y1="${p.y}" x2="${p.x}" y2="${height - padding}" stroke="#cbd5e1" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.5" />
+          `;
+        }
+      });
+      
+      return `
+        <svg width="100%" height="180px" viewBox="0 0 ${width} ${height}">
+          <defs>
+            <linearGradient id="printLineGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0d6b66" />
+              <stop offset="100%" stop-color="#0d6b66" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          ${content}
+        </svg>
+      `;
+    };
+
+    const expenseSlices = groupsList
+      .filter(g => g.totalExp > 0)
+      .map(g => ({ name: g.name, value: g.totalExp }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    const barChartActivities = groupsList.slice(0, 6);
+
+    const perEventHtml = groupsList.map((g, idx) => {
+      const revRows = g.revenues.map((item, rIdx) => `
+        <tr>
+          <td>${rIdx + 1}</td>
+          <td>${item.date_earned ? formatDate(item.date_earned) : '—'}</td>
+          <td style="font-weight: bold;">${item.name}</td>
+          <td style="text-align: right;">₱${(item.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+          <td style="text-align: right;">${item.quantity || 1}</td>
+          <td style="text-align: right; font-weight: bold; color: #059669;">₱${((item.price || 0) * (item.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `).join('');
+
+      const expRows = g.expenses.map((item, eIdx) => `
+        <tr>
+          <td>${eIdx + 1}</td>
+          <td>${item.date_buy ? formatDate(item.date_buy) : '—'}</td>
+          <td style="font-weight: bold;">${item.name}</td>
+          <td style="text-align: right;">₱${(item.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+          <td style="text-align: right;">${item.quantity || 1}</td>
+          <td style="text-align: right; font-weight: bold; color: #dc2626;">₱${((item.price || 0) * (item.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="activity-section-page">
+          <div class="header-container">
+            <div class="logo-container">
+              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
+            </div>
+            <div class="header-text">
+              <div class="university">Partido State University</div>
+              <div class="college">College of Engineering and Computational Sciences</div>
+              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
+            </div>
+            <div class="logo-container">
+              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
+            </div>
+          </div>
+ 
+          <h2 class="report-title">Activity Detailed Report</h2>
+          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
+            ${g.name} (${g.isEvent ? 'Event' : 'General Activity'})
+          </h3>
+ 
+          <h4 class="table-group-header">Revenue Logs</h4>
+          <table class="report-table" style="margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 15%;">Date</th>
+                <th style="width: 45%;">Description / Source</th>
+                <th style="width: 12%; text-align: right;">Unit Price</th>
+                <th style="width: 8%; text-align: right;">Qty</th>
+                <th style="width: 15%; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${revRows || '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No revenue records for this activity.</td></tr>'}
+              <tr style="background-color: #f8fafc; font-weight: bold;">
+                <td colspan="5" style="text-align: right; border-top: 1.5px solid #cbd5e1; font-size: 10px; color: #475569;">Total Collected Revenue:</td>
+                <td style="text-align: right; border-top: 1.5px solid #cbd5e1; color: #059669; font-size: 10px; font-weight: 800;">₱${g.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+          </table>
+ 
+          <h4 class="table-group-header">Expense Logs</h4>
+          <table class="report-table" style="margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No.</th>
+                <th style="width: 15%;">Date</th>
+                <th style="width: 45%;">Description / Source</th>
+                <th style="width: 12%; text-align: right;">Unit Price</th>
+                <th style="width: 8%; text-align: right;">Qty</th>
+                <th style="width: 15%; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${expRows || '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No expense records for this activity.</td></tr>'}
+              <tr style="background-color: #f8fafc; font-weight: bold;">
+                <td colspan="5" style="text-align: right; border-top: 1.5px solid #cbd5e1; font-size: 10px; color: #475569;">Total Expenditures:</td>
+                <td style="text-align: right; border-top: 1.5px solid #cbd5e1; color: #dc2626; font-size: 10px; font-weight: 800;">₱${g.totalExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+          </table>
+ 
+          <div style="display: flex; justify-content: flex-end; margin-top: 15px; margin-bottom: 15px; padding: 10px 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px;">
+            <span style="font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Net Activity Balance:</span>
+            <span style="margin-left: 10px; font-weight: 800; ${g.totalRev - g.totalExp >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">
+              ₱${(g.totalRev - g.totalExp).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+ 
+          <div class="footer-notes">
+            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal | Page ${idx + 2} of ${groupsList.length + 1}
+          </div>
+        </div>
+        ${idx < groupsList.length - 1 ? '<div class="page-break"></div>' : ''}
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SPECS Finance Combined Report</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              margin: 45px;
+              line-height: 1.4;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .activity-section-page {
+              min-height: 94vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .header-container {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              border-bottom: 3px solid #0d6b66;
+              padding-bottom: 12px;
+              margin-bottom: 20px;
+            }
+            .logo-container {
+              width: 75px;
+              height: 75px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background-color: #ffffff;
+            }
+            .logo {
+              max-height: 100%;
+              max-width: 100%;
+              object-fit: contain;
+            }
+            .header-text {
+              text-align: center;
+              flex-grow: 1;
+              padding: 0 15px;
+            }
+            .university {
+              font-size: 15px;
+              font-weight: 800;
+              text-transform: uppercase;
+              color: #0f172a;
+              letter-spacing: 0.5px;
+            }
+            .college {
+              font-size: 11px;
+              font-weight: 600;
+              color: #475569;
+              margin-top: 1px;
+              text-transform: uppercase;
+            }
+            .org {
+              font-size: 10px;
+              font-weight: 700;
+              color: #0d6b66;
+              margin-top: 3px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .report-title {
+              text-align: center;
+              font-size: 18px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 15px 0 8px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 12px 18px;
+              margin-bottom: 20px;
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 8px 20px;
+              font-size: 12px;
+            }
+            .meta-item {
+              margin: 0;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 8px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #e2e8f0;
+              padding: 7px 9px;
+              text-align: left;
+              font-size: 11px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 9px;
+              letter-spacing: 0.5px;
+            }
+            .report-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .table-group-header {
+              font-size: 11px;
+              font-weight: 800;
+              color: #0f172a;
+              text-transform: uppercase;
+              margin: 12px 0 4px 0;
+              border-left: 3px solid #0d6b66;
+              padding-left: 6px;
+            }
+            .footer-notes {
+              margin-top: auto;
+              padding-top: 12px;
+              font-size: 9px;
+              color: #64748b;
+              text-align: center;
+              border-top: 1px solid #e2e8f0;
+            }
+            .page-break {
+              page-break-after: always;
+              break-after: page;
+            }
+            
+            /* Print Visuals Grid Dashboard */
+            .visuals-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 20px;
+            }
+            .chart-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 10px;
+              padding: 15px;
+              background-color: #f8fafc;
+              display: flex;
+              flex-direction: column;
+            }
+            .chart-title {
+              font-size: 11px;
+              font-weight: 800;
+              color: #0f172a;
+              text-transform: uppercase;
+              margin-bottom: 12px;
+              border-bottom: 1px dashed #cbd5e1;
+              padding-bottom: 6px;
+            }
+            .split-bar-outer {
+              height: 24px;
+              width: 100%;
+              background-color: #e2e8f0;
+              border-radius: 6px;
+              overflow: hidden;
+              display: flex;
+              margin: 15px 0 10px 0;
+            }
+            .split-bar-fill {
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #ffffff;
+              font-size: 10px;
+              font-weight: bold;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .split-bar-fill.revenue {
+              background-color: #0d6b66;
+            }
+            .split-bar-fill.expense {
+              background-color: #ef4444;
+            }
+            .graph-row {
+              display: flex;
+              align-items: center;
+              margin-bottom: 8px;
+            }
+            .graph-label {
+              width: 160px;
+              font-size: 11px;
+              font-weight: bold;
+              color: #334155;
+              margin-right: 15px;
+              text-overflow: ellipsis;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+            .graph-bar-container {
+              flex-grow: 1;
+              background-color: #e2e8f0;
+              height: 20px;
+              border-radius: 4px;
+              overflow: hidden;
+              display: flex;
+            }
+            .graph-bar-fill {
+              height: 100%;
+              display: flex;
+              align-items: center;
+              padding: 0 8px;
+              color: #ffffff;
+              font-size: 9px;
+              font-weight: bold;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .graph-bar-fill.revenue {
+              background-color: #0d6b66;
+            }
+            .graph-bar-fill.expense {
+              background-color: #ef4444;
+              justify-content: flex-end;
+            }
+            @media print {
+              body {
+                margin: 20px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Page 1: Finance Summary & Visual Charts Dashboard -->
+          <div class="activity-section-page">
+            <div class="header-container">
+              <div class="logo-container">
+                <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
+              </div>
+              <div class="header-text">
+                <div class="university">Partido State University</div>
+                <div class="college">College of Engineering and Computational Sciences</div>
+                <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
+              </div>
+              <div class="logo-container">
+                <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
+              </div>
+            </div>
+
+            <h2 class="report-title">SPECS Financial Report</h2>
+            <h3 style="text-align: center; color: #475569; margin-top: -4px; font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 15px;">
+              Annual Statement & Graphical Overview
+            </h3>
+
+            <div class="meta-section">
+              <p class="meta-item"><strong>Total Collected Revenue:</strong> <span style="color: #059669; font-weight: bold;">₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Total Expenditures:</strong> <span style="color: #dc2626; font-weight: bold;">₱${overallExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Net Cash Balance:</strong> <span style="font-weight: bold; ${overallBal >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">₱${overallBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+            </div>
+
+            <!-- Visual Dashboard Grid -->
+            <div class="visuals-grid" style="grid-template-columns: 1fr; gap: 15px; flex-grow: 1; justify-content: center;">
+              <!-- Chart: Expense Categories Allocation (Pie Chart) -->
+              <div class="chart-card" style="padding: 15px;">
+                <div class="chart-title" style="font-size: 11px; padding-bottom: 6px; margin-bottom: 12px;">Expense Distribution Share</div>
+                ${generateSVGPieChart(expenseSlices)}
+              </div>
+
+              <!-- Chart: Revenue vs Expense per Activity (Bar Chart) -->
+              <div class="chart-card" style="padding: 15px;">
+                <div class="chart-title" style="font-size: 11px; padding-bottom: 6px; margin-bottom: 12px;">Revenue vs Expense per Activity</div>
+                ${generateSVGBarChart(barChartActivities)}
+                <div style="display: flex; justify-content: center; gap: 15px; font-size: 8px; font-weight: bold; margin-top: 6px;">
+                  <span style="color: #0d6b66;">■ Revenue</span>
+                  <span style="color: #ef4444;">■ Expenses</span>
+                </div>
+              </div>
+
+              <!-- Chart: Revenue vs Expenses Allocation Split Bar -->
+              <div class="chart-card" style="padding: 15px;">
+                <div class="chart-title" style="font-size: 11px; padding-bottom: 6px; margin-bottom: 12px;">Overall Revenue vs Expenses Allocation</div>
+                <div class="split-bar-outer" style="height: 22px; margin: 10px 0 5px 0;">
+                  ${revPercent > 0 ? `<div class="split-bar-fill revenue" style="width: ${revPercent}%;">Revenue: ${revPercent}%</div>` : ''}
+                  ${expPercent > 0 ? `<div class="split-bar-fill expense" style="width: ${expPercent}%;">Expenses: ${expPercent}%</div>` : ''}
+                </div>
+                <div style="display: flex; justify-content: space-around; font-size: 8px; font-weight: bold; margin-top: 5px;">
+                  <span style="color: #0d6b66;">● Revenue: ₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span style="color: #ef4444;">● Expenses: ₱${overallExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer-notes">
+              Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} | Page 1 of ${groupsList.length + 1}
+            </div>
+          </div>
+          
+          <div class="page-break"></div>
+
+          ${perEventHtml}
+
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   // Metrics computation
@@ -633,6 +1383,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                         <th className="py-2.5 px-3 text-right">Unit Price</th>
                         <th className="py-2.5 px-3 text-right">Qty</th>
                         <th className="py-2.5 px-3 text-right">Total</th>
+                        <th className="py-2.5 px-3 text-center w-10">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
@@ -645,6 +1396,15 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                           <td className="py-2.5 px-3 text-right font-bold text-emerald-600">
                             {formatCurrency((item.price || 0) * (item.quantity || 1))}
                           </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              onClick={() => setDeleteConfirm({ open: true, id: item.$id, type: 'revenue' })}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-1.5 transition-colors border border-transparent hover:border-red-100"
+                              title="Delete revenue record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -652,7 +1412,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                 </div>
               )}
             </div>
-
+ 
             {/* Expenses List */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Expense Purchases</h3>
@@ -668,6 +1428,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                         <th className="py-2.5 px-3 text-right">Unit Price</th>
                         <th className="py-2.5 px-3 text-right">Qty</th>
                         <th className="py-2.5 px-3 text-right">Total</th>
+                        <th className="py-2.5 px-3 text-center w-10">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
@@ -680,6 +1441,15 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                           <td className="py-2.5 px-3 text-right font-bold text-red-600">
                             {formatCurrency((item.price || 0) * (item.quantity || 1))}
                           </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              onClick={() => setDeleteConfirm({ open: true, id: item.$id, type: 'expense' })}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-1.5 transition-colors border border-transparent hover:border-red-100"
+                              title="Delete expense record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -689,6 +1459,20 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             </div>
           </div>
         </div>
+
+        {/* Delete Expense/Revenue record confirmation */}
+        <ConfirmModal
+          isOpen={deleteConfirm.open}
+          onClose={() => setDeleteConfirm({ open: false, id: null, type: null })}
+          onConfirm={handleDeleteConfirm}
+          title={deleteConfirm.type === 'revenue' ? 'Delete Revenue Entry' : 'Delete Expense Entry'}
+          message={deleteConfirm.type === 'revenue'
+            ? "Are you sure you want to delete this recorded revenue line? This adjustment modifies net balancing reports."
+            : "Are you sure you want to delete this recorded expense line? This adjustment modifies net balancing reports."}
+          confirmLabel="Remove"
+          variant="danger"
+          loading={actionLoading}
+        />
       </div>
     );
   }
@@ -713,6 +1497,14 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
             Export CSV
+          </button>
+          <button
+            onClick={handlePrintCombinedReport}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#0d6b66] bg-emerald-50/10 dark:bg-[#0d6b66]/10 text-[#0d6b66] dark:text-emerald-400 px-3.5 py-2 text-sm font-bold hover:bg-emerald-50 dark:hover:bg-[#0d6b66]/20 transition-colors shadow-sm"
+            title="Print Financial Statements & Detailed Breakdown"
+          >
+            <Printer className="h-4 w-4" />
+            Print Report
           </button>
           <button
             onClick={() => loadData(true)}
@@ -1139,18 +1931,9 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                             </p>
                             <p className="text-[10px] text-slate-400 mt-0.5">{item.date_buy ? formatDate(item.date_buy) : 'N/A'}</p>
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="font-bold text-slate-900 dark:text-white">{formatCurrency((item.price || 0) * (item.quantity || 1))}</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">Qty: {item.quantity || 1} × {formatCurrency(item.price || 0)}</p>
-                            </div>
-                            <button
-                              onClick={() => setDeleteConfirm({ open: true, id: item.$id })}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-1.5 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
-                              title="Delete record"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-slate-900 dark:text-white">{formatCurrency((item.price || 0) * (item.quantity || 1))}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Qty: {item.quantity || 1} × {formatCurrency(item.price || 0)}</p>
                           </div>
                         </div>
                       ))}
@@ -1166,10 +1949,12 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       {/* Delete Expense record confirmation */}
       <ConfirmModal
         isOpen={deleteConfirm.open}
-        onClose={() => setDeleteConfirm({ open: false, id: null })}
-        onConfirm={handleDeleteExpense}
-        title="Delete Expense Entry"
-        message="Are you sure you want to delete this recorded expense line? This adjustment modifies net balancing reports."
+        onClose={() => setDeleteConfirm({ open: false, id: null, type: null })}
+        onConfirm={handleDeleteConfirm}
+        title={deleteConfirm.type === 'revenue' ? 'Delete Revenue Entry' : 'Delete Expense Entry'}
+        message={deleteConfirm.type === 'revenue'
+          ? "Are you sure you want to delete this recorded revenue line? This adjustment modifies net balancing reports."
+          : "Are you sure you want to delete this recorded expense line? This adjustment modifies net balancing reports."}
         confirmLabel="Remove"
         variant="danger"
         loading={actionLoading}

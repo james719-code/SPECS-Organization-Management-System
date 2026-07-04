@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RotateCw, Loader2, Check, Camera, Search } from 'lucide-react';
+import { RotateCw, Loader2, Check, Camera, Search, Printer } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { formatDateTime, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -523,6 +523,214 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
+  const handlePrintReport = () => {
+    if (!selectedEventId) {
+      addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
+      return;
+    }
+    const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+    if (!selectedEvent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
+    const rowsHtml = filteredGroupedRecords.map((group, index) => {
+      const sessionsStr = group.records.map(r => {
+        const timeStr = new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `${r.sessionLabel} (${timeStr})`;
+      }).join(', ');
+
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td style="font-weight: bold;">${group.studentName}</td>
+          <td>${sessionsStr}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const origin = window.location.origin;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Attendance Report - ${selectedEvent.event_name}</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              margin: 40px;
+              line-height: 1.5;
+            }
+            .header-container {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              border-bottom: 3px solid #0d6b66;
+              padding-bottom: 16px;
+              margin-bottom: 24px;
+            }
+            .logo-container {
+              width: 80px;
+              height: 80px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background-color: #ffffff;
+              border-radius: 12px;
+              padding: 4px;
+            }
+            .logo {
+              max-height: 100%;
+              max-width: 100%;
+              object-fit: contain;
+            }
+            .header-text {
+              text-align: center;
+              flex-grow: 1;
+              padding: 0 20px;
+            }
+            .university {
+              font-size: 16px;
+              font-weight: 800;
+              text-transform: uppercase;
+              color: #0f172a;
+              letter-spacing: 0.5px;
+            }
+            .college {
+              font-size: 12px;
+              font-weight: 600;
+              color: #475569;
+              margin-top: 2px;
+              text-transform: uppercase;
+            }
+            .org {
+              font-size: 11px;
+              font-weight: 700;
+              color: #0d6b66;
+              margin-top: 4px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .report-title {
+              text-align: center;
+              font-size: 20px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 20px 0 10px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 24px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px 30px;
+              font-size: 13px;
+            }
+            .meta-item {
+              margin: 0;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 16px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #e2e8f0;
+              padding: 10px 12px;
+              text-align: left;
+              font-size: 12px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 11px;
+              letter-spacing: 0.5px;
+            }
+            .report-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .footer-notes {
+              margin-top: 40px;
+              font-size: 11px;
+              color: #64748b;
+              text-align: center;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 15px;
+            }
+            @media print {
+              body {
+                margin: 20px;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-container">
+            <div class="logo-container">
+              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
+            </div>
+            <div class="header-text">
+              <div class="university">Partido State University</div>
+              <div class="college">College of Engineering and Computational Sciences</div>
+              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
+            </div>
+            <div class="logo-container">
+              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
+            </div>
+          </div>
+
+          <h2 class="report-title">Official Attendance Sheet Report</h2>
+
+          <div class="meta-section">
+            <p class="meta-item"><strong>Event Name:</strong> ${selectedEvent.event_name}</p>
+            <p class="meta-item"><strong>Location:</strong> ${selectedEvent.location || 'N/A'}</p>
+            <p class="meta-item"><strong>Event Date:</strong> ${formatDate(selectedEvent.date_to_held || '')}</p>
+          </div>
+
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 8%;">No.</th>
+                <th style="width: 42%;">Student Name</th>
+                <th style="width: 50%;">Sessions Attended</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="footer-notes">
+            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal.
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Group attendance records by student to prevent duplicate rows in the log sheet
   const groupedRecords = useMemo(() => {
     const groups: Record<string, {
@@ -842,7 +1050,17 @@ const AdminAttendance: React.FC = () => {
             <div className="lg:col-span-2 space-y-3">
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Attendance Logs</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Attendance Logs</h3>
+                    <button
+                      onClick={handlePrintReport}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
+                      title="Print Official Attendance Sheet"
+                    >
+                      <Printer className="h-3.5 w-3.5 text-slate-500" />
+                      Print Sheet
+                    </button>
+                  </div>
                   <div className="relative w-full sm:max-w-xs">
                     <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

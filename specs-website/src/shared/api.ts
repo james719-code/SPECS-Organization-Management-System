@@ -420,11 +420,13 @@ export const api = {
                 throw createApiError(error, 'Failed to list students');
             }
         },
-        async listAccounts({ limit = DEFAULT_PAGE_SIZE, offset = 0, type = null, orderDesc = null }: any = {}): Promise<PaginatedResponse<AccountDoc>> {
+        async listAccounts({ limit = DEFAULT_PAGE_SIZE, offset = 0, type = null, verified = null, deactivated = null, orderDesc = null }: any = {}): Promise<PaginatedResponse<AccountDoc>> {
             try {
                 const pageSize = clampPageSize(limit);
                 const queries = [Query.limit(pageSize), Query.offset(offset)];
                 if (type) queries.unshift(Query.equal('type', type));
+                if (verified !== null) queries.unshift(Query.equal('verified', verified));
+                if (deactivated !== null) queries.unshift(Query.equal('deactivated', deactivated));
                 if (orderDesc) queries.push(Query.orderDesc(orderDesc));
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, queries);
                 return createPaginatedResponse<AccountDoc>(result, pageSize, offset);
