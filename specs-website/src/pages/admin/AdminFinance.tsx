@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { formatCurrency, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -45,6 +46,10 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedActivityName, setSelectedActivityName] = useState('General');
   const [customActivityName, setCustomActivityName] = useState('');
+  const [officersList, setOfficersList] = useState<any[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printSignatory, setPrintSignatory] = useState<'treasurer' | 'asst-treasurer'>('treasurer');
+  const [printScope, setPrintScope] = useState<string>('all');
 
   // Add Revenue form states
   const [revenueDesc, setRevenueDesc] = useState('');
@@ -61,6 +66,56 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null; type: 'revenue' | 'expense' | null }>({ open: false, id: null, type: null });
   const [actionLoading, setActionLoading] = useState(false);
 
+  const getRevenueGroupName = (r: RevenueDoc) => {
+    let groupName = 'General Revenue';
+    if (r.isEvent && r.event) {
+      const matchedEvent = eventsList.find(e => e.$id === r.event);
+      if (matchedEvent && matchedEvent.event_name) {
+        groupName = matchedEvent.event_name;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      } else {
+        groupName = 'Event Payments';
+      }
+    } else if (r.activity) {
+      groupName = r.activity;
+    }
+    return groupName;
+  };
+
+  const getExpenseGroupName = (e: ExpenseDoc) => {
+    let groupName = 'General Expenses';
+    if (e.isEvent) {
+      if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
+        groupName = (e.events as any).event_name;
+      } else if (e.events && typeof e.events === 'string') {
+        const matchedEvent = eventsList.find(ev => ev.$id === e.events);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else {
+          groupName = 'Event Expenses';
+        }
+      } else {
+        groupName = 'Event Expenses';
+      }
+    } else if (e.activity_name) {
+      groupName = e.activity_name;
+    }
+    return groupName;
+  };
+
+  const financeGroupsList = useMemo(() => {
+    const groups = new Set<string>();
+    revenue.forEach(r => {
+      groups.add(getRevenueGroupName(r));
+    });
+    expenses.forEach(e => {
+      groups.add(getExpenseGroupName(e));
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b));
+  }, [revenue, expenses, eventsList]);
+
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -69,7 +124,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const [revenueRes, expensesRes, paymentsRes, eventsRes] = await Promise.all([
+      const [revenueRes, expensesRes, paymentsRes, eventsRes, officersRes] = await Promise.all([
         databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
           Query.orderDesc('$createdAt'),
           Query.limit(500)
@@ -82,13 +137,15 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
           Query.orderAsc('event_name'),
           Query.limit(100)
-        ])
+        ]),
+        cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000)
       ]);
 
       setRevenue(revenueRes.documents as RevenueDoc[]);
       setExpenses(expensesRes.documents as ExpenseDoc[]);
       setPendingPayments((paymentsRes.documents as PaymentDoc[]).filter(p => !p.is_paid));
       setEventsList(eventsRes.documents as EventDoc[]);
+      setOfficersList(officersRes.documents as any);
 
       if (isRefresh) {
         addToast({ type: 'success', title: 'Refreshed', message: 'Finance logs synchronized successfully.' });
@@ -277,7 +334,82 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     }
   };
 
-  const handlePrintCombinedReport = () => {
+  const getActivityStartDate = (gName: string) => {
+    let earliestDate: Date | null = null;
+    revenue.forEach(r => {
+      let groupName = 'General Revenue';
+      if (r.isEvent && r.event) {
+        const matchedEvent = eventsList.find(e => e.$id === r.event);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        }
+      } else if (r.activity) {
+        groupName = r.activity;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      }
+      
+      if (groupName === gName && r.date_earned) {
+        const d = new Date(r.date_earned);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      }
+    });
+
+    expenses.forEach(e => {
+      let groupName = 'General Expense';
+      if (e.isEvent && e.events) {
+        const matchedEvent = eventsList.find(ev => ev.$id === (typeof e.events === 'string' ? e.events : (e.events as any).$id));
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (e.name) {
+          groupName = e.name;
+        }
+      } else if (e.activity_name) {
+        groupName = e.activity_name;
+      } else if (e.name) {
+        groupName = e.name;
+      }
+
+      if (groupName === gName && e.date_buy) {
+        const d = new Date(e.date_buy);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      }
+    });
+
+    return earliestDate;
+  };
+
+  const getOrgBalanceBefore = (date: Date | null) => {
+    if (!date) return 0;
+    let totalRevBefore = 0;
+    let totalExpBefore = 0;
+
+    revenue.forEach(r => {
+      if (r.date_earned) {
+        const d = new Date(r.date_earned);
+        if (d.getTime() < date.getTime()) {
+          totalRevBefore += (r.price || 0) * (r.quantity || 1);
+        }
+      }
+    });
+
+    expenses.forEach(e => {
+      if (e.date_buy) {
+        const d = new Date(e.date_buy);
+        if (d.getTime() < date.getTime()) {
+          totalExpBefore += (e.price || 0) * (e.quantity || 1);
+        }
+      }
+    });
+
+    return totalRevBefore - totalExpBefore;
+  };
+
+  const handlePrintCombinedReport = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
@@ -295,50 +427,6 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       totalExp: number;
       netBalance: number;
     }> = {};
-
-    const getRevenueGroupName = (r: RevenueDoc) => {
-      let groupName = 'General Revenue';
-      if (r.isEvent && r.event) {
-        const matchedEvent = eventsList.find(e => e.$id === r.event);
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else if (r.name) {
-          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-          groupName = match ? match[1].trim() : r.name;
-        } else {
-          groupName = 'Event Payments';
-        }
-      } else if (r.activity) {
-        groupName = r.activity;
-      } else if (r.name) {
-        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-        groupName = match ? match[1].trim() : r.name;
-      }
-      return groupName;
-    };
-
-    const getExpenseGroupName = (e: ExpenseDoc) => {
-      let groupName = 'General Expenses';
-      if (e.isEvent) {
-        if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
-          groupName = (e.events as any).event_name;
-        } else if (e.events && typeof e.events === 'string') {
-          const matchedEvent = eventsList.find(ev => ev.$id === e.events);
-          if (matchedEvent && matchedEvent.event_name) {
-            groupName = matchedEvent.event_name;
-          } else {
-            groupName = 'Event Expenses';
-          }
-        } else {
-          groupName = 'Event Expenses';
-        }
-      } else if (e.activity_name) {
-        groupName = e.activity_name;
-      } else if (e.name) {
-        groupName = e.name;
-      }
-      return groupName;
-    };
 
     revenue.forEach(r => {
       const gName = getRevenueGroupName(r);
@@ -361,7 +449,6 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     Object.keys(groups).forEach(gName => {
       const g = groups[gName];
       g.netBalance = g.totalRev - g.totalExp;
-      g.isEvent = g.revenues.some(r => r.isEvent) || g.expenses.some(e => e.isEvent);
     });
 
     const groupsList = Object.values(groups).sort((a, b) => b.totalRev + b.totalExp - (a.totalRev + a.totalExp));
@@ -396,99 +483,89 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         });
       }
     });
-    
-    // Sort transactions by date ascending
-    allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
-    
-    let runningBal = 0;
-    const dailyBalances: Record<string, number> = {};
-    allTransactions.forEach(t => {
-      const key = t.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      runningBal += t.type === 'revenue' ? t.amount : -t.amount;
-      dailyBalances[key] = runningBal;
-    });
-    
-    const historyPoints = Object.entries(dailyBalances).map(([dateStr, bal]) => ({ dateStr, runningBal: bal }));
 
-    // Dynamic Graph Helpers
-    const CHART_COLORS = ['#0d6b66', '#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#6366f1'];
+    allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let running = 0;
+    const historyPoints = allTransactions.map(t => {
+      if (t.type === 'revenue') running += t.amount;
+      else running -= t.amount;
+      return {
+        dateStr: t.date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        runningBal: running
+      };
+    });
 
     const generateSVGPieChart = (slices: { name: string; value: number }[]) => {
       const total = slices.reduce((sum, s) => sum + s.value, 0);
-      if (total === 0) return `<div style="text-align: center; color: #94a3b8; font-size: 11px; padding: 20px;">No expense records</div>`;
+      if (total === 0) {
+        return `<div style="text-align: center; color: #94a3b8; font-size: 11px; padding: 50px 0;">No expenditures logged</div>`;
+      }
       
-      let accumulatedAngle = 0;
-      const cx = 100, cy = 100, r = 80;
-      let paths = '';
+      const colors = ['#0d6b66', '#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
+      let cumulativeAngle = 0;
+      let content = '';
       
-      slices.forEach((slice, i) => {
-        const percentage = slice.value / total;
-        if (percentage === 0) return;
+      slices.forEach((slice, idx) => {
+        const percentage = (slice.value / total) * 100;
+        const angle = (slice.value / total) * 360;
         
-        const angle = percentage * 360;
-        const startAngle = accumulatedAngle;
-        const endAngle = accumulatedAngle + angle;
-        accumulatedAngle = endAngle;
+        // Arc coordinates
+        const r = 50;
+        const cx = 80;
+        const cy = 70;
         
-        const rad1 = (startAngle - 90) * Math.PI / 180;
-        const rad2 = (endAngle - 90) * Math.PI / 180;
+        const x1 = cx + r * Math.cos((cumulativeAngle - 90) * Math.PI / 180);
+        const y1 = cy + r * Math.sin((cumulativeAngle - 90) * Math.PI / 180);
         
-        const x1 = cx + r * Math.cos(rad1);
-        const y1 = cy + r * Math.sin(rad1);
-        const x2 = cx + r * Math.cos(rad2);
-        const y2 = cy + r * Math.sin(rad2);
+        cumulativeAngle += angle;
         
-        const largeArcFlag = angle > 180 ? 1 : 0;
-        const color = CHART_COLORS[i % CHART_COLORS.length];
+        const x2 = cx + r * Math.cos((cumulativeAngle - 90) * Math.PI / 180);
+        const y2 = cy + r * Math.sin((cumulativeAngle - 90) * Math.PI / 180);
         
-        paths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z" fill="${color}" stroke="#ffffff" stroke-width="1.5" />`;
+        const largeArc = angle > 180 ? 1 : 0;
+        
+        const pathData = angle === 360
+          ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[idx % colors.length]}" stroke-width="12" />`
+          : `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="${colors[idx % colors.length]}" stroke-width="12" />`;
+          
+        content += pathData;
       });
-      
-      const legendItems = slices.map((slice, i) => {
+
+      let legendHtml = '<div style="display: flex; flex-direction: column; gap: 6px; font-size: 9px; font-weight: 700; color: #334155; margin-left: 20px; justify-content: center;">';
+      slices.forEach((slice, idx) => {
         const pct = ((slice.value / total) * 100).toFixed(1);
-        const color = CHART_COLORS[i % CHART_COLORS.length];
-        return `
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 10px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background-color: ${color}; flex-shrink: 0; display: inline-block;"></span>
-            <div style="display: flex; flex-direction: column; overflow: hidden; min-width: 0; text-align: left;">
-              <span style="font-weight: 700; color: #334155; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 9px;" title="${slice.name}">${slice.name}</span>
-              <span style="color: #64748b; font-size: 8px; margin-top: 1px;">₱${slice.value.toLocaleString()} (${pct}%)</span>
-            </div>
+        legendHtml += `
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="display: inline-block; width: 8px; height: 8px; background-color: ${colors[idx % colors.length]}; border-radius: 2px;"></span>
+            <span style="text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 140px;">${slice.name}</span>
+            <span style="color: #64748b; margin-left: auto;">₱${slice.value.toLocaleString()} (${pct}%)</span>
           </div>
         `;
-      }).join('');
+      });
+      legendHtml += '</div>';
 
       return `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%;">
-          <svg width="180" height="180" viewBox="0 0 200 200" style="margin-bottom: 20px; margin-top: 5px;">${paths}</svg>
-          <div style="width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 20px; border-top: 1px dashed #e2e8f0; padding-top: 15px; margin-top: 10px;">
-            ${legendItems}
-          </div>
+        <div style="display: flex; align-items: center; justify-content: center; height: 140px;">
+          <svg width="160px" height="140px" style="transform: rotate(0deg); overflow: visible;">
+            ${content}
+          </svg>
+          ${legendHtml}
         </div>
       `;
     };
 
     const generateSVGBarChart = (activities: typeof groupsList) => {
-      const width = 450, height = 140, padding = 25;
+      const width = 500, height = 150, padding = 20;
       const chartWidth = width - padding * 2;
       const chartHeight = height - padding * 2;
       
       const maxVal = Math.max(...activities.map(a => Math.max(a.totalRev, a.totalExp)), 100);
       
+      const barGroupWidth = chartWidth / (activities.length || 1);
+      const barWidth = Math.max(barGroupWidth * 0.3, 4);
+      
       let content = '';
-      
-      // Draw grid lines
-      for (let i = 0; i <= 3; i++) {
-        const y = padding + chartHeight * (1 - i / 3);
-        const val = (maxVal * i) / 3;
-        content += `
-          <line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#e2e8f0" stroke-width="0.8" stroke-dasharray="3,3" />
-          <text x="${padding - 6}" y="${y + 3}" font-size="7" fill="#64748b" text-anchor="end">₱${Math.round(val).toLocaleString()}</text>
-        `;
-      }
-      
-      const barGroupWidth = chartWidth / activities.length;
-      const barWidth = barGroupWidth * 0.32;
       
       activities.forEach((act, idx) => {
         const x = padding + idx * barGroupWidth;
@@ -496,7 +573,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         // Revenue bar
         const revHeight = (act.totalRev / maxVal) * chartHeight;
         const revY = padding + chartHeight - revHeight;
-        const revBarX = x + barGroupWidth * 0.15;
+        const revBarX = x + (barGroupWidth - barWidth * 2 - 2) / 2;
         
         // Expense bar
         const expHeight = (act.totalExp / maxVal) * chartHeight;
@@ -581,6 +658,59 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       `;
     };
 
+    const getOfficerDetails = (posKey: string, fallbackTitle: string) => {
+      const match = officersList.find(o => o.position === posKey);
+      if (match && match.students) {
+        return {
+          name: match.students.name || '_______________________',
+          title: match.position_title || match.position || fallbackTitle
+        };
+      }
+      return {
+        name: '_______________________',
+        title: match?.position_title || fallbackTitle
+      };
+    };
+
+    const presidentDetails = getOfficerDetails('president', 'President');
+    const auditorDetails = getOfficerDetails('auditor', 'Auditor');
+    
+    const treasurerDetails = selectedRole === 'treasurer'
+      ? getOfficerDetails('treasurer', 'Treasurer')
+      : getOfficerDetails('asst-treasurer', 'Assistant Treasurer');
+      
+    const adviserDetails = {
+      name: 'NICOLAS A. PURA',
+      title: 'Adviser, SPECS'
+    };
+
+    const signatureHtml = `
+      <div style="page-break-inside: avoid; margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px 80px; text-align: left;">
+          <div>
+            <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${treasurerDetails.name.toUpperCase()}</p>
+            <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${treasurerDetails.title.toUpperCase()}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">AUDITED BY:</p>
+            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${auditorDetails.name.toUpperCase()}</p>
+            <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${auditorDetails.title.toUpperCase()}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name.toUpperCase()}</p>
+            <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title.toUpperCase()}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${adviserDetails.name.toUpperCase()}</p>
+            <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${adviserDetails.title.toUpperCase()}</p>
+          </div>
+        </div>
+      </div>
+    `;
+
     const expenseSlices = groupsList
       .filter(g => g.totalExp > 0)
       .map(g => ({ name: g.name, value: g.totalExp }))
@@ -589,7 +719,14 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
     const barChartActivities = groupsList.slice(0, 6);
 
-    const perEventHtml = groupsList.map((g, idx) => {
+    const filteredGroupsList = selectedScope === 'all'
+      ? groupsList
+      : groupsList.filter(g => g.name === selectedScope);
+
+    const perEventHtml = filteredGroupsList.map((g, idx) => {
+      const eventStartDate = getActivityStartDate(g.name);
+      const standingFunds = getOrgBalanceBefore(eventStartDate);
+
       const revRows = g.revenues.map((item, rIdx) => `
         <tr>
           <td>${rIdx + 1}</td>
@@ -614,24 +751,32 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
       return `
         <div class="activity-section-page">
-          <div class="header-container">
-            <div class="logo-container">
-              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
+          <h2 class="report-title">Financial Report</h2>
+          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
+            ${g.name}
+          </h3>
+
+          <!-- Standing Funds & Balance Summary Box -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; font-size: 12px; text-align: center;">
+            <div style="border-right: 1px solid #e2e8f0; padding-right: 10px;">
+              <span style="font-weight: 700; color: #475569; display: block; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 5px;">Standing Funds</span>
+              <span style="font-weight: 800; color: #0f172a; font-size: 13px;">₱${standingFunds.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div class="header-text">
-              <div class="university">Partido State University</div>
-              <div class="college">College of Engineering and Computational Sciences</div>
-              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
+            <div style="border-right: 1px solid #e2e8f0; padding-right: 10px; padding-left: 10px;">
+              <span style="font-weight: 700; color: #475569; display: block; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 5px;">Event Revenue</span>
+              <span style="font-weight: 800; color: #059669; font-size: 13px;">+ ₱${g.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div class="logo-container">
-              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
+            <div style="border-right: 1px solid #e2e8f0; padding-right: 10px; padding-left: 10px;">
+              <span style="font-weight: 700; color: #475569; display: block; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 5px;">Event Expenditures</span>
+              <span style="font-weight: 800; color: #dc2626; font-size: 13px;">- ₱${g.totalExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div style="padding-left: 10px;">
+              <span style="font-weight: 800; color: #334155; display: block; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 5px;">Current Balance</span>
+              <span style="font-weight: 900; ${standingFunds + g.totalRev - g.totalExp >= 0 ? 'color: #059669;' : 'color: #dc2626;'} font-size: 13px;">
+                ₱${(standingFunds + g.totalRev - g.totalExp).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
- 
-          <h2 class="report-title">Activity Detailed Report</h2>
-          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
-            ${g.name} (${g.isEvent ? 'Event' : 'General Activity'})
-          </h3>
  
           <h4 class="table-group-header">Revenue Logs</h4>
           <table class="report-table" style="margin-bottom: 20px;">
@@ -648,7 +793,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             <tbody>
               ${revRows || '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No revenue records for this activity.</td></tr>'}
               <tr style="background-color: #f8fafc; font-weight: bold;">
-                <td colspan="5" style="text-align: right; border-top: 1.5px solid #cbd5e1; font-size: 10px; color: #475569;">Total Collected Revenue:</td>
+                <td colspan="5" style="text-align: right; border-top: 1.5px solid #cbd5e1; font-size: 10px; color: #475569;">Total Revenue:</td>
                 <td style="text-align: right; border-top: 1.5px solid #cbd5e1; color: #059669; font-size: 10px; font-weight: 800;">₱${g.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
               </tr>
             </tbody>
@@ -675,285 +820,24 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             </tbody>
           </table>
  
-          <div style="display: flex; justify-content: flex-end; margin-top: 15px; margin-bottom: 15px; padding: 10px 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px;">
-            <span style="font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Net Activity Balance:</span>
-            <span style="margin-left: 10px; font-weight: 800; ${g.totalRev - g.totalExp >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">
-              ₱${(g.totalRev - g.totalExp).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
- 
-          <div class="footer-notes">
-            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal | Page ${idx + 2} of ${groupsList.length + 1}
-          </div>
+          ${signatureHtml}
         </div>
-        ${idx < groupsList.length - 1 ? '<div class="page-break"></div>' : ''}
+        ${idx < filteredGroupsList.length - 1 ? '<div class="page-break"></div>' : ''}
       `;
     }).join('');
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>SPECS Finance Combined Report</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              color: #1e293b;
-              margin: 45px;
-              line-height: 1.4;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .activity-section-page {
-              min-height: 94vh;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-            }
-            .header-container {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              border-bottom: 3px solid #0d6b66;
-              padding-bottom: 12px;
-              margin-bottom: 20px;
-            }
-            .logo-container {
-              width: 75px;
-              height: 75px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background-color: #ffffff;
-            }
-            .logo {
-              max-height: 100%;
-              max-width: 100%;
-              object-fit: contain;
-            }
-            .header-text {
-              text-align: center;
-              flex-grow: 1;
-              padding: 0 15px;
-            }
-            .university {
-              font-size: 15px;
-              font-weight: 800;
-              text-transform: uppercase;
-              color: #0f172a;
-              letter-spacing: 0.5px;
-            }
-            .college {
-              font-size: 11px;
-              font-weight: 600;
-              color: #475569;
-              margin-top: 1px;
-              text-transform: uppercase;
-            }
-            .org {
-              font-size: 10px;
-              font-weight: 700;
-              color: #0d6b66;
-              margin-top: 3px;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            }
-            .report-title {
-              text-align: center;
-              font-size: 18px;
-              font-weight: 800;
-              text-transform: uppercase;
-              margin: 15px 0 8px 0;
-              color: #0f172a;
-            }
-            .meta-section {
-              background-color: #f8fafc;
-              border: 1px solid #e2e8f0;
-              border-radius: 8px;
-              padding: 12px 18px;
-              margin-bottom: 20px;
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 8px 20px;
-              font-size: 12px;
-            }
-            .meta-item {
-              margin: 0;
-            }
-            .report-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 8px;
-            }
-            .report-table th, .report-table td {
-              border: 1px solid #e2e8f0;
-              padding: 7px 9px;
-              text-align: left;
-              font-size: 11px;
-            }
-            .report-table th {
-              background-color: #f1f5f9;
-              font-weight: 700;
-              color: #334155;
-              text-transform: uppercase;
-              font-size: 9px;
-              letter-spacing: 0.5px;
-            }
-            .report-table tr:nth-child(even) {
-              background-color: #f8fafc;
-            }
-            .table-group-header {
-              font-size: 11px;
-              font-weight: 800;
-              color: #0f172a;
-              text-transform: uppercase;
-              margin: 12px 0 4px 0;
-              border-left: 3px solid #0d6b66;
-              padding-left: 6px;
-            }
-            .footer-notes {
-              margin-top: auto;
-              padding-top: 12px;
-              font-size: 9px;
-              color: #64748b;
-              text-align: center;
-              border-top: 1px solid #e2e8f0;
-            }
-            .page-break {
-              page-break-after: always;
-              break-after: page;
-            }
-            
-            /* Print Visuals Grid Dashboard */
-            .visuals-grid {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 15px;
-              margin-bottom: 20px;
-            }
-            .chart-card {
-              border: 1px solid #e2e8f0;
-              border-radius: 10px;
-              padding: 15px;
-              background-color: #f8fafc;
-              display: flex;
-              flex-direction: column;
-            }
-            .chart-title {
-              font-size: 11px;
-              font-weight: 800;
-              color: #0f172a;
-              text-transform: uppercase;
-              margin-bottom: 12px;
-              border-bottom: 1px dashed #cbd5e1;
-              padding-bottom: 6px;
-            }
-            .split-bar-outer {
-              height: 24px;
-              width: 100%;
-              background-color: #e2e8f0;
-              border-radius: 6px;
-              overflow: hidden;
-              display: flex;
-              margin: 15px 0 10px 0;
-            }
-            .split-bar-fill {
-              height: 100%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #ffffff;
-              font-size: 10px;
-              font-weight: bold;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .split-bar-fill.revenue {
-              background-color: #0d6b66;
-            }
-            .split-bar-fill.expense {
-              background-color: #ef4444;
-            }
-            .graph-row {
-              display: flex;
-              align-items: center;
-              margin-bottom: 8px;
-            }
-            .graph-label {
-              width: 160px;
-              font-size: 11px;
-              font-weight: bold;
-              color: #334155;
-              margin-right: 15px;
-              text-overflow: ellipsis;
-              overflow: hidden;
-              white-space: nowrap;
-            }
-            .graph-bar-container {
-              flex-grow: 1;
-              background-color: #e2e8f0;
-              height: 20px;
-              border-radius: 4px;
-              overflow: hidden;
-              display: flex;
-            }
-            .graph-bar-fill {
-              height: 100%;
-              display: flex;
-              align-items: center;
-              padding: 0 8px;
-              color: #ffffff;
-              font-size: 9px;
-              font-weight: bold;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .graph-bar-fill.revenue {
-              background-color: #0d6b66;
-            }
-            .graph-bar-fill.expense {
-              background-color: #ef4444;
-              justify-content: flex-end;
-            }
-            @media print {
-              body {
-                margin: 20px;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-              .page-break {
-                page-break-after: always;
-                break-after: page;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <!-- Page 1: Finance Summary & Visual Charts Dashboard -->
+    const summaryPageHtml = selectedScope === 'all'
+      ? `
           <div class="activity-section-page">
-            <div class="header-container">
-              <div class="logo-container">
-                <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
-              </div>
-              <div class="header-text">
-                <div class="university">Partido State University</div>
-                <div class="college">College of Engineering and Computational Sciences</div>
-                <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
-              </div>
-              <div class="logo-container">
-                <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
-              </div>
-            </div>
-
             <h2 class="report-title">SPECS Financial Report</h2>
             <h3 style="text-align: center; color: #475569; margin-top: -4px; font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 15px;">
               Annual Statement & Graphical Overview
             </h3>
 
             <div class="meta-section">
-              <p class="meta-item"><strong>Total Collected Revenue:</strong> <span style="color: #059669; font-weight: bold;">₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Standing Funds (Total Revenue):</strong> <span style="color: #059669; font-weight: bold;">₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
               <p class="meta-item"><strong>Total Expenditures:</strong> <span style="color: #dc2626; font-weight: bold;">₱${overallExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
-              <p class="meta-item"><strong>Net Cash Balance:</strong> <span style="font-weight: bold; ${overallBal >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">₱${overallBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Current Cash Balance:</strong> <span style="font-weight: bold; ${overallBal >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">₱${overallBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
             </div>
 
             <!-- Visual Dashboard Grid -->
@@ -974,32 +858,226 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                 </div>
               </div>
 
-              <!-- Chart: Revenue vs Expenses Allocation Split Bar -->
+              <!-- Chart: Cumulative Cash Balance Trend (Line Chart) -->
               <div class="chart-card" style="padding: 15px;">
-                <div class="chart-title" style="font-size: 11px; padding-bottom: 6px; margin-bottom: 12px;">Overall Revenue vs Expenses Allocation</div>
-                <div class="split-bar-outer" style="height: 22px; margin: 10px 0 5px 0;">
-                  ${revPercent > 0 ? `<div class="split-bar-fill revenue" style="width: ${revPercent}%;">Revenue: ${revPercent}%</div>` : ''}
-                  ${expPercent > 0 ? `<div class="split-bar-fill expense" style="width: ${expPercent}%;">Expenses: ${expPercent}%</div>` : ''}
-                </div>
-                <div style="display: flex; justify-content: space-around; font-size: 8px; font-weight: bold; margin-top: 5px;">
-                  <span style="color: #0d6b66;">● Revenue: ₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  <span style="color: #ef4444;">● Expenses: ₱${overallExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
+                <div class="chart-title" style="font-size: 11px; padding-bottom: 6px; margin-bottom: 12px;">Cumulative Cash Flow Trend</div>
+                ${generateSVGLineChart(historyPoints)}
               </div>
             </div>
 
-            <div class="footer-notes">
-              Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} | Page 1 of ${groupsList.length + 1}
-            </div>
+            ${signatureHtml}
           </div>
-          
-          <div class="page-break"></div>
+          ${perEventHtml ? '<div class="page-break"></div>' : ''}
+        `
+      : '';
 
-          ${perEventHtml}
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>SPECS Financial Report</title>
+          <style>
+            @page {
+              size: 8.5in 13in;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              line-height: 1.5;
+            }
+            .activity-section-page {
+              width: 100%;
+            }
+            .print-header {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 5cm;
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+              z-index: 1000;
+            }
+            .print-header img {
+              width: 100%;
+              height: auto;
+              max-height: 5cm;
+              object-fit: contain;
+              display: block;
+            }
+            .print-footer {
+              position: fixed;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              height: 3cm;
+              display: flex;
+              align-items: flex-end;
+              justify-content: center;
+              z-index: 1000;
+            }
+            .print-footer img {
+              width: 100%;
+              height: auto;
+              max-height: 3cm;
+              object-fit: contain;
+              display: block;
+            }
+            .print-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none !important;
+            }
+            .print-layout-table > thead > tr > td,
+            .print-layout-table > tbody > tr > td,
+            .print-layout-table > tfoot > tr > td {
+              padding-left: 2.54cm;
+              padding-right: 2.54cm;
+              border: none !important;
+              background: transparent !important;
+            }
+            .header-spacer {
+              height: 5cm;
+            }
+            .footer-spacer {
+              height: 3cm;
+            }
+            thead {
+              display: table-header-group;
+            }
+            tfoot {
+              display: table-footer-group;
+            }
+            .report-title {
+              text-align: center;
+              font-size: 20px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 20px 0 10px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 24px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px 30px;
+              font-size: 13px;
+            }
+            .meta-item {
+              margin: 0;
+            }
+            .visuals-grid {
+              display: grid;
+              grid-template-columns: 1fr;
+              gap: 15px;
+              margin-bottom: 20px;
+            }
+            .chart-card {
+              border: 1px solid #e2e8f0;
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 15px;
+            }
+            .chart-title {
+              font-weight: bold;
+              font-size: 11px;
+              text-transform: uppercase;
+              color: #475569;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 4px;
+              margin-bottom: 10px;
+            }
+            .table-group-header {
+              font-size: 13px;
+              font-weight: bold;
+              color: #0d6b66;
+              text-transform: uppercase;
+              margin-top: 15px;
+              margin-bottom: 8px;
+              border-left: 3px solid #0d6b66;
+              padding-left: 8px;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 12px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #e2e8f0;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 11px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 10px;
+              letter-spacing: 0.5px;
+            }
+            .report-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .page-break {
+              page-break-after: always;
+              break-after: page;
+            }
+            @media print {
+              body {
+                margin: 0;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <img src="${origin}/header.png" alt="Header" />
+          </div>
+          <div class="print-footer">
+            <img src="${origin}/footer.png" alt="Footer" />
+          </div>
 
+          <table class="print-layout-table">
+            <thead>
+              <tr>
+                <td>
+                  <div class="header-spacer"></div>
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  ${summaryPageHtml}
+                  ${perEventHtml}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>
+                  <div class="footer-spacer"></div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
           <script>
             window.onload = function() {
               window.print();
+              window.close();
             }
           </script>
         </body>
@@ -1499,7 +1577,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             Export CSV
           </button>
           <button
-            onClick={handlePrintCombinedReport}
+            onClick={() => setPrintModalOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-[#0d6b66] bg-emerald-50/10 dark:bg-[#0d6b66]/10 text-[#0d6b66] dark:text-emerald-400 px-3.5 py-2 text-sm font-bold hover:bg-emerald-50 dark:hover:bg-[#0d6b66]/20 transition-colors shadow-sm"
             title="Print Financial Statements & Detailed Breakdown"
           >
@@ -1959,6 +2037,92 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         variant="danger"
         loading={actionLoading}
       />
+
+      {printModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl mx-4 animate-in zoom-in-95">
+            <div className="flex flex-col items-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[#0d6b66] border border-teal-100 mb-4">
+                <Printer className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Print Report Options</h3>
+              <p className="text-sm text-slate-500 text-center mb-5">Configure the report scope and preparer signatory before printing.</p>
+              
+              <div className="w-full space-y-4 mb-6">
+                {/* Scope Selection */}
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Report Scope</label>
+                  <select
+                    value={printScope}
+                    onChange={(e) => setPrintScope(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  >
+                    <option value="all">All Activities & Events</option>
+                    {financeGroupsList.map(actName => (
+                      <option key={actName} value={actName}>{actName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Signatory Selection */}
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Prepared By Signatory</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('treasurer')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'treasurer'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Treasurer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('asst-treasurer')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'asst-treasurer'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Asst. Treasurer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPrintModalOpen(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setPrintModalOpen(false);
+                    setTimeout(() => {
+                      handlePrintCombinedReport(printSignatory, printScope);
+                    }, 50);
+                  }}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
+                >
+                  Print Report
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

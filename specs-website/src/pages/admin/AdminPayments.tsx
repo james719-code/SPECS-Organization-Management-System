@@ -8,7 +8,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import type { EventDoc, PaymentDoc, AccountDoc } from '../../types/database';
+import type { EventDoc, PaymentDoc, AccountDoc, OfficerDoc, StudentDoc } from '../../types/database';
 import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail, Printer } from 'lucide-react';
 import { functions, databases } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID, DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
@@ -81,6 +81,26 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   const [currentUserProfile, setCurrentUserProfile] = useState<AccountDoc | null>(null);
   const [modalPaid, setModalPaid] = useState<'cash' | 'gcash'>('cash');
   const [confirmRecipient, setConfirmRecipient] = useState(false);
+  const [officersList, setOfficersList] = useState<OfficerDoc[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printSignatory, setPrintSignatory] = useState<'treasurer' | 'asst-treasurer'>('treasurer');
+  const [printScope, setPrintScope] = useState<string>('all');
+
+  const activitiesList = useMemo(() => {
+    const groups = new Set<string>();
+    payments.filter(p => !p.is_outside_bscs).forEach(p => {
+      let actName = 'General Collection';
+      if (p.is_event && p.events) {
+        const evId = typeof p.events === 'object' ? p.events.$id : p.events;
+        const ev = events.find(e => e.$id === evId);
+        actName = ev?.event_name || 'Linked Event';
+      } else if (p.activity) {
+        actName = p.activity;
+      }
+      groups.add(actName);
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b));
+  }, [payments, events]);
 
   const { addToast } = useToast();
 
@@ -99,11 +119,12 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         console.warn('Failed to load current user profile:', err);
       }
 
-      const [studentsRes, officersRes, paymentsRes, eventsRes] = await Promise.all([
+      const [studentsRes, officersRes, paymentsRes, eventsRes, activeOfficersRes] = await Promise.all([
         cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
         cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000),
         cachedApi.payments.listAll({}, isRefresh ? 0 : 1 * 60 * 1000),
-        cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000)
+        cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000),
+        cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000)
       ]);
 
       const combined = [...studentsRes.documents, ...officersRes.documents];
@@ -111,6 +132,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       setPayments(paymentsRes.documents);
       setEvents(eventsRes.documents);
       setCurrentUserProfile(profileDoc);
+      setOfficersList(activeOfficersRes.documents);
 
       if (selectedStudent) {
         // Refresh current student doc
@@ -547,7 +569,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     })();
   };
 
-  const handlePrintActivityLedger = () => {
+  const handlePrintActivityLedger = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
@@ -590,7 +612,41 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
     const activitiesList = Object.keys(activityGroups).sort((a, b) => a.localeCompare(b));
 
-    const pagesHtml = activitiesList.map((activityName, index) => {
+    const getOfficerDetails = (positionCode: string, defaultTitle: string) => {
+      const officer = officersList.find(o => o.position === positionCode);
+      if (officer && officer.students) {
+        const student = typeof officer.students === 'object' ? (officer.students as StudentDoc) : null;
+        if (student?.name) {
+          return {
+            name: student.name.toUpperCase(),
+            title: `${defaultTitle}, SPECS`
+          };
+        }
+      }
+      return {
+        name: '_______________________',
+        title: `${defaultTitle}, SPECS`
+      };
+    };
+
+    const presidentDetails = getOfficerDetails('president', 'President');
+    const auditorDetails = getOfficerDetails('auditor', 'Auditor');
+    
+    // For Treasurer/Prep by: dynamically resolved based on selection
+    const treasurerDetails = selectedRole === 'treasurer'
+      ? getOfficerDetails('treasurer', 'Treasurer')
+      : getOfficerDetails('asst-treasurer', 'Assistant Treasurer');
+
+    const adviserDetails = {
+      name: 'NICOLAS A. PURA',
+      title: 'Adviser, SPECS'
+    };
+
+    const activitiesToPrint = selectedScope === 'all'
+      ? activitiesList
+      : activitiesList.filter(a => a === selectedScope);
+
+    const pagesHtml = activitiesToPrint.map((activityName, index) => {
       const actPayments = activityGroups[activityName];
       const sortedPayments = [...actPayments].sort((a, b) => {
         const nameA = getStudentName(a.students);
@@ -626,24 +682,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         `;
       }).join('');
 
-      const pageBreakHtml = index < activitiesList.length - 1 ? '<div class="page-break"></div>' : '';
+      const pageBreakHtml = index < activitiesToPrint.length - 1 ? '<div class="page-break"></div>' : '';
 
       return `
         <div class="activity-report-page">
-          <div class="header-container">
-            <div class="logo-container">
-              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
-            </div>
-            <div class="header-text">
-              <div class="university">Partido State University</div>
-              <div class="college">College of Engineering and Computational Sciences</div>
-              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
-            </div>
-            <div class="logo-container">
-              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
-            </div>
-          </div>
-
           <h2 class="report-title">Payment Ledger Report</h2>
           <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
             Activity: ${activityName}
@@ -672,8 +714,29 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
             </tbody>
           </table>
 
-          <div class="footer-notes">
-            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal.
+          <div class="signature-section" style="margin-top: 50px; page-break-inside: avoid;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px 80px;">
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${treasurerDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${treasurerDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">AUDITED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${auditorDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${auditorDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title.toUpperCase()}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${adviserDetails.name.toUpperCase()}</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${adviserDetails.title.toUpperCase()}</p>
+              </div>
+            </div>
           </div>
         </div>
         ${pageBreakHtml}
@@ -686,67 +749,80 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         <head>
           <title>SPECS Payment Ledger by Activity</title>
           <style>
-            body {
+            @page {
+              size: 8.5in 13in;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
               color: #1e293b;
-              margin: 40px;
               line-height: 1.5;
             }
             .activity-report-page {
-              min-height: 90vh;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
+              width: 100%;
             }
-            .header-container {
+            .print-header {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 5cm;
               display: flex;
-              align-items: center;
-              justify-content: space-between;
-              border-bottom: 3px solid #0d6b66;
-              padding-bottom: 16px;
-              margin-bottom: 24px;
-            }
-            .logo-container {
-              width: 80px;
-              height: 80px;
-              display: flex;
-              align-items: center;
+              align-items: flex-start;
               justify-content: center;
-              background-color: #ffffff;
-              border-radius: 12px;
-              padding: 4px;
+              z-index: 1000;
             }
-            .logo {
-              max-height: 100%;
-              max-width: 100%;
+            .print-header img {
+              width: 100%;
+              height: auto;
+              max-height: 5cm;
               object-fit: contain;
+              display: block;
             }
-            .header-text {
-              text-align: center;
-              flex-grow: 1;
-              padding: 0 20px;
+            .print-footer {
+              position: fixed;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              height: 3cm;
+              display: flex;
+              align-items: flex-end;
+              justify-content: center;
+              z-index: 1000;
             }
-            .university {
-              font-size: 16px;
-              font-weight: 800;
-              text-transform: uppercase;
-              color: #0f172a;
-              letter-spacing: 0.5px;
+            .print-footer img {
+              width: 100%;
+              height: auto;
+              max-height: 3cm;
+              object-fit: contain;
+              display: block;
             }
-            .college {
-              font-size: 12px;
-              font-weight: 600;
-              color: #475569;
-              margin-top: 2px;
-              text-transform: uppercase;
+            .print-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none !important;
             }
-            .org {
-              font-size: 11px;
-              font-weight: 700;
-              color: #0d6b66;
-              margin-top: 4px;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
+            .print-layout-table > thead > tr > td,
+            .print-layout-table > tbody > tr > td,
+            .print-layout-table > tfoot > tr > td {
+              padding-left: 2.54cm;
+              padding-right: 2.54cm;
+              border: none !important;
+              background: transparent !important;
+            }
+            .header-spacer {
+              height: 5cm;
+            }
+            .footer-spacer {
+              height: 3cm;
+            }
+            thead {
+              display: table-header-group;
+            }
+            tfoot {
+              display: table-footer-group;
             }
             .report-title {
               text-align: center;
@@ -792,21 +868,14 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
             .report-table tr:nth-child(even) {
               background-color: #f8fafc;
             }
-            .footer-notes {
-              margin-top: auto;
-              padding-top: 20px;
-              font-size: 11px;
-              color: #64748b;
-              text-align: center;
-              border-top: 1px solid #e2e8f0;
-            }
+
             .page-break {
               page-break-after: always;
               break-after: page;
             }
             @media print {
               body {
-                margin: 20px;
+                margin: 0;
               }
               .page-break {
                 page-break-after: always;
@@ -816,11 +885,41 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
           </style>
         </head>
         <body>
-          ${pagesHtml || '<div style="text-align: center; padding: 40px; color: #94a3b8;">No payment activities available to print.</div>'}
+          <div class="print-header">
+            <img src="${origin}/header.png" alt="Header" />
+          </div>
+          <div class="print-footer">
+            <img src="${origin}/footer.png" alt="Footer" />
+          </div>
+
+          <table class="print-layout-table">
+            <thead>
+              <tr>
+                <td>
+                  <div class="header-spacer"></div>
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  ${pagesHtml || '<div style="text-align: center; padding: 40px; color: #94a3b8;">No payment activities available to print.</div>'}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>
+                  <div class="footer-spacer"></div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
 
           <script>
             window.onload = function() {
               window.print();
+              window.close();
             }
           </script>
         </body>
@@ -1438,7 +1537,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   />
                 </div>
                 <button
-                  onClick={handlePrintActivityLedger}
+                  onClick={() => setPrintModalOpen(true)}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
                   title="Print Payment Ledger grouped by Activity"
                 >
@@ -2090,6 +2189,92 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         variant="danger"
         loading={actionLoading}
       />
+
+      {printModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl mx-4 animate-in zoom-in-95">
+            <div className="flex flex-col items-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[#0d6b66] border border-teal-100 mb-4">
+                <Printer className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Print Report Options</h3>
+              <p className="text-sm text-slate-500 text-center mb-5">Configure the report scope and preparer signatory before printing.</p>
+              
+              <div className="w-full space-y-4 mb-6">
+                {/* Scope Selection */}
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Report Scope</label>
+                  <select
+                    value={printScope}
+                    onChange={(e) => setPrintScope(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  >
+                    <option value="all">All Activities & Events</option>
+                    {activitiesList.map(actName => (
+                      <option key={actName} value={actName}>{actName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Signatory Selection */}
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Prepared By Signatory</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('treasurer')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'treasurer'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Treasurer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('asst-treasurer')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'asst-treasurer'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Asst. Treasurer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPrintModalOpen(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setPrintModalOpen(false);
+                    setTimeout(() => {
+                      handlePrintActivityLedger(printSignatory, printScope);
+                    }, 50);
+                  }}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
+                >
+                  Print Report
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

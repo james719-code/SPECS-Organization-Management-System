@@ -560,61 +560,77 @@ const AdminAttendance: React.FC = () => {
         <head>
           <title>Attendance Report - ${selectedEvent.event_name}</title>
           <style>
-            body {
+            @page {
+              size: 8.5in 13in;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
               color: #1e293b;
-              margin: 40px;
               line-height: 1.5;
             }
-            .header-container {
+            .print-header {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 5cm;
               display: flex;
-              align-items: center;
-              justify-content: space-between;
-              border-bottom: 3px solid #0d6b66;
-              padding-bottom: 16px;
-              margin-bottom: 24px;
-            }
-            .logo-container {
-              width: 80px;
-              height: 80px;
-              display: flex;
-              align-items: center;
+              align-items: flex-start;
               justify-content: center;
-              background-color: #ffffff;
-              border-radius: 12px;
-              padding: 4px;
+              z-index: 1000;
             }
-            .logo {
-              max-height: 100%;
-              max-width: 100%;
+            .print-header img {
+              width: 100%;
+              height: auto;
+              max-height: 5cm;
               object-fit: contain;
+              display: block;
             }
-            .header-text {
-              text-align: center;
-              flex-grow: 1;
-              padding: 0 20px;
+            .print-footer {
+              position: fixed;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              height: 3cm;
+              display: flex;
+              align-items: flex-end;
+              justify-content: center;
+              z-index: 1000;
             }
-            .university {
-              font-size: 16px;
-              font-weight: 800;
-              text-transform: uppercase;
-              color: #0f172a;
-              letter-spacing: 0.5px;
+            .print-footer img {
+              width: 100%;
+              height: auto;
+              max-height: 3cm;
+              object-fit: contain;
+              display: block;
             }
-            .college {
-              font-size: 12px;
-              font-weight: 600;
-              color: #475569;
-              margin-top: 2px;
-              text-transform: uppercase;
+            .print-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none !important;
             }
-            .org {
-              font-size: 11px;
-              font-weight: 700;
-              color: #0d6b66;
-              margin-top: 4px;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
+            .print-layout-table > thead > tr > td,
+            .print-layout-table > tbody > tr > td,
+            .print-layout-table > tfoot > tr > td {
+              padding-left: 2.54cm;
+              padding-right: 2.54cm;
+              border: none !important;
+              background: transparent !important;
+            }
+            .header-spacer {
+              height: 5cm;
+            }
+            .footer-spacer {
+              height: 3cm;
+            }
+            thead {
+              display: table-header-group;
+            }
+            tfoot {
+              display: table-footer-group;
             }
             .report-title {
               text-align: center;
@@ -660,17 +676,10 @@ const AdminAttendance: React.FC = () => {
             .report-table tr:nth-child(even) {
               background-color: #f8fafc;
             }
-            .footer-notes {
-              margin-top: 40px;
-              font-size: 11px;
-              color: #64748b;
-              text-align: center;
-              border-top: 1px solid #e2e8f0;
-              padding-top: 15px;
-            }
+
             @media print {
               body {
-                margin: 20px;
+                margin: 0;
               }
               .no-print {
                 display: none;
@@ -679,48 +688,62 @@ const AdminAttendance: React.FC = () => {
           </style>
         </head>
         <body>
-          <div class="header-container">
-            <div class="logo-container">
-              <img src="${origin}/parsu_logo.png" alt="ParSU Logo" class="logo" />
-            </div>
-            <div class="header-text">
-              <div class="university">Partido State University</div>
-              <div class="college">College of Engineering and Computational Sciences</div>
-              <div class="org">Society of Programmers and Enthusiasts in Computer Science</div>
-            </div>
-            <div class="logo-container">
-              <img src="${origin}/logo.webp" alt="SPECS Logo" class="logo" />
-            </div>
+          <div class="print-header">
+            <img src="${origin}/header.png" alt="Header" />
+          </div>
+          <div class="print-footer">
+            <img src="${origin}/footer.png" alt="Footer" />
           </div>
 
-          <h2 class="report-title">Official Attendance Sheet Report</h2>
-
-          <div class="meta-section">
-            <p class="meta-item"><strong>Event Name:</strong> ${selectedEvent.event_name}</p>
-            <p class="meta-item"><strong>Location:</strong> ${selectedEvent.location || 'N/A'}</p>
-            <p class="meta-item"><strong>Event Date:</strong> ${formatDate(selectedEvent.date_to_held || '')}</p>
-          </div>
-
-          <table class="report-table">
+          <table class="print-layout-table">
             <thead>
               <tr>
-                <th style="width: 8%;">No.</th>
-                <th style="width: 42%;">Student Name</th>
-                <th style="width: 50%;">Sessions Attended</th>
+                <td>
+                  <div class="header-spacer"></div>
+                </td>
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml || '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
-            </tbody>
-          </table>
+              <tr>
+                <td>
+                  <h2 class="report-title">Official Attendance Sheet Report</h2>
 
-          <div class="footer-notes">
-            Report generated on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by SPECS Portal.
-          </div>
+                  <div class="meta-section">
+                    <p class="meta-item"><strong>Event Name:</strong> ${selectedEvent.event_name}</p>
+                    <p class="meta-item"><strong>Location:</strong> ${selectedEvent.location || 'N/A'}</p>
+                    <p class="meta-item"><strong>Event Date:</strong> ${formatDate(selectedEvent.date_to_held || '')}</p>
+                  </div>
+
+                  <table class="report-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 8%;">No.</th>
+                        <th style="width: 42%;">Student Name</th>
+                        <th style="width: 50%;">Sessions Attended</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rowsHtml || '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
+                    </tbody>
+                  </table>
+
+
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>
+                  <div class="footer-spacer"></div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
 
           <script>
             window.onload = function() {
               window.print();
+              window.close();
             }
           </script>
         </body>
