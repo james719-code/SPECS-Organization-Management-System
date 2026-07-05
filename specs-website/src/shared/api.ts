@@ -12,6 +12,7 @@ import {
     COLLECTION_ID_FILES,
     COLLECTION_ID_OFFICERS,
     COLLECTION_ID_TASKS,
+    COLLECTION_ID_ADMINS,
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';

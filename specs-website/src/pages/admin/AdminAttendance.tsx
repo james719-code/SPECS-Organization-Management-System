@@ -6,7 +6,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import type { EventDoc, AttendanceDoc, AccountDoc } from '../../types/database';
+import type { EventDoc, AttendanceDoc, AccountDoc, OfficerDoc, StudentDoc } from '../../types/database';
+import { createPortal } from 'react-dom';
 import { functions } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID } from '../../shared/constants';
 import { getAttendanceHtml } from '../../shared/emailTemplates';
@@ -37,6 +38,28 @@ const AdminAttendance: React.FC = () => {
   // Search filter on records
   const [recordFilterQuery, setRecordFilterQuery] = useState('');
 
+  // Signatory & Fullscreen Scanner states
+  const [officersList, setOfficersList] = useState<OfficerDoc[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printSignatory, setPrintSignatory] = useState<'secretary' | 'asst-secretary'>('secretary');
+  const [isFullScreenScan, setIsFullScreenScan] = useState(false);
+  const [fullscreenLogs, setFullscreenLogs] = useState<{ id: string; name: string; time: string; status: 'success' | 'error' | 'warning'; message: string }[]>([]);
+  const [scanFlash, setScanFlash] = useState<'success' | 'error' | 'warning' | null>(null);
+
+  // Manual Camera Control states & refs
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const [brightness, setBrightness] = useState<number>(0);
+  const [focusMode, setFocusMode] = useState<string>('continuous');
+  const [exposureCapabilities, setExposureCapabilities] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [focusCapabilities, setFocusCapabilities] = useState<string[]>([]);
+  const [hardwareBrightnessSupported, setHardwareBrightnessSupported] = useState(false);
+  const [brightnessMode, setBrightnessMode] = useState<'exposureCompensation' | 'brightness' | 'none'>('none');
+  const [focusDistance, setFocusDistance] = useState<number>(0.2);
+  const [focusDistanceCapabilities, setFocusDistanceCapabilities] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [hardwareFocusSupported, setHardwareFocusSupported] = useState(false);
+  const [showCameraControls, setShowCameraControls] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+  const [isLiveFeedCollapsed, setIsLiveFeedCollapsed] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : true);
+
   // Delete Action states
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [actionLoading, setActionLoading] = useState(false);
@@ -48,13 +71,15 @@ const AdminAttendance: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setInitialLoading(true);
 
-      const [eventsRes, studentsRes, officersRes] = await Promise.all([
+      const [eventsRes, studentsRes, officersRes, activeOfficersRes] = await Promise.all([
         cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000),
         cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
-        cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000)
+        cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000),
+        cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000)
       ]);
 
       setEvents(eventsRes.documents);
+      setOfficersList(activeOfficersRes.documents);
       
       // Combine students and officers as eligible attendees
       const combinedAttendees = [...studentsRes.documents, ...officersRes.documents];
@@ -270,8 +295,23 @@ const AdminAttendance: React.FC = () => {
   const handleQrScanned = async (decodedText: string) => {
     if (scanCooldown) return;
     
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
     if (!decodedText.startsWith('specs-member:')) {
+      setScanCooldown(true);
+      setTimeout(() => setScanCooldown(false), 1500);
       addToast({ type: 'warning', title: 'Invalid QR Code', message: 'Scanned QR code is not a valid SPECS member code.' });
+      
+      const errorLog = {
+        id: Math.random().toString(),
+        name: 'Invalid QR Code',
+        time: timeStr,
+        status: 'error' as const,
+        message: 'Not a valid SPECS member code'
+      };
+      setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+      setScanFlash('error');
+      setTimeout(() => setScanFlash(null), 1000);
       return;
     }
     
@@ -295,8 +335,24 @@ const AdminAttendance: React.FC = () => {
       });
     }
 
+    const attendeeName = attendeeAccount ? (attendeeAccount.students as any)?.name || attendeeAccount.username : 'Unknown Member';
+    const attendeeEmail = attendeeAccount ? (attendeeAccount.students as any)?.email : '';
+
     if (!studentProfileId) {
+      setScanCooldown(true);
+      setTimeout(() => setScanCooldown(false), 1500);
       addToast({ type: 'error', title: 'Invalid Scan', message: 'Could not resolve student profile from this QR code.' });
+      
+      const errorLog = {
+        id: Math.random().toString(),
+        name: attendeeName,
+        time: timeStr,
+        status: 'error' as const,
+        message: 'Could not resolve student profile'
+      };
+      setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+      setScanFlash('error');
+      setTimeout(() => setScanFlash(null), 1000);
       return;
     }
 
@@ -328,16 +384,30 @@ const AdminAttendance: React.FC = () => {
 
     const scanKey = `${selectedEventId}:${studentProfileId}:${attendanceLabel.trim()}`;
     if (cache[scanKey]) {
+      setScanCooldown(true);
+      setTimeout(() => setScanCooldown(false), 1500);
+      
       addToast({ 
         type: 'warning', 
         title: 'Duplicate Scan', 
         message: `This member has already been recorded for "${attendanceLabel}" in this event.` 
       });
+      
+      const errorLog = {
+        id: Math.random().toString(),
+        name: attendeeName,
+        time: timeStr,
+        status: 'warning' as const,
+        message: `Duplicate scan for "${attendanceLabel}"`
+      };
+      setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+      setScanFlash('warning');
+      setTimeout(() => setScanFlash(null), 1000);
       return;
     }
 
     setScanCooldown(true);
-    setTimeout(() => setScanCooldown(false), 2500); // 2.5 second cooldown
+    setTimeout(() => setScanCooldown(false), 1200); // 1.2 second cooldown for snappy scanning
 
     // Prevent officer from scanning themselves
     const currentStudentId = currentUserProfile?.students 
@@ -345,12 +415,22 @@ const AdminAttendance: React.FC = () => {
       : null;
 
     if (currentStudentId && studentProfileId === currentStudentId) {
+      setScanCooldown(true);
+      setTimeout(() => setScanCooldown(false), 1500);
       addToast({ type: 'error', title: 'Invalid Scan', message: 'An officer cannot record their own attendance.' });
+      
+      const errorLog = {
+        id: Math.random().toString(),
+        name: attendeeName,
+        time: timeStr,
+        status: 'error' as const,
+        message: 'Cannot record own attendance'
+      };
+      setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+      setScanFlash('error');
+      setTimeout(() => setScanFlash(null), 1000);
       return;
     }
-
-    const attendeeName = attendeeAccount ? (attendeeAccount.students as any)?.name || attendeeAccount.username : 'Unknown Member';
-    const attendeeEmail = attendeeAccount ? (attendeeAccount.students as any)?.email : '';
 
     try {
       const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
@@ -370,6 +450,17 @@ const AdminAttendance: React.FC = () => {
       playBeep();
       addToast({ type: 'success', title: 'Recorded via QR', message: `Attendance marked for ${attendeeName}.` });
 
+      const successLog = {
+        id: Math.random().toString(),
+        name: attendeeName,
+        time: timeStr,
+        status: 'success' as const,
+        message: `Recorded for "${attendanceLabel}"`
+      };
+      setFullscreenLogs(prev => [successLog, ...prev.slice(0, 9)]);
+      setScanFlash('success');
+      setTimeout(() => setScanFlash(null), 1000);
+
       if (notifyViaEmail && attendeeEmail) {
         (async () => {
           try {
@@ -378,14 +469,14 @@ const AdminAttendance: React.FC = () => {
               ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
               : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-            const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const formattedTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
             const htmlBody = getAttendanceHtml(
               attendeeName,
               selectedEvent?.event_name || 'Organization Event',
               dateStr,
               'Present',
-              timeStr,
+              formattedTimeStr,
               window.location.origin
             );
 
@@ -412,6 +503,17 @@ const AdminAttendance: React.FC = () => {
       loadAttendanceRecords(selectedEventId);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
+      
+      const errorLog = {
+        id: Math.random().toString(),
+        name: attendeeName,
+        time: timeStr,
+        status: 'error' as const,
+        message: err.message || 'Failed to record attendance'
+      };
+      setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+      setScanFlash('error');
+      setTimeout(() => setScanFlash(null), 1000);
     }
   };
 
@@ -419,6 +521,87 @@ const AdminAttendance: React.FC = () => {
   useEffect(() => {
     scanHandlerRef.current = handleQrScanned;
   }, [handleQrScanned, scanCooldown]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullScreenScan) {
+        setIsFullScreenScan(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullScreenScan]);
+
+  const applyCameraControls = async (newBrightness: number, newFocusMode: string, newFocusDistance: number) => {
+    try {
+      const scanner = qrScannerRef.current;
+      if (!scanner || !scanner.isScanning) return;
+      
+      const track = typeof scanner.getRunningTrack === 'function' 
+        ? scanner.getRunningTrack() 
+        : null;
+      if (!track) return;
+      
+      const flatConstraints: any = {};
+      const advancedConstraints: any = {};
+      
+      // Focus mode hardware control
+      flatConstraints.focusMode = newFocusMode;
+      advancedConstraints.focusMode = newFocusMode;
+      
+      if (newFocusMode === 'manual') {
+        flatConstraints.focusDistance = newFocusDistance;
+        advancedConstraints.focusDistance = newFocusDistance;
+      }
+      
+      // Exposure/Brightness hardware control (mapped to device min/max limits)
+      if (hardwareBrightnessSupported && exposureCapabilities) {
+        const hwMin = exposureCapabilities.min;
+        const hwMax = exposureCapabilities.max;
+        const hwVal = hwMin + ((newBrightness + 2) / 4) * (hwMax - hwMin);
+        
+        if (brightnessMode === 'exposureCompensation') {
+          flatConstraints.exposureCompensation = hwVal;
+          advancedConstraints.exposureCompensation = hwVal;
+        } else if (brightnessMode === 'brightness') {
+          flatConstraints.brightness = hwVal;
+          advancedConstraints.brightness = hwVal;
+        }
+      }
+      
+      if (Object.keys(flatConstraints).length > 0 || Object.keys(advancedConstraints).length > 0) {
+        // Try applying directly on the track (bypassing any wrapper limits)
+        if (typeof track.applyConstraints === 'function') {
+          try {
+            await track.applyConstraints({
+              ...flatConstraints,
+              advanced: [advancedConstraints]
+            });
+            console.log("[AdminAttendance Controls] Applied constraints directly on track:", flatConstraints, advancedConstraints);
+          } catch (trackErr) {
+            console.warn("[AdminAttendance Controls] Failed to apply constraints directly on track, trying wrapper:", trackErr);
+            if (typeof scanner.applyVideoConstraints === 'function') {
+              await scanner.applyVideoConstraints({
+                ...flatConstraints,
+                advanced: [advancedConstraints]
+              });
+            }
+          }
+        } else if (typeof scanner.applyVideoConstraints === 'function') {
+          await scanner.applyVideoConstraints({
+            ...flatConstraints,
+            advanced: [advancedConstraints]
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[AdminAttendance Controls] Failed to apply manual camera settings:", e);
+    }
+  };
+
+  useEffect(() => {
+    applyCameraControls(brightness, focusMode, focusDistance);
+  }, [brightness, focusMode, focusDistance]);
 
   useEffect(() => {
     let html5QrCode: Html5Qrcode | null = null;
@@ -429,6 +612,8 @@ const AdminAttendance: React.FC = () => {
       const startScanner = async () => {
         try {
           html5QrCode = new Html5Qrcode(elementId);
+          qrScannerRef.current = html5QrCode;
+          
           await html5QrCode.start(
             { facingMode: "environment" },
             {
@@ -449,15 +634,58 @@ const AdminAttendance: React.FC = () => {
           // Optimize focus constraints and exposure settings for scanning screens
           try {
             let capabilities: any = {};
-            if (typeof html5QrCode.getRunningTrackCapabilities === 'function') {
-              capabilities = html5QrCode.getRunningTrackCapabilities();
+            const track = typeof html5QrCode.getRunningTrack === 'function' 
+              ? html5QrCode.getRunningTrack() 
+              : null;
+            if (track && typeof track.getCapabilities === 'function') {
+              capabilities = track.getCapabilities();
+            }
+
+            // Expose capabilities to controls
+            if (capabilities.exposureCompensation) {
+              setExposureCapabilities({
+                min: capabilities.exposureCompensation.min || -2.0,
+                max: capabilities.exposureCompensation.max || 2.0,
+                step: capabilities.exposureCompensation.step || 0.1
+              });
+              setHardwareBrightnessSupported(true);
+              setBrightnessMode('exposureCompensation');
+              console.log("[AdminAttendance QR] Hardware exposure compensation supported:", capabilities.exposureCompensation);
+            } else if (capabilities.brightness) {
+              setExposureCapabilities({
+                min: capabilities.brightness.min || 0,
+                max: capabilities.brightness.max || 100,
+                step: capabilities.brightness.step || 1
+              });
+              setHardwareBrightnessSupported(true);
+              setBrightnessMode('brightness');
+              console.log("[AdminAttendance QR] Hardware brightness control supported:", capabilities.brightness);
             } else {
-              const track = typeof html5QrCode.getRunningTrack === 'function' 
-                ? html5QrCode.getRunningTrack() 
-                : null;
-              if (track && typeof track.getCapabilities === 'function') {
-                capabilities = track.getCapabilities();
-              }
+              setExposureCapabilities({ min: -2.0, max: 2.0, step: 0.1 });
+              setHardwareBrightnessSupported(false);
+              setBrightnessMode('none');
+              console.log("[AdminAttendance QR] Hardware exposure/brightness control NOT supported.");
+            }
+
+            if (capabilities.focusMode) {
+              setFocusCapabilities(capabilities.focusMode);
+            } else {
+              setFocusCapabilities(['continuous', 'manual']);
+            }
+
+            if (capabilities.focusDistance) {
+              setFocusDistanceCapabilities({
+                min: capabilities.focusDistance.min || 0,
+                max: capabilities.focusDistance.max || 1.0,
+                step: capabilities.focusDistance.step || 0.05
+              });
+              setHardwareFocusSupported(true);
+              const mid = (capabilities.focusDistance.min + capabilities.focusDistance.max) / 2;
+              setFocusDistance(mid);
+            } else {
+              setFocusDistanceCapabilities({ min: 0, max: 1.0, step: 0.05 });
+              setHardwareFocusSupported(false);
+              setFocusDistance(0.2);
             }
 
             const advancedConstraints: any = {};
@@ -465,6 +693,7 @@ const AdminAttendance: React.FC = () => {
             // Request continuous focus if supported
             if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
               advancedConstraints.focusMode = 'continuous';
+              setFocusMode('continuous');
             }
 
             // Request continuous exposure if supported
@@ -472,17 +701,19 @@ const AdminAttendance: React.FC = () => {
               advancedConstraints.exposureMode = 'continuous';
             }
 
-            // Request negative exposure compensation to reduce brightness of screen emission
+            // Request default exposure compensation
             if (capabilities.exposureCompensation) {
               const minExp = capabilities.exposureCompensation.min || -2.0;
-              advancedConstraints.exposureCompensation = Math.max(minExp, -1.5);
+              const defaultBrightness = Math.max(minExp, -1.5);
+              advancedConstraints.exposureCompensation = defaultBrightness;
             }
+            setBrightness(0);
 
             if (Object.keys(advancedConstraints).length > 0) {
               await html5QrCode.applyVideoConstraints({
                 advanced: [advancedConstraints]
               });
-              console.log("[AdminAttendance QR] Camera optimized for screens:", advancedConstraints);
+              console.log("[AdminAttendance QR] Camera initialized with optimizations:", advancedConstraints);
             }
           } catch (constErr) {
             console.warn("[AdminAttendance QR] Failed to apply advanced camera optimization:", constErr);
@@ -497,6 +728,13 @@ const AdminAttendance: React.FC = () => {
       const timer = setTimeout(startScanner, 250);
       return () => {
         clearTimeout(timer);
+        qrScannerRef.current = null;
+        setExposureCapabilities(null);
+        setFocusCapabilities([]);
+        setHardwareBrightnessSupported(false);
+        setBrightnessMode('none');
+        setFocusDistanceCapabilities(null);
+        setHardwareFocusSupported(false);
         if (html5QrCode) {
           if (html5QrCode.isScanning) {
             html5QrCode.stop().then(() => {
@@ -506,7 +744,7 @@ const AdminAttendance: React.FC = () => {
         }
       };
     }
-  }, [attendanceMode, selectedEventId]);
+  }, [attendanceMode, selectedEventId, isFullScreenScan]);
 
   const handleDeleteRecord = async () => {
     if (!deleteConfirm.id) return;
@@ -523,7 +761,7 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
-  const handlePrintReport = () => {
+  const handlePrintReport = (selectedSignatory: 'secretary' | 'asst-secretary') => {
     if (!selectedEventId) {
       addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
       return;
@@ -553,6 +791,28 @@ const AdminAttendance: React.FC = () => {
     }).join('');
 
     const origin = window.location.origin;
+
+    const getOfficerDetails = (positionCode: string, defaultTitle: string) => {
+      const officer = officersList.find(o => o.position === positionCode);
+      if (officer && officer.students) {
+        const student = typeof officer.students === 'object' ? (officer.students as StudentDoc) : null;
+        if (student?.name) {
+          return {
+            name: student.name.toUpperCase(),
+            title: `${defaultTitle}, SPECS`
+          };
+        }
+      }
+      return {
+        name: '_______________________',
+        title: `${defaultTitle.toUpperCase()}, SPECS`
+      };
+    };
+
+    const presidentDetails = getOfficerDetails('president', 'President');
+    const preparedByDetails = selectedSignatory === 'secretary'
+      ? getOfficerDetails('secretary', 'Executive Secretary')
+      : getOfficerDetails('asst-secretary', 'Assistant Secretary');
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -727,6 +987,25 @@ const AdminAttendance: React.FC = () => {
                     </tbody>
                   </table>
 
+                  <div class="signature-section" style="margin-top: 60px; page-break-inside: avoid; text-align: left;">
+                    <div style="display: flex; flex-direction: column; gap: 40px; text-align: left; align-items: flex-start;">
+                      <div style="text-align: left;">
+                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${preparedByDetails.name}</p>
+                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${preparedByDetails.title}</p>
+                      </div>
+                      <div style="text-align: left;">
+                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name}</p>
+                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title}</p>
+                      </div>
+                      <div style="text-align: left;">
+                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">NICOLAS A. PURA</p>
+                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">ADVISER, SPECS</p>
+                      </div>
+                    </div>
+                  </div>
 
                 </td>
               </tr>
@@ -805,6 +1084,14 @@ const AdminAttendance: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Styles to prevent camera stretching */}
+      <style>{`
+        #qr-reader-el video {
+          object-fit: cover !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}</style>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -1050,21 +1337,47 @@ const AdminAttendance: React.FC = () => {
                     </label>
                   </div>
 
-                  {/* QR webcam reader container */}
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center justify-center">
-                    <div id="qr-reader-el" className="absolute inset-0 w-full h-full object-cover" />
-                    
-                    {/* Floating targeting scan overlay */}
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10 bg-transparent">
-                      <div className="w-44 h-44 border-4 border-dashed border-[#0d6b66] rounded-xl relative shadow-md">
-                        {/* Red scan line */}
-                        <div className="absolute left-0 right-0 h-0.5 bg-red-500 opacity-60 animate-pulse top-1/2" />
-                      </div>
-                      <p className="text-[10px] text-white/90 font-bold uppercase mt-4 tracking-wider bg-slate-900/60 px-3 py-1 rounded-full backdrop-blur-xs shadow-xs">
-                        Align QR code inside box
-                      </p>
+                  {isFullScreenScan ? (
+                    <div className="aspect-square w-full rounded-xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center p-4">
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Scanner Active</p>
+                      <p className="text-[10px] text-slate-500 font-medium text-center">Webcam is currently running in full-screen overlay mode.</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsFullScreenScan(false)}
+                        className="mt-3 px-3 py-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white text-[10px] font-bold transition-all shadow-xs"
+                      >
+                        Minimize
+                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center justify-center">
+                      <div id="qr-reader-el" className="absolute inset-0 w-full h-full object-cover" />
+                      
+                      {/* Floating targeting scan overlay */}
+                      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10 bg-transparent">
+                        <div className="w-44 h-44 border-4 border-dashed border-[#0d6b66] rounded-xl relative shadow-md">
+                          {/* Red scan line */}
+                          <div className="absolute left-0 right-0 h-0.5 bg-red-500 opacity-60 animate-pulse top-1/2" />
+                        </div>
+                        <p className="text-[10px] text-white/90 font-bold uppercase mt-4 tracking-wider bg-slate-900/60 px-3 py-1 rounded-full backdrop-blur-xs shadow-xs">
+                          Align QR code inside box
+                        </p>
+                      </div>
+
+                      {/* Button to enter full screen */}
+                      <button
+                        type="button"
+                        onClick={() => setIsFullScreenScan(true)}
+                        className="absolute bottom-3 right-3 z-20 bg-slate-900/80 hover:bg-slate-900 border border-slate-700/80 text-white p-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 animate-pulse"
+                        title="Enter Full Screen Scanner"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                        Full Screen
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1076,7 +1389,7 @@ const AdminAttendance: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Attendance Logs</h3>
                     <button
-                      onClick={handlePrintReport}
+                      onClick={() => setPrintModalOpen(true)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs"
                       title="Print Official Attendance Sheet"
                     >
@@ -1172,6 +1485,311 @@ const AdminAttendance: React.FC = () => {
         variant="danger"
         loading={actionLoading}
       />
+
+      {/* Signatory Selection Modal */}
+      {printModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl mx-4 animate-in zoom-in-95">
+            <div className="flex flex-col items-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[#0d6b66] border border-teal-100 mb-4">
+                <Printer className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Print Attendance Sheet</h3>
+              <p className="text-sm text-slate-500 text-center mb-5 font-medium">Select the officer signatory who prepared this report.</p>
+              
+              <div className="w-full space-y-4 mb-6">
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Prepared By Signatory</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('secretary')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'secretary'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Secretary
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintSignatory('asst-secretary')}
+                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
+                        printSignatory === 'asst-secretary'
+                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Asst. Secretary
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPrintModalOpen(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setPrintModalOpen(false);
+                    setTimeout(() => {
+                      handlePrintReport(printSignatory);
+                    }, 50);
+                  }}
+                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
+                >
+                  Print Report
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Full Screen QR Scanner Portal */}
+      {isFullScreenScan && createPortal(
+        (() => {
+          const cssBrightness = brightness < 0 
+            ? ((brightness + 2) / 2) * 100 
+            : 100 + brightness * 50;
+          
+          return (
+            <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center w-screen h-screen select-none animate-in fade-in">
+              {/* Camera Viewport Element */}
+              <div 
+                id="qr-reader-el" 
+                className="absolute inset-0 w-full h-full object-cover" 
+                style={{ filter: `brightness(${cssBrightness}%)` }}
+              />
+              
+              {/* Target Box Overlay */}
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10 bg-transparent">
+                <div className="w-64 h-64 border-4 border-dashed border-[#0d6b66] rounded-xl relative shadow-md">
+                  <div className="absolute left-0 right-0 h-0.5 bg-red-500 opacity-60 animate-pulse top-1/2" />
+                </div>
+                <p className="text-[10px] text-white/90 font-bold uppercase mt-4 tracking-wider bg-slate-900/60 px-3 py-1 rounded-full backdrop-blur-xs shadow-xs">
+                  Align QR code inside box
+                </p>
+              </div>
+
+              {/* Top Bar for status and buttons */}
+              <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
+                {/* Left Side: Attendance Scanner title */}
+                <div className="bg-slate-900/80 border border-slate-800/80 px-4 py-2 rounded-xl text-left shadow-lg pointer-events-auto backdrop-blur-xs max-w-[150px] sm:max-w-[200px] md:max-w-none">
+                  <h4 className="text-[10px] md:text-xs font-black uppercase text-teal-400 tracking-wider truncate">Attendance Scanner</h4>
+                  <p className="text-[9px] md:text-[10px] text-slate-300 font-semibold truncate">{attendanceLabel}</p>
+                </div>
+                
+                {/* Right Side: Action buttons */}
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <button 
+                    onClick={() => setShowCameraControls(prev => !prev)}
+                    className={`bg-slate-900/80 hover:bg-slate-800/90 border rounded-xl px-3 py-2 text-xs font-bold flex items-center gap-2 shadow-lg transition-all ${
+                      showCameraControls ? 'border-teal-500/50 text-teal-300' : 'border-slate-800 text-white'
+                    }`}
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                    </svg>
+                    <span className="hidden md:inline">{showCameraControls ? 'Hide Controls' : 'Adjust Camera'}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setIsFullScreenScan(false)}
+                    className="bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 text-white rounded-xl px-3 py-2 text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>Exit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Side Manual Camera Controls */}
+              {showCameraControls && (
+                <div className="absolute top-1/2 -translate-y-1/2 right-4 md:right-6 z-40 bg-slate-955/95 backdrop-blur-md border border-slate-800 rounded-xl p-5 text-white shadow-2xl flex flex-col gap-4 max-w-[90vw] w-72 max-h-[70vh] overflow-y-auto animate-in slide-in-from-right duration-200">
+                  <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-400 text-left">Camera Adjust</span>
+                    <button 
+                      onClick={() => setShowCameraControls(false)}
+                      className="text-slate-450 hover:text-white p-0.5 rounded-md hover:bg-slate-900 transition-colors"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Brightness / Exposure Slider */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-300">Exposure / Brightness</span>
+                      <span className="font-mono text-teal-400 font-bold">{brightness > 0 ? `+${brightness.toFixed(1)}` : brightness.toFixed(1)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-2.0"
+                      max="2.0"
+                      step="0.1"
+                      value={brightness}
+                      onChange={(e) => setBrightness(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#0d6b66] focus:outline-none"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                      <span>DARK</span>
+                      <span>NORMAL</span>
+                      <span>BRIGHT</span>
+                    </div>
+                  </div>
+
+                  {/* Focus Mode Selector */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-300 text-left">Autofocus Mode</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['continuous', 'manual'].map((mode) => {
+                        const isSelected = focusMode === mode;
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setFocusMode(mode)}
+                            className={`rounded-lg py-2 text-[10px] font-bold border transition-all ${
+                              isSelected
+                                ? 'border-[#0d6b66] bg-teal-500/10 text-teal-300 font-extrabold'
+                                : 'border-slate-800 bg-slate-900/40 text-slate-450 hover:bg-slate-900/60'
+                            }`}
+                          >
+                            {mode === 'continuous' ? 'Continuous' : 'Manual Focus'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Focus Distance Slider (Only active if manual focus mode is selected) */}
+                  {focusMode === 'manual' && (
+                    <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-300">Focus Distance</span>
+                        <span className="font-mono text-teal-400 font-bold">{focusDistance.toFixed(2)}m</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={focusDistanceCapabilities?.min ?? 0.0}
+                        max={focusDistanceCapabilities?.max ?? 1.0}
+                        step={focusDistanceCapabilities?.step ?? 0.01}
+                        value={focusDistance}
+                        onChange={(e) => setFocusDistance(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#0d6b66] focus:outline-none"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                        <span>CLOSE (MACRO)</span>
+                        <span>FAR (INFINITY)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[9px] text-slate-505 leading-normal text-left">
+                    * Controls apply hardware constraints where supported, falling back to real-time software filters for maximum device compatibility.
+                  </div>
+                </div>
+              )}
+
+              {/* Collapsible Live scan log stream */}
+              <div className={`absolute bottom-4 left-4 right-4 md:right-auto md:left-6 z-40 max-w-sm md:w-80 bg-slate-950/85 backdrop-blur-md border border-slate-850 rounded-xl p-3 text-white shadow-2xl flex flex-col transition-all duration-300 ${
+                isLiveFeedCollapsed ? 'max-h-[72px]' : 'max-h-[30vh]'
+              }`}>
+                {/* Header */}
+                <div 
+                  onClick={() => setIsLiveFeedCollapsed(prev => !prev)}
+                  className="flex items-center justify-between border-b border-slate-850 pb-1.5 mb-1.5 cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400">Live Scan Feed</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {fullscreenLogs.length > 0 && (
+                      <span className="text-[9px] bg-slate-850 text-slate-300 px-1.5 py-0.5 rounded-full font-bold">
+                        {fullscreenLogs.length}
+                      </span>
+                    )}
+                    <svg 
+                      className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-300 ${isLiveFeedCollapsed ? '' : 'rotate-180'}`} 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor" 
+                      strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto space-y-1.5 text-left scrollbar-none">
+                  {fullscreenLogs.length === 0 ? (
+                    <div className="text-center text-xs text-slate-500 py-3">Waiting for scans...</div>
+                  ) : isLiveFeedCollapsed ? (
+                    /* Render ONLY the single most recent log in collapsed state */
+                    (() => {
+                      const latestLog = fullscreenLogs[0];
+                      return (
+                        <div className="flex items-center justify-between text-[11px] bg-white/5 border border-white/5 rounded-lg px-2 py-1.5 animate-in fade-in duration-200">
+                          <div className="flex flex-col truncate pr-2">
+                            <span className="font-bold text-slate-100 truncate">{latestLog.name}</span>
+                            <span className={`text-[10px] truncate ${
+                              latestLog.status === 'success' ? 'text-emerald-400' : latestLog.status === 'warning' ? 'text-amber-400' : 'text-rose-400'
+                            }`}>
+                              {latestLog.message}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-slate-505 font-mono flex-shrink-0">{latestLog.time}</span>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    /* Render full list of logs in expanded state */
+                    fullscreenLogs.map(log => (
+                      <div key={log.id} className="flex flex-col text-[11px] bg-white/5 border border-white/5 rounded-lg p-2 transition-all">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-100">{log.name}</span>
+                          <span className="text-[9px] text-slate-505 font-mono">{log.time}</span>
+                        </div>
+                        <span className={`mt-0.5 text-[10px] ${
+                          log.status === 'success' ? 'text-emerald-400' : log.status === 'warning' ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Color Splash screen flash */}
+              {scanFlash && (
+                <div className={`absolute inset-0 pointer-events-none z-30 flex items-center justify-center transition-opacity duration-350 animate-pulse ${
+                  scanFlash === 'success' ? 'bg-emerald-500/10 border-4 border-emerald-500' : scanFlash === 'warning' ? 'bg-amber-500/10 border-4 border-amber-500' : 'bg-red-500/10 border-4 border-red-500'
+                }`} />
+              )}
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 };
