@@ -599,12 +599,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     })();
   };
 
-  const handlePrintActivityLedger = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
-      return;
-    }
+  const handlePrintActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
 
     const origin = window.location.origin;
 
@@ -956,16 +951,24 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const { downloadPdfFromHtml } = await import('../../shared/utils');
+      await downloadPdfFromHtml(htmlContent, `Payment_Ledger_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
+      return;
+    }
 
-  const handlePrintOutsideActivityLedger = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
       return;
     }
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handlePrintOutsideActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
 
     const origin = window.location.origin;
 
@@ -1299,6 +1302,19 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         </body>
       </html>
     `;
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const { downloadPdfFromHtml } = await import('../../shared/utils');
+      await downloadPdfFromHtml(htmlContent, `Outside_Payment_Ledger_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
@@ -2001,7 +2017,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   title="Print Payment Ledger grouped by Activity"
                 >
                   <Printer className="h-4 w-4 text-slate-500" />
-                  Print Activity Report
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Activity Report'}
                 </button>
               </div>
 
@@ -2115,7 +2131,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                     title="Print Outside Payment Ledger grouped by Activity"
                   >
                     <Printer className="h-4 w-4 text-slate-500" />
-                    Print Outside Report
+                    {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Outside Report'}
                   </button>
                   <button
                     onClick={() => navigate('outside')}
@@ -2743,7 +2759,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
                 >
-                  Print Report
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
                 </button>
               </div>
             </div>

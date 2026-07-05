@@ -416,10 +416,47 @@ const AdminStudents: React.FC = () => {
 
     (async () => {
       try {
-        // Bulk delete: for each selected student, attempt direct student delete
-        // (Appwrite backend accounts will be orphaned if deleted bulk from students directory,
-        // which matches previous logic of direct DB deletion on list)
-        await Promise.all(ids.map(id => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id)));
+        const currentUser = await cachedApi.users.getCurrent();
+        
+        await Promise.all(ids.map(async (id) => {
+          try {
+            // Find linked account
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
+              Query.equal('students', id)
+            ]);
+            
+            if (res.documents.length > 0) {
+              const targetAccount = res.documents[0];
+              // Call cloud function to delete the entire account and auth user
+              const execution = await functions.createExecution(
+                FUNCTION_ID,
+                JSON.stringify({
+                  action: 'delete_account',
+                  payload: { userId: targetAccount.$id },
+                  requestingUserId: currentUser?.$id,
+                }),
+                false
+              );
+              let result: any = {};
+              try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
+              if (result.success === false) {
+                throw new Error(result.error || 'Failed to delete account');
+              }
+            } else {
+              // Direct student delete if no linked account exists
+              await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id);
+            }
+          } catch (itemErr) {
+            console.warn(`Failed to fully delete student record ${id}:`, itemErr);
+            // Try fallback direct delete so the list item is at least removed if DB permissions allow
+            try {
+              await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, id);
+            } catch (fallbackErr) {
+              throw itemErr;
+            }
+          }
+        }));
+
         api.cache.clearTags(['students', 'accounts', 'dashboard']);
         setStudents(prev => prev.filter(s => !ids.includes(s.$id)));
         addToast({ type: 'success', title: 'Success', message: `Deleted ${ids.length} student records.` });

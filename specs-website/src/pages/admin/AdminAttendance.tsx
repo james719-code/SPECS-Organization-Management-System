@@ -761,19 +761,13 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
-  const handlePrintReport = (selectedSignatory: 'secretary' | 'asst-secretary') => {
+  const handlePrintReport = async (selectedSignatory: 'secretary' | 'asst-secretary') => {
     if (!selectedEventId) {
       addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
       return;
     }
     const selectedEvent = events.find(ev => ev.$id === selectedEventId);
     if (!selectedEvent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
-      return;
-    }
 
     const rowsHtml = filteredGroupedRecords.map((group, index) => {
       const sessionsStr = group.records.map(r => {
@@ -1028,6 +1022,19 @@ const AdminAttendance: React.FC = () => {
         </body>
       </html>
     `;
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const { downloadPdfFromHtml } = await import('../../shared/utils');
+      await downloadPdfFromHtml(htmlContent, `Attendance_Report_${selectedEvent.event_name.replace(/\s+/g, '_')}.pdf`, addToast);
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
@@ -1548,7 +1555,7 @@ const AdminAttendance: React.FC = () => {
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
                 >
-                  Print Report
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
                 </button>
               </div>
             </div>

@@ -409,13 +409,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     return totalRevBefore - totalExpBefore;
   };
 
-  const handlePrintCombinedReport = (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
-      return;
-    }
-
+  const handlePrintCombinedReport = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
     const origin = window.location.origin;
 
     const groups: Record<string, {
@@ -1084,6 +1078,19 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       </html>
     `;
 
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const { downloadPdfFromHtml } = await import('../../shared/utils');
+      await downloadPdfFromHtml(htmlContent, `Finance_Report_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
@@ -1582,7 +1589,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             title="Print Financial Statements & Detailed Breakdown"
           >
             <Printer className="h-4 w-4" />
-            Print Report
+            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
           </button>
           <button
             onClick={() => loadData(true)}
@@ -2115,7 +2122,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
                 >
-                  Print Report
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
                 </button>
               </div>
             </div>
