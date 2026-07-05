@@ -7,7 +7,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc } from '../../types/database';
-import { Calendar, Users, Clock, Plus, Trash2, X, Loader2, RotateCw, User, MapPin, ExternalLink } from 'lucide-react';
+import { Calendar, Users, Clock, Plus, Trash2, X, Loader2, RotateCw, User, MapPin, ExternalLink, Edit } from 'lucide-react';
 
 const AdminEvents: React.FC = () => {
   const [events, setEvents] = useState<EventDoc[]>([]);
@@ -31,12 +31,42 @@ const AdminEvents: React.FC = () => {
   const [eventLocation, setEventLocation] = useState('');
   const [eventRatingLinks, setEventRatingLinks] = useState('');
 
+  // Edit Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventDoc | null>(null);
+  const [editEventName, setEditEventName] = useState('');
+  const [editEventDesc, setEditEventDesc] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editEventImageFile, setEditEventImageFile] = useState<File | null>(null);
+  const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
+  const [editEventCollab, setEditEventCollab] = useState('');
+  const [editRelatedLinks, setEditRelatedLinks] = useState<{ name: string; url: string }[]>([]);
+  const [editEventLocation, setEditEventLocation] = useState('');
+  const [editEventRatingLinks, setEditEventRatingLinks] = useState('');
+
   // Confirm Actions
   const [endConfirm, setEndConfirm] = useState<{ open: boolean; event: EventDoc | null }>({ open: false, event: null });
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; event: EventDoc | null }>({ open: false, event: null });
   const [actionLoading, setActionLoading] = useState(false);
 
   const { addToast } = useToast();
+
+  const checkDateOverlap = (dateStr: string, currentEventId?: string) => {
+    if (!dateStr) return null;
+    const targetDate = new Date(dateStr);
+    
+    const match = events.find(e => {
+      if (currentEventId && e.$id === currentEventId) return false;
+      if (e.archived) return false;
+      
+      const eDate = new Date(e.date_to_held || '');
+      return eDate.getFullYear() === targetDate.getFullYear() &&
+             eDate.getMonth() === targetDate.getMonth() &&
+             eDate.getDate() === targetDate.getDate();
+    });
+    
+    return match ? match.event_name : null;
+  };
 
   const loadData = async (isRefresh = false) => {
     try {
@@ -116,7 +146,12 @@ const AdminEvents: React.FC = () => {
         rating_links: eventRatingLinks.trim() || null
       });
 
-      addToast({ type: 'success', title: 'Success', message: `Event "${eventName}" created successfully!` });
+      const overlapEventName = checkDateOverlap(eventDate);
+      if (overlapEventName) {
+        addToast({ type: 'warning', title: 'Schedule Conflict', message: `Event "${eventName}" created, but conflicts with "${overlapEventName}".` });
+      } else {
+        addToast({ type: 'success', title: 'Success', message: `Event "${eventName}" created successfully!` });
+      }
       setIsCreateOpen(false);
       
       // Reset form fields
@@ -134,6 +169,104 @@ const AdminEvents: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to create event.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditClick = (event: EventDoc) => {
+    setEditingEvent(event);
+    setEditEventName(event.event_name || '');
+    setEditEventDesc(event.description || '');
+    
+    if (event.date_to_held) {
+      const d = new Date(event.date_to_held);
+      const offset = d.getTimezoneOffset();
+      const localDate = new Date(d.getTime() - offset * 60 * 1000);
+      setEditEventDate(localDate.toISOString().slice(0, 16));
+    } else {
+      setEditEventDate('');
+    }
+    
+    if (event.image_file) {
+      setEditImagePreviewUrl(api.files.getFilePreview(event.image_file, 150, 100));
+    } else {
+      setEditImagePreviewUrl(null);
+    }
+    setEditEventImageFile(null);
+    setEditEventCollab((event.collab || []).join(', '));
+    
+    const links: { name: string; url: string }[] = [];
+    if (event.related_links) {
+      event.related_links.forEach((url, idx) => {
+        links.push({
+          name: event.meaning && event.meaning[idx] ? event.meaning[idx] : 'Link',
+          url
+        });
+      });
+    }
+    setEditRelatedLinks(links);
+    setEditEventLocation(event.location || '');
+    setEditEventRatingLinks(event.rating_links || '');
+    setIsEditOpen(true);
+  };
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditEventImageFile(file);
+      setEditImagePreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent) return;
+
+    setSubmitting(true);
+    try {
+      let imageFileId = editingEvent.image_file || '';
+
+      if (editEventImageFile) {
+        const uploadRes = await api.files.uploadEventImage(editEventImageFile);
+        imageFileId = uploadRes.$id;
+
+        if (editingEvent.image_file) {
+          try {
+            await api.files.deleteEventImage(editingEvent.image_file);
+          } catch (err) {
+            console.warn('Failed to delete old image:', err);
+          }
+        }
+      }
+
+      const validLinks = editRelatedLinks.filter(l => l.url.trim() !== '');
+      const relatedLinksUrls = validLinks.map(l => l.url.trim());
+      const relatedLinksNames = validLinks.map(l => l.name.trim() || 'Link');
+
+      await api.events.update(editingEvent.$id, {
+        event_name: editEventName,
+        description: editEventDesc,
+        date_to_held: new Date(editEventDate).toISOString(),
+        image_file: imageFileId || null,
+        collab: editEventCollab.split(',').map(s => s.trim()).filter(Boolean),
+        related_links: relatedLinksUrls,
+        meaning: relatedLinksNames,
+        location: editEventLocation.trim() || null,
+        rating_links: editEventRatingLinks.trim() || null
+      });
+
+      const overlapEventName = checkDateOverlap(editEventDate, editingEvent.$id);
+      if (overlapEventName) {
+        addToast({ type: 'warning', title: 'Schedule Conflict', message: `Event "${editEventName}" updated, but conflicts with "${overlapEventName}".` });
+      } else {
+        addToast({ type: 'success', title: 'Success', message: `Event "${editEventName}" updated successfully!` });
+      }
+
+      setIsEditOpen(false);
+      loadData(true);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update event.' });
     } finally {
       setSubmitting(false);
     }
@@ -175,6 +308,27 @@ const AdminEvents: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete event.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleArchive = async (event: EventDoc, archive: boolean) => {
+    setActionLoading(true);
+    try {
+      await api.events.archive(event.$id, archive);
+      addToast({
+        type: 'success',
+        title: 'Success',
+        message: `Event "${event.event_name}" has been ${archive ? 'archived' : 'restored'}.`
+      });
+      loadData(true);
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: err.message || `Failed to ${archive ? 'archive' : 'restore'} event.`
+      });
     } finally {
       setActionLoading(false);
     }
@@ -349,6 +503,14 @@ const AdminEvents: React.FC = () => {
                           )}
                           <button
                             disabled={actionLoading}
+                            onClick={() => handleEditClick(event)}
+                            className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-xs"
+                            title="Edit Event"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            disabled={actionLoading}
                             onClick={() => setDeleteConfirm({ open: true, event })}
                             className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-100 transition-colors shadow-xs"
                             title="Delete Event"
@@ -452,7 +614,7 @@ const AdminEvents: React.FC = () => {
                 />
               </div>
 
-              <div>
+               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date & Time</label>
                 <input
                   type="datetime-local"
@@ -461,6 +623,14 @@ const AdminEvents: React.FC = () => {
                   onChange={e => setEventDate(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
                 />
+                {(() => {
+                  const conflictName = checkDateOverlap(eventDate);
+                  return conflictName ? (
+                    <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 font-medium leading-relaxed">
+                      Warning: Another event ("{conflictName}") is already scheduled on this date.
+                    </p>
+                  ) : null;
+                })()}
               </div>
 
               <div>
@@ -591,6 +761,198 @@ const AdminEvents: React.FC = () => {
                 >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {submitting ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit Event Dialog Modal */}
+      {isEditOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setIsEditOpen(false)}>
+          <div
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Edit Event</h2>
+              <button onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Event Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. General Assembly 2026"
+                  value={editEventName}
+                  onChange={e => setEditEventName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
+                <textarea
+                  placeholder="Brief description of event details..."
+                  rows={3}
+                  value={editEventDesc}
+                  onChange={e => setEditEventDesc(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date & Time</label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={editEventDate}
+                  onChange={e => setEditEventDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                />
+                {(() => {
+                  const conflictName = checkDateOverlap(editEventDate, editingEvent?.$id);
+                  return conflictName ? (
+                    <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 font-medium leading-relaxed">
+                      Warning: Another event ("{conflictName}") is already scheduled on this date.
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Banner Image (Optional - Leave empty to keep existing)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditImageChange}
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100 cursor-pointer"
+                />
+                {editImagePreviewUrl && (
+                  <div className="mt-3 rounded-lg overflow-hidden border border-slate-100 max-h-36 shadow-xs flex justify-center bg-slate-50">
+                    <img src={editImagePreviewUrl} alt="Preview" className="object-contain max-h-36" />
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Parameters form fields */}
+              <div className="border-t pt-4 space-y-4">
+                <span className="block text-xs font-bold text-[#0d6b66] uppercase tracking-wide">Additional Details (Optional)</span>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide mb-1">Collaborations (Comma-separated)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. IT Club, Google DSC"
+                    value={editEventCollab}
+                    onChange={e => setEditEventCollab(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide">
+                      Related Links
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditRelatedLinks([...editRelatedLinks, { name: '', url: '' }])}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0d6b66] hover:text-[#0b5c58] transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Link
+                    </button>
+                  </div>
+
+                  {editRelatedLinks.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">No related links added yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                      {editRelatedLinks.map((link, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Name (e.g. RSVP Form)"
+                            value={link.name}
+                            onChange={e => {
+                              const newLinks = [...editRelatedLinks];
+                              newLinks[idx].name = e.target.value;
+                              setEditRelatedLinks(newLinks);
+                            }}
+                            className="flex-1 min-w-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                          />
+                          <input
+                            type="url"
+                            placeholder="URL (e.g. https://...)"
+                            value={link.url}
+                            onChange={e => {
+                              const newLinks = [...editRelatedLinks];
+                              newLinks[idx].url = e.target.value;
+                              setEditRelatedLinks(newLinks);
+                            }}
+                            className="flex-[2] min-w-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditRelatedLinks(editRelatedLinks.filter((_, i) => i !== idx));
+                            }}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 hover:border-red-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide mb-1">Location</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Main Campus"
+                      value={editEventLocation}
+                      onChange={e => setEditEventLocation(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide mb-1">Rating Link</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Feedback Form URL"
+                      value={editEventRatingLinks}
+                      onChange={e => setEventRatingLinks(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsEditOpen(false)}
+                  className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-[#0d6b66] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0b5c58] disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

@@ -53,6 +53,77 @@ const AdminOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { yearLevelCounts, totalStudentsWithYear, sectionCounts, totalStudentsWithSection } = React.useMemo(() => {
+    if (!stats?.accounts) {
+      return { yearLevelCounts: {}, totalStudentsWithYear: 0, sectionCounts: [], totalStudentsWithSection: 0 };
+    }
+    
+    const yearCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    
+    // Initialize the 8 standard BSCS sections with 0 to ensure they are always displayed
+    const secCounts: Record<string, number> = {
+      'BSCS 1A': 0,
+      'BSCS 1B': 0,
+      'BSCS 2A': 0,
+      'BSCS 2B': 0,
+      'BSCS 3A': 0,
+      'BSCS 3B': 0,
+      'BSCS 4A': 0,
+      'BSCS 4B': 0
+    };
+
+    const getYearSectionLabel = (year: number | null | undefined, section: string | null | undefined): string => {
+      if (!section) return '';
+      const cleanSection = section.trim();
+      
+      const match = cleanSection.match(/(?:BSCS|CS|IT|-)?\s*([1-4])\s*([A-Za-z]+)/i);
+      if (match) {
+        return `BSCS ${match[1]}${match[2].toUpperCase()}`;
+      }
+      
+      if (year && year >= 1 && year <= 4) {
+        if (!cleanSection.startsWith(String(year))) {
+          return `BSCS ${year}${cleanSection.toUpperCase()}`;
+        }
+      }
+
+      if (/^[1-4][A-Za-z]+$/i.test(cleanSection)) {
+        return `BSCS ${cleanSection.toUpperCase()}`;
+      }
+      
+      return cleanSection.toUpperCase();
+    };
+
+    stats.accounts.forEach((acc: any) => {
+      if (acc.type !== 'admin' && acc.students) {
+        const student = acc.students;
+        const year = student.yearLevel;
+        if (year && year >= 1 && year <= 4) {
+          yearCounts[year] = (yearCounts[year] || 0) + 1;
+        }
+
+        const section = student.section;
+        const label = getYearSectionLabel(year, section);
+        if (label) {
+          secCounts[label] = (secCounts[label] || 0) + 1;
+        }
+      }
+    });
+
+    const totalYear = Object.values(yearCounts).reduce((a, b) => a + b, 0);
+    const sortedSections = Object.entries(secCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const totalSec = sortedSections.reduce((sum, item) => sum + item.count, 0);
+
+    return {
+      yearLevelCounts: yearCounts,
+      totalStudentsWithYear: totalYear,
+      sectionCounts: sortedSections,
+      totalStudentsWithSection: totalSec
+    };
+  }, [stats]);
+
   useEffect(() => {
     async function load() {
       try {
@@ -151,33 +222,32 @@ const AdminOverview: React.FC = () => {
       {/* Quick Insights */}
       {!loading && stats && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* User Breakdown */}
+          {/* Student Breakdown */}
           <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">User Breakdown</h3>
-            <div className="space-y-3">
-              {(() => {
-                const types = ['student', 'officer', 'admin'];
-                const colors = ['bg-[#0d6b66]', 'bg-blue-500', 'bg-purple-500'];
-                return types.map((type, idx) => {
-                  const count = stats.accounts.filter((a: any) => a.type === type).length;
-                  const pct = stats.totalUsers > 0 ? Math.round((count / stats.totalUsers) * 100) : 0;
+            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Student Breakdown</h3>
+            {sectionCounts.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-4">No section data available</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pr-1">
+                {sectionCounts.map((sec) => {
+                  const pct = totalStudentsWithSection > 0 ? Math.round((sec.count / totalStudentsWithSection) * 100) : 0;
                   return (
-                    <div key={type}>
+                    <div key={sec.name}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-slate-700 capitalize">{type}s</span>
-                        <span className="text-sm text-slate-500">{count} ({pct}%)</span>
+                        <span className="text-sm font-semibold text-slate-700">{sec.name}</span>
+                        <span className="text-sm text-slate-500 font-medium">{sec.count} ({pct}%)</span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${colors[idx]} transition-all duration-700 ease-out`}
+                          className="h-full rounded-full bg-teal-600 transition-all duration-700 ease-out"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
                     </div>
                   );
-                });
-              })()}
-            </div>
+                })}
+              </div>
+            )}
           </div>
 
           {/* Financial Summary */}
@@ -224,7 +294,10 @@ const AdminOverview: React.FC = () => {
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Recent Members</h3>
           <div className="divide-y divide-slate-100">
-            {stats.accounts.slice(0, 5).map((acc: any) => (
+            {[...stats.accounts]
+              .sort((a: any, b: any) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime())
+              .slice(0, 5)
+              .map((acc: any) => (
               <div key={acc.$id} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#0d6b66] to-[#149a93] text-white flex items-center justify-center text-xs font-semibold uppercase">

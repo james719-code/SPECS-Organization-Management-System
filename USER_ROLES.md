@@ -28,7 +28,7 @@ The system employs client-side role-based routing (defined in [auth.js](file:///
 | **Account Lifecycle Management** | - | - | ✅ | [admin/views/accounts.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/accounts.js) (Cloud Function integration) |
 | **Event Attendance Tracking** | - | - | ✅ | [admin/views/attendance.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/attendance.js) |
 | **Broadcasting Announcements** | - | - | ✅ | [admin/views/announcements.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/announcements.js) |
-| **Analytics, Logs, & Reports Export** | - | - | ✅ | [admin/views/reports.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/reports.js) & [activity-logs.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/activity-logs.js) |
+| **Analytics & Reports Export** | - | - | ✅ | [admin/views/reports.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/reports.js) |
 
 ---
 
@@ -238,14 +238,6 @@ Admins hold the highest privilege, controlling accounts, databases, global setti
 * **Key Features:**
   * Display monthly user signup growth and payment collection statistics.
   * Generate CSV reports for user records, finances, payments, and events.
-
-### 🕒 Activity Audit Logs
-* **View File:** [activity-logs.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/activity-logs.js)
-* **Description:** Track user actions in the portal for auditing purposes.
-* **Key Features:**
-  * Log 18 specific action types (e.g. login, verify, promote, edit payments).
-  * Filter audit records by date, target account, or action category.
-  * Export audit records to CSV (stored locally in client cache, capped at 500 entries).
 
 ### ⚙️ System Settings
 * **View File:** [settings.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/settings.js)

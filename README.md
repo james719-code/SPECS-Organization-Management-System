@@ -87,7 +87,6 @@ In building this application, specific architectural and technical choices were 
 - **Stories Management:** Full CRUD, approval workflow, filtering by status, and statistics.
 - **Announcements:** Draft composition with recipient targeting (all/students/officers), copy-to-clipboard, and open-in-email-client.
 - **Reports:** Account, student, payment, and event reports with monthly growth charts, distribution analysis, and CSV export.
-- **Activity Logs:** Client-side activity tracking (18 activity types, max 500 entries) with filtering, search, date range, and CSV export.
 - **Settings:** Admin profile and preferences.
 
 ### Public Landing Page (7 routes)

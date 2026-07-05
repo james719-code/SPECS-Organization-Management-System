@@ -93,10 +93,20 @@ export function createApiError(error: any, operation: string): ApiError {
       console.warn('Failed to clear cache on auth failure', e);
     }
     
-    // Redirect to login page
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-      console.warn('[API] Unauthenticated request detected. Redirecting to /login.');
-      window.location.href = '/login';
+    // Redirect to login page only if not on a public route
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const isPublic = 
+        path === '/' || 
+        path === '/login' || 
+        path === '/signup' || 
+        path === '/forgot-password' || 
+        path.startsWith('/story/');
+      
+      if (!isPublic) {
+        console.warn('[API] Unauthenticated request detected. Redirecting to /login.');
+        window.location.href = '/login';
+      }
     }
   }
 

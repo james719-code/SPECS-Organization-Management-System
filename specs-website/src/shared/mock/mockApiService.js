@@ -470,8 +470,54 @@ class MockApiService {
         // Apply query processing
         const { documents, total, limit, offset } = this._applyQueries(data, queries);
 
+        // Clone and resolve relationship attributes
+        const resolvedDocs = documents.map(doc => {
+            const cloned = { ...doc };
+            
+            // If it's accounts collection, resolve nested student/admin/officer details
+            if (collectionId && (collectionId.toLowerCase().includes('account') || collectionId === '6858feff002fb157e032')) {
+                if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                    const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                    if (student) cloned.students = { ...student };
+                }
+                if (cloned.admins && typeof cloned.admins === 'object' && cloned.admins.$id) {
+                    const admin = mockAdmins.find(a => a.$id === cloned.admins.$id);
+                    if (admin) cloned.admins = { ...admin };
+                }
+                if (cloned.officers && typeof cloned.officers === 'object' && cloned.officers.$id) {
+                    const officer = mockOfficers.find(o => o.$id === cloned.officers.$id);
+                    if (officer) {
+                        const clonedOfficer = { ...officer };
+                        if (clonedOfficer.students && typeof clonedOfficer.students === 'object' && clonedOfficer.students.$id) {
+                            const oStudent = mockStudents.find(s => s.$id === clonedOfficer.students.$id);
+                            if (oStudent) clonedOfficer.students = { ...oStudent };
+                        }
+                        cloned.officers = clonedOfficer;
+                    }
+                }
+            }
+
+            // If it's payments collection, resolve nested student details
+            if (collectionId && (collectionId.toLowerCase().includes('payment') || collectionId === '6885e333002bfa41803b')) {
+                if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                    const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                    if (student) cloned.students = { ...student };
+                }
+            }
+
+            // If it's attendance collection, resolve nested student details
+            if (collectionId && collectionId.toLowerCase().includes('attendance')) {
+                if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                    const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                    if (student) cloned.students = { ...student };
+                }
+            }
+
+            return cloned;
+        });
+
         return {
-            documents,
+            documents: resolvedDocs,
             total
         };
     }
@@ -485,7 +531,46 @@ class MockApiService {
             throw new Error(`Document not found: ${documentId}`);
         }
 
-        return { ...doc };
+        const cloned = { ...doc };
+
+        // Resolve relationship attributes
+        if (collectionId && (collectionId.toLowerCase().includes('account') || collectionId === '6858feff002fb157e032')) {
+            if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                if (student) cloned.students = { ...student };
+            }
+            if (cloned.admins && typeof cloned.admins === 'object' && cloned.admins.$id) {
+                const admin = mockAdmins.find(a => a.$id === cloned.admins.$id);
+                if (admin) cloned.admins = { ...admin };
+            }
+            if (cloned.officers && typeof cloned.officers === 'object' && cloned.officers.$id) {
+                const officer = mockOfficers.find(o => o.$id === cloned.officers.$id);
+                if (officer) {
+                    const clonedOfficer = { ...officer };
+                    if (clonedOfficer.students && typeof clonedOfficer.students === 'object' && clonedOfficer.students.$id) {
+                        const oStudent = mockStudents.find(s => s.$id === clonedOfficer.students.$id);
+                        if (oStudent) clonedOfficer.students = { ...oStudent };
+                    }
+                    cloned.officers = clonedOfficer;
+                }
+            }
+        }
+
+        if (collectionId && (collectionId.toLowerCase().includes('payment') || collectionId === '6885e333002bfa41803b')) {
+            if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                if (student) cloned.students = { ...student };
+            }
+        }
+
+        if (collectionId && collectionId.toLowerCase().includes('attendance')) {
+            if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
+                const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                if (student) cloned.students = { ...student };
+            }
+        }
+
+        return cloned;
     }
 
     async createDocument(databaseId, collectionId, documentId, data) {
