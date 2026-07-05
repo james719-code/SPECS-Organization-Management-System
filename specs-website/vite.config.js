@@ -1,9 +1,6 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import dotenv from 'dotenv';
 import { resolve } from 'path';
-
-dotenv.config();
 
 /**
  * SPA Fallback Plugin
@@ -38,44 +35,50 @@ const spaFallbackPlugin = () => ({
   },
 });
 
-export default defineConfig({
-  root: 'src',
-  publicDir: '../public',
+export default defineConfig(({ mode }) => {
+  // Load env file from the project directory
+  const env = loadEnv(mode, resolve(__dirname), '');
 
-  define: {
-    __APP_TITLE__: JSON.stringify(process.env.VITE_APP_TITLE),
-  },
+  return {
+    root: 'src',
+    publicDir: '../public',
+    envDir: '../',
 
-  plugins: [
-    react(),
-    spaFallbackPlugin(),
-  ],
-
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, './src'),
-    },
-  },
-
-  build: {
-    outDir: '../dist',
-    emptyOutDir: true,
-    minify: 'terser',
-    chunkSizeWarningLimit: 800,
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug', 'console.info']
-      }
+    define: {
+      __APP_TITLE__: JSON.stringify(env.VITE_APP_TITLE || 'SPECS Portal'),
     },
 
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/index.html'),
-      },
-      output: {
+    plugins: [
+      react(),
+      spaFallbackPlugin(),
+    ],
+
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, './src'),
       },
     },
-  }
+
+    build: {
+      outDir: '../dist',
+      emptyOutDir: true,
+      minify: 'terser',
+      chunkSizeWarningLimit: 800,
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+          pure_funcs: ['console.log', 'console.debug', 'console.info']
+        }
+      },
+
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'src/index.html'),
+        },
+        output: {
+        },
+      },
+    }
+  };
 });
