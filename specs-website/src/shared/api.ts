@@ -28,7 +28,8 @@ import {
   StoryDoc, 
   FileDoc,
   OfficerDoc,
-  TaskDoc
+  TaskDoc,
+  AdminDoc
 } from '../types/database';
 
 export { ApiError, ErrorCodes };
@@ -226,13 +227,14 @@ export const api = {
                 throw createApiError(error, 'Failed to list payments');
             }
         },
-        async listForStudent(studentId: string): Promise<any> {
+        async listForStudent(studentId: string): Promise<PaginatedResponse<PaymentDoc>> {
             try {
-                return await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
                     Query.equal('students', studentId),
                     Query.orderDesc('date_paid'),
                     Query.limit(100)
                 ]);
+                return createPaginatedResponse<PaymentDoc>(result, 100, 0);
             } catch (error) {
                 throw createApiError(error, `Failed to list payments for student ${studentId}`);
             }
@@ -330,12 +332,13 @@ export const api = {
 
     // --- ATTENDANCE ---
     attendance: {
-        async listForStudent(studentId: string): Promise<any> {
+        async listForStudent(studentId: string): Promise<PaginatedResponse<AttendanceDoc>> {
             try {
-                return await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
                     Query.equal('students', studentId),
                     Query.orderDesc('$createdAt')
                 ]);
+                return createPaginatedResponse<AttendanceDoc>(result, 100, 0);
             } catch (error) {
                 throw createApiError(error, `Failed to list attendance for student ${studentId}`);
             }
@@ -352,6 +355,17 @@ export const api = {
                 return createPaginatedResponse<AttendanceDoc>(result, pageSize, offset);
             } catch (error) {
                 throw createApiError(error, `Failed to list attendance for event ${eventId}`);
+            }
+        },
+        async listAll(options: ListOptions = {}): Promise<PaginatedResponse<AttendanceDoc>> {
+            try {
+                const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = normalizeListOptions(options);
+                const pageSize = clampPageSize(limit);
+                const queries = [Query.limit(pageSize), Query.offset(offset)];
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, queries);
+                return createPaginatedResponse<AttendanceDoc>(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list all attendance records');
             }
         },
         async create(eventId: string, studentId: string, officerId: string | null | undefined, attendanceName: string): Promise<AttendanceDoc> {
@@ -543,10 +557,10 @@ export const api = {
 
     // --- STORIES ---
     stories: {
-        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true }: any = {}): Promise<PaginatedResponse<StoryDoc>> {
+        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, extraQueries = [] }: any = {}): Promise<PaginatedResponse<StoryDoc>> {
             try {
                 const pageSize = clampPageSize(limit);
-                const queries = [Query.limit(pageSize), Query.offset(offset)];
+                const queries = [...extraQueries, Query.limit(pageSize), Query.offset(offset)];
                 if (orderDesc) queries.push(Query.orderDesc('$createdAt'));
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STORIES, queries);
                 return createPaginatedResponse<StoryDoc>(result, pageSize, offset);
@@ -559,6 +573,33 @@ export const api = {
                 return await databases.getDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId);
             } catch (error) {
                 throw createApiError(error, `Failed to get story ${storyId}`);
+            }
+        },
+        async create(data: Partial<StoryDoc>): Promise<StoryDoc> {
+            try {
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_STORIES, ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create story');
+            }
+        },
+        async update(storyId: string, data: Partial<StoryDoc>): Promise<StoryDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId, data);
+                dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update story ${storyId}`);
+            }
+        },
+        async delete(storyId: string): Promise<any> {
+            try {
+                const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId);
+                dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to delete story ${storyId}`);
             }
         }
     },
@@ -660,6 +701,54 @@ export const api = {
         }
     },
 
+    admins: {
+        async get(adminId: string): Promise<AdminDoc> {
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_ADMINS || 'admins', adminId);
+            } catch (error) {
+                throw createApiError(error, `Failed to get admin profile ${adminId}`);
+            }
+        },
+        async update(adminId: string, data: Partial<AdminDoc>): Promise<AdminDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_ADMINS || 'admins', adminId, data);
+                dataCache.invalidateTags([CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update admin profile ${adminId}`);
+            }
+        }
+    },
+
+    metadata: {
+        async get(): Promise<any> {
+            try {
+                const result = await databases.listDocuments(DATABASE_ID, 'metadata', [Query.limit(1)]);
+                return result.documents[0] || null;
+            } catch (error) {
+                throw createApiError(error, 'Failed to fetch system metadata');
+            }
+        },
+        async create(data: any): Promise<any> {
+            try {
+                const result = await databases.createDocument(DATABASE_ID, 'metadata', ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create system metadata');
+            }
+        },
+        async update(metadataId: string, data: any): Promise<any> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, 'metadata', metadataId, data);
+                dataCache.invalidateTags([CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update system metadata ${metadataId}`);
+            }
+        }
+    },
+
     cache: {
         clearAll(): void {
             dataCache.clear();
@@ -721,7 +810,7 @@ export const cachedApi = {
                 tags: [CacheTags.PAYMENTS, CacheTags.FINANCE]
             });
         },
-        async listForStudent(studentId: string, ttl = 60 * 1000): Promise<any> {
+        async listForStudent(studentId: string, ttl = 60 * 1000): Promise<PaginatedResponse<PaymentDoc>> {
             const cacheKey = generateCacheKey('payments_student', { studentId });
             return dataCache.getOrFetch(cacheKey, () => api.payments.listForStudent(studentId), {
                 ttl,
@@ -881,6 +970,43 @@ export const cachedApi = {
                 ttl,
                 staleTtl: 5 * 60 * 1000,
                 tags: [CacheTags.TASKS]
+            });
+        }
+    },
+
+    attendance: {
+        async listForStudent(studentId: string, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
+            const cacheKey = generateCacheKey('attendance_student', { studentId });
+            return dataCache.getOrFetch(cacheKey, () => api.attendance.listForStudent(studentId), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.ATTENDANCE]
+            });
+        },
+        async listForEvent(eventId: string, options: ListOptions = {}, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
+            const cacheKey = generateCacheKey('attendance_event', { eventId, ...options });
+            return dataCache.getOrFetch(cacheKey, () => api.attendance.listForEvent(eventId, options), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.ATTENDANCE, CacheTags.EVENTS]
+            });
+        },
+        async listAll(options: ListOptions = {}, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
+            const cacheKey = generateCacheKey('attendance_all', options);
+            return dataCache.getOrFetch(cacheKey, () => api.attendance.listAll(options), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.ATTENDANCE]
+            });
+        }
+    },
+
+    metadata: {
+        async get(ttl = 2 * 60 * 1000): Promise<any> {
+            return dataCache.getOrFetch('system_metadata', () => api.metadata.get(), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.DASHBOARD]
             });
         }
     }

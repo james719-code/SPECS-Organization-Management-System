@@ -931,7 +931,7 @@ const AdminEvents: React.FC = () => {
                       type="text"
                       placeholder="e.g. Feedback Form URL"
                       value={editEventRatingLinks}
-                      onChange={e => setEventRatingLinks(e.target.value)}
+                      onChange={e => setEditEventRatingLinks(e.target.value)}
                       className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
                     />
                   </div>

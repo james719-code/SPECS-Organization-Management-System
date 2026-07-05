@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../components/ui/Toast';
-import { account, databases } from '../../shared/appwrite';
-import { 
-  DATABASE_ID, 
-  COLLECTION_ID_ACCOUNTS, 
-  COLLECTION_ID_ADMINS 
-} from '../../shared/constants';
+import { account } from '../../shared/appwrite';
+import { api, cachedApi } from '../../shared/api';
 import { User, Server, Loader2 } from 'lucide-react';
 
 interface AdminProfile {
@@ -49,23 +45,13 @@ const AdminSettings: React.FC = () => {
     const fetchAdminProfile = async () => {
       try {
         setLoadingProfile(true);
-        const currentUser = await account.get();
-        const accDoc = await databases.getDocument(
-          DATABASE_ID,
-          COLLECTION_ID_ACCOUNTS,
-          currentUser.$id
-        );
+        const currentUser = await cachedApi.users.getCurrent();
+        const accDoc = await cachedApi.users.getAccount(currentUser.$id);
         
-        let adminData = accDoc.admins;
-        if (typeof adminData === 'string') {
-          adminData = await databases.getDocument(
-            DATABASE_ID,
-            COLLECTION_ID_ADMINS || 'admins',
-            adminData
-          );
-        }
+        const adminId = typeof accDoc.admins === 'object' ? accDoc.admins?.$id : accDoc.admins;
         
-        if (adminData) {
+        if (adminId) {
+          const adminData = await api.admins.get(adminId);
           setProfile({
             $id: adminData.$id,
             fullName: adminData.fullName || '',
@@ -84,12 +70,8 @@ const AdminSettings: React.FC = () => {
     const fetchMetadata = async () => {
       try {
         setLoadingMetadata(true);
-        const result = await databases.listDocuments(
-          DATABASE_ID,
-          'metadata'
-        );
-        if (result.documents.length > 0) {
-          const doc = result.documents[0];
+        const doc = await cachedApi.metadata.get();
+        if (doc) {
           setMetadata({
             $id: doc.$id,
             ismaintenance: !!doc.ismaintenance,
@@ -121,9 +103,7 @@ const AdminSettings: React.FC = () => {
 
     try {
       setSavingProfile(true);
-      await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTION_ID_ADMINS || 'admins',
+      await api.admins.update(
         profile.$id,
         {
           fullName: profile.fullName.trim(),
@@ -143,10 +123,7 @@ const AdminSettings: React.FC = () => {
     try {
       setSavingMetadata(true);
       if (metadata.$id === 'new') {
-        const doc = await databases.createDocument(
-          DATABASE_ID,
-          'metadata',
-          'unique()',
+        const doc = await api.metadata.create(
           {
             ismaintenance: metadata.ismaintenance,
             ishiddenofficer: metadata.ishiddenofficer,
@@ -155,9 +132,7 @@ const AdminSettings: React.FC = () => {
         );
         setMetadata(prev => ({ ...prev, $id: doc.$id }));
       } else {
-        await databases.updateDocument(
-          DATABASE_ID,
-          'metadata',
+        await api.metadata.update(
           metadata.$id,
           {
             ismaintenance: metadata.ismaintenance,

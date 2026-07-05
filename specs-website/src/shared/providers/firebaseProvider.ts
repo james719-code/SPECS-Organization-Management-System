@@ -4,17 +4,17 @@
  * Note: Firebase Auth and Firestore only - use CloudflareR2Provider for storage
  */
 
-import { IAuthProvider, IDatabaseProvider } from './interface.js';
+import { IAuthProvider, IDatabaseProvider } from './interface';
 
 // Firebase imports will be loaded dynamically when needed
-let firebaseApp = null;
-let firebaseAuth = null;
-let firebaseDb = null;
+let firebaseApp: any = null;
+let firebaseAuth: any = null;
+let firebaseDb: any = null;
 
 /**
  * Initialize Firebase lazily
  */
-async function initFirebase(config) {
+async function initFirebase(config: any) {
     if (firebaseApp) return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
 
     const { initializeApp } = await import('firebase/app');
@@ -32,13 +32,16 @@ async function initFirebase(config) {
  * Firebase Authentication Provider
  */
 export class FirebaseAuthProvider extends IAuthProvider {
-    constructor(config) {
+    private config: any;
+    private auth: any;
+
+    constructor(config: any) {
         super();
         this.config = config;
         this.auth = null;
     }
 
-    async _ensureAuth() {
+    private async _ensureAuth() {
         if (!this.auth) {
             const { auth } = await initFirebase(this.config);
             this.auth = auth;
@@ -46,12 +49,12 @@ export class FirebaseAuthProvider extends IAuthProvider {
         return this.auth;
     }
 
-    async getCurrentUser() {
+    async getCurrentUser(): Promise<any> {
         const auth = await this._ensureAuth();
         const { onAuthStateChanged } = await import('firebase/auth');
 
         return new Promise((resolve, reject) => {
-            const unsubscribe = onAuthStateChanged(auth, (user) => {
+            const unsubscribe = onAuthStateChanged(auth, (user: any) => {
                 unsubscribe();
                 if (user) {
                     resolve({
@@ -67,7 +70,7 @@ export class FirebaseAuthProvider extends IAuthProvider {
         });
     }
 
-    async login(email, password) {
+    async login(email: string, password: string): Promise<any> {
         const auth = await this._ensureAuth();
         const { signInWithEmailAndPassword } = await import('firebase/auth');
         const result = await signInWithEmailAndPassword(auth, email, password);
@@ -77,13 +80,13 @@ export class FirebaseAuthProvider extends IAuthProvider {
         };
     }
 
-    async logout() {
+    async logout(): Promise<void> {
         const auth = await this._ensureAuth();
         const { signOut } = await import('firebase/auth');
-        return await signOut(auth);
+        await signOut(auth);
     }
 
-    async register(email, password, name) {
+    async register(email: string, password: string, name: string): Promise<any> {
         const auth = await this._ensureAuth();
         const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
         const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -99,35 +102,36 @@ export class FirebaseAuthProvider extends IAuthProvider {
         };
     }
 
-    async sendPasswordRecovery(email, redirectUrl) {
+    async sendPasswordRecovery(email: string, redirectUrl: string): Promise<void> {
         const auth = await this._ensureAuth();
         const { sendPasswordResetEmail } = await import('firebase/auth');
-        return await sendPasswordResetEmail(auth, email, {
+        await sendPasswordResetEmail(auth, email, {
             url: redirectUrl
         });
     }
 
-    async confirmPasswordRecovery(oobCode, password) {
+    async confirmPasswordRecovery(oobCode: string, password: string): Promise<void> {
         const auth = await this._ensureAuth();
         const { confirmPasswordReset } = await import('firebase/auth');
-        return await confirmPasswordReset(auth, oobCode, password);
+        await confirmPasswordReset(auth, oobCode, password);
     }
 
-    async sendVerification(redirectUrl) {
+    async sendVerification(redirectUrl: string): Promise<void> {
         const auth = await this._ensureAuth();
         const { sendEmailVerification } = await import('firebase/auth');
         if (auth.currentUser) {
-            return await sendEmailVerification(auth.currentUser, {
+            await sendEmailVerification(auth.currentUser, {
                 url: redirectUrl
             });
+            return;
         }
         throw new Error('No user logged in');
     }
 
-    async confirmVerification(oobCode) {
+    async confirmVerification(oobCode: string): Promise<void> {
         const auth = await this._ensureAuth();
         const { applyActionCode } = await import('firebase/auth');
-        return await applyActionCode(auth, oobCode);
+        await applyActionCode(auth, oobCode);
     }
 }
 
@@ -135,13 +139,16 @@ export class FirebaseAuthProvider extends IAuthProvider {
  * Firebase Firestore Database Provider
  */
 export class FirebaseDatabaseProvider extends IDatabaseProvider {
-    constructor(config) {
+    private config: any;
+    private db: any;
+
+    constructor(config: any) {
         super();
         this.config = config;
         this.db = null;
     }
 
-    async _ensureDb() {
+    private async _ensureDb() {
         if (!this.db) {
             const { db } = await initFirebase(this.config);
             this.db = db;
@@ -149,12 +156,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         return this.db;
     }
 
-    /**
-     * Parse an Appwrite Query string into its components
-     * @param {string} queryStr - Query string from Appwrite SDK
-     * @returns {Object|null} Parsed query object
-     */
-    _parseAppwriteQuery(queryStr) {
+    private _parseAppwriteQuery(queryStr: string | any) {
         const str = typeof queryStr === 'string' ? queryStr : String(queryStr);
         const match = str.match(/^(\w+)\((.+)\)$/);
         if (!match) return null;
@@ -162,7 +164,6 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         const method = match[1];
         const argsStr = match[2];
 
-        // Parse arguments
         const args = [];
         let current = '';
         let inString = false;
@@ -199,7 +200,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
             if (arg.startsWith('[') && arg.endsWith(']')) {
                 try { return JSON.parse(arg); } catch { return arg; }
             }
-            if (!isNaN(arg)) return Number(arg);
+            if (!isNaN(arg as any)) return Number(arg);
             if (arg === 'true') return true;
             if (arg === 'false') return false;
             return arg;
@@ -208,13 +209,8 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         return { method, args: parsedArgs };
     }
 
-    /**
-     * Convert Appwrite queries to Firestore query constraints
-     * @param {Array} queries - Array of Appwrite query strings
-     * @returns {Object} Object with constraints array, limit, and orderBy info
-     */
-    async _convertQueries(queries) {
-        const { where, orderBy, limit: firestoreLimit, startAfter } = await import('firebase/firestore');
+    private async _convertQueries(queries: any[]) {
+        const { where, orderBy, limit: firestoreLimit } = await import('firebase/firestore');
         
         const constraints = [];
         let limitValue = null;
@@ -273,15 +269,12 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
                     }
                     break;
                 case 'offset':
-                    // Firestore doesn't support offset directly
-                    // Would need cursor-based pagination
                     offsetValue = Number(args[0]);
                     console.warn('[FirebaseProvider] offset() is not efficiently supported in Firestore. Consider cursor-based pagination.');
                     break;
             }
         }
 
-        // Add limit constraint at the end
         if (limitValue !== null) {
             constraints.push(firestoreLimit(limitValue));
         }
@@ -289,14 +282,12 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         return { constraints, limitValue, offsetValue };
     }
 
-    async listDocuments(databaseId, collectionId, queries = []) {
+    async listDocuments(databaseId: string, collectionId: string, queries: any[] = []): Promise<{ documents: any[]; total: number }> {
         const db = await this._ensureDb();
         const { collection, getDocs, query } = await import('firebase/firestore');
 
-        // Note: databaseId is ignored in Firestore (uses default database)
         const collectionRef = collection(db, collectionId);
 
-        // Convert Appwrite queries to Firestore constraints
         const { constraints, offsetValue } = await this._convertQueries(queries);
         const q = query(collectionRef, ...constraints);
         const snapshot = await getDocs(q);
@@ -306,7 +297,6 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
             ...doc.data()
         }));
 
-        // Handle offset manually (inefficient but functional)
         if (offsetValue > 0) {
             documents = documents.slice(offsetValue);
         }
@@ -317,7 +307,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         };
     }
 
-    async getDocument(databaseId, collectionId, documentId) {
+    async getDocument(databaseId: string, collectionId: string, documentId: string): Promise<any> {
         const db = await this._ensureDb();
         const { doc, getDoc } = await import('firebase/firestore');
 
@@ -334,7 +324,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         };
     }
 
-    async createDocument(databaseId, collectionId, documentId, data) {
+    async createDocument(databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
         const db = await this._ensureDb();
         const { doc, setDoc } = await import('firebase/firestore');
 
@@ -355,7 +345,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         };
     }
 
-    async updateDocument(databaseId, collectionId, documentId, data) {
+    async updateDocument(databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
         const db = await this._ensureDb();
         const { doc, updateDoc, getDoc } = await import('firebase/firestore');
 
@@ -373,7 +363,7 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         };
     }
 
-    async deleteDocument(databaseId, collectionId, documentId) {
+    async deleteDocument(databaseId: string, collectionId: string, documentId: string): Promise<void> {
         const db = await this._ensureDb();
         const { doc, deleteDoc } = await import('firebase/firestore');
 
@@ -384,13 +374,11 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
 
 /**
  * Create Firebase providers from configuration
- * @param {Object} config - Firebase configuration
- * @returns {{auth: FirebaseAuthProvider, database: FirebaseDatabaseProvider}}
  */
-export function createFirebaseProviders(config) {
+export function createFirebaseProviders(config: any) {
     return {
         auth: new FirebaseAuthProvider(config),
         database: new FirebaseDatabaseProvider(config),
-        storage: null // Use CloudflareR2Provider for storage
+        storage: null
     };
 }

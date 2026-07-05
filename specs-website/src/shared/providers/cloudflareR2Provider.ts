@@ -4,24 +4,31 @@
  * Note: This requires a backend proxy for secure credential handling
  */
 
-import { IStorageProvider } from './interface.js';
+import { IStorageProvider } from './interface';
+
+interface R2Config {
+    endpoint: string;
+    bucketName: string;
+    publicUrl: string;
+}
 
 /**
  * Cloudflare R2 Storage Provider
  * Uses pre-signed URLs or a proxy endpoint for secure file operations
  */
 export class CloudflareR2StorageProvider extends IStorageProvider {
-    constructor(config) {
+    private endpoint: string;
+    private bucketName: string;
+    private publicUrl: string;
+
+    constructor(config: R2Config) {
         super();
         this.endpoint = config.endpoint;
         this.bucketName = config.bucketName;
         this.publicUrl = config.publicUrl;
-        // Note: Access keys should never be exposed to the browser
-        // Use a backend proxy to generate signed URLs
     }
 
-    async listFiles(bucketId, queries = []) {
-        // This would typically call a backend API that interfaces with R2
+    async listFiles(bucketId?: string, queries: any[] = []): Promise<{ files: any[]; total: number }> {
         const response = await fetch(`${this.endpoint}/api/storage/list`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -39,24 +46,19 @@ export class CloudflareR2StorageProvider extends IStorageProvider {
         };
     }
 
-    getFileView(bucketId, fileId) {
-        // Return public URL for viewing
+    getFileView(bucketId: string | null, fileId: string): string {
         return `${this.publicUrl}/${bucketId || this.bucketName}/${fileId}`;
     }
 
-    getFilePreview(bucketId, fileId, width = 600, height = 400) {
-        // R2 doesn't have built-in image transformation
-        // You would use Cloudflare Images or a third-party service
+    getFilePreview(bucketId: string | null, fileId: string, _width?: number, _height?: number): string {
         return this.getFileView(bucketId, fileId);
     }
 
-    getFileDownload(bucketId, fileId) {
-        // For downloads, you might need a signed URL
+    getFileDownload(bucketId: string | null, fileId: string): string {
         return `${this.endpoint}/api/storage/download?bucket=${bucketId || this.bucketName}&file=${fileId}`;
     }
 
-    async createFile(bucketId, fileId, file) {
-        // Get a pre-signed upload URL from backend
+    async createFile(bucketId: string | null, fileId: string, file: File): Promise<any> {
         const presignResponse = await fetch(`${this.endpoint}/api/storage/presign-upload`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -74,7 +76,6 @@ export class CloudflareR2StorageProvider extends IStorageProvider {
 
         const { uploadUrl, finalFileId } = await presignResponse.json();
 
-        // Upload directly to R2 using pre-signed URL
         const uploadResponse = await fetch(uploadUrl, {
             method: 'PUT',
             body: file,
@@ -97,7 +98,7 @@ export class CloudflareR2StorageProvider extends IStorageProvider {
         };
     }
 
-    async deleteFile(bucketId, fileId) {
+    async deleteFile(bucketId: string | null, fileId: string): Promise<void> {
         const response = await fetch(`${this.endpoint}/api/storage/delete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -115,12 +116,10 @@ export class CloudflareR2StorageProvider extends IStorageProvider {
 
 /**
  * Create Cloudflare R2 provider from configuration
- * @param {Object} config - R2 configuration
- * @returns {{storage: CloudflareR2StorageProvider}}
  */
-export function createCloudflareR2Provider(config) {
+export function createCloudflareR2Provider(config: R2Config) {
     return {
-        auth: null, // R2 is storage only
+        auth: null,
         database: null,
         storage: new CloudflareR2StorageProvider(config)
     };

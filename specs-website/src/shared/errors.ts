@@ -81,6 +81,20 @@ export function mapAppwriteError(error: any): ErrorCode {
   }
 }
 
+let navigateFn: ((to: string, options?: any) => void) | null = null;
+
+export function setGlobalNavigate(navigate: (to: string, options?: any) => void) {
+  navigateFn = navigate;
+}
+
+export function globalNavigate(to: string, options?: any) {
+  if (navigateFn) {
+    navigateFn(to, options);
+  } else {
+    window.location.href = to;
+  }
+}
+
 export function createApiError(error: any, operation: string): ApiError {
   const code = mapAppwriteError(error);
 
@@ -105,7 +119,7 @@ export function createApiError(error: any, operation: string): ApiError {
       
       if (!isPublic) {
         console.warn('[API] Unauthenticated request detected. Redirecting to /login.');
-        window.location.href = '/login';
+        globalNavigate('/login');
       }
     }
   }

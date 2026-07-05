@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { databases, storage } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_STORIES, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
+import { storage } from '../../shared/appwrite';
 import { Query, ID } from 'appwrite';
+import { api, cachedApi } from '../../shared/api';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
@@ -50,7 +50,7 @@ const StudentPosts: React.FC = () => {
       setCurrentUser(user);
 
       // Get account document links
-      const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+      const accountDoc = await cachedApi.users.getAccount(user.$id);
       const studentId = accountDoc.students?.$id || accountDoc.students;
       
       if (!studentId) {
@@ -59,13 +59,7 @@ const StudentPosts: React.FC = () => {
       }
 
       // Fetch student info
-      const studentDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id).then(async doc => {
-        if (typeof doc.students === 'object' && doc.students.name) {
-          return doc.students;
-        }
-        const studentId = typeof doc.students === 'object' ? doc.students.$id : doc.students;
-        return await databases.getDocument(DATABASE_ID, 'students', studentId);
-      });
+      const studentDoc = await cachedApi.users.getStudentProfile(studentId);
       setStudentData(studentDoc);
 
       if (!studentDoc.is_volunteer) {
@@ -74,11 +68,10 @@ const StudentPosts: React.FC = () => {
       }
 
       // Fetch stories written by this student
-      const storiesRes = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STORIES, [
-        Query.equal('students', studentDoc.$id),
-        Query.orderDesc('$createdAt'),
-        Query.limit(100)
-      ]);
+      const storiesRes = await api.stories.list({
+        extraQueries: [Query.equal('students', studentDoc.$id)],
+        limit: 100
+      });
       setPosts(storiesRes.documents);
 
     } catch (err: any) {
@@ -191,7 +184,7 @@ const StudentPosts: React.FC = () => {
           imageId = uploaded.$id;
         }
 
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, composerPostId, {
+        await api.stories.update(composerPostId, {
           title: title.trim(),
           post_description: description.trim(),
           post_details: content.trim(),
@@ -211,7 +204,7 @@ const StudentPosts: React.FC = () => {
           imageId = uploaded.$id;
         }
 
-        await databases.createDocument(DATABASE_ID, COLLECTION_ID_STORIES, ID.unique(), {
+        await api.stories.create({
           title: title.trim(),
           post_description: description.trim(),
           post_details: content.trim(),
@@ -247,7 +240,7 @@ const StudentPosts: React.FC = () => {
         } catch (e) {}
       }
 
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, deleteConfirm.id);
+      await api.stories.delete(deleteConfirm.id);
       addToast({ type: 'success', title: 'Removed', message: 'Post successfully deleted.' });
       setDeleteConfirm({ open: false, id: null, title: '' });
       loadData();

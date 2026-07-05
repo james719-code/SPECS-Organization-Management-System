@@ -74,7 +74,7 @@ In building this application, specific architectural and technical choices were 
 - **Story Approval:** Review, approve/reject, edit, and delete volunteer posts before publication.
 - **Settings:** Manage officer profile and preferences.
 
-### Admin Panel (14 views)
+### Admin Panel (13 views)
 - **Dashboard Stats:** At-a-glance overview with Chart.js / Recharts visualizations and animated counters.
 - **Account Management:** Approve, verify, deactivate/reactivate, and delete accounts. Promote students to officers or demote via Appwrite Cloud Functions. CSV export.
 - **Event Management:** A timeline view to add, edit, and delete events with related links and collaborators.
@@ -86,7 +86,6 @@ In building this application, specific architectural and technical choices were 
 - **Volunteer Management:** Full volunteer lifecycle management.
 - **Stories Management:** Full CRUD, approval workflow, filtering by status, and statistics.
 - **Announcements:** Draft composition with recipient targeting (all/students/officers), copy-to-clipboard, and open-in-email-client.
-- **Reports:** Account, student, payment, and event reports with monthly growth charts, distribution analysis, and CSV export.
 - **Settings:** Admin profile and preferences.
 
 ### Public Landing Page (7 routes)
@@ -369,6 +368,31 @@ specs-website/
 ├── vitest.config.ts
 └── unlighthouse.config.mjs
 ```
+
+---
+
+## Development Mock Mode & Architecture
+
+To facilitate rapid frontend development and offline testing, this portal includes a full multi-provider and mocking architecture.
+
+### 1. Mock Mode Configuration
+By default, in local development mode, you can bypass connection to a real Appwrite instance by setting `VITE_USE_MOCK_DATA="true"` in your `.env.local` file. 
+* This directs the provider factory (`src/shared/providers/factory.ts`) to initialize mock implementations of the `auth`, `database`, and `storage` provider classes.
+* All data changes and query filters are simulated in-memory using `src/shared/mock/mockApiService.js`, providing pre-populated relational mocks for students, officers, events, and payment logs.
+* A quick login panel is exposed on the login screen to easily log in as `student`, `officer`, or `admin` accounts.
+
+### 2. Multi-Provider Abstraction
+The system code is decoupled from Appwrite using a set of common interface abstractions located in `src/shared/providers/interface.ts`:
+* **`IAuthProvider`**: Controls user state retrieval, user session logins, recovery, and token validations.
+* **`IDatabaseProvider`**: Standardizes document read, list, and write queries.
+* **`IStorageProvider`**: Manages bucket listings, uploads, downloads, and image previews.
+
+The factory `src/shared/providers/factory.ts` loads the active client module depending on your `.env` settings (`VITE_AUTH_PROVIDER`, `VITE_DB_PROVIDER`, `VITE_STORAGE_PROVIDER`), making it easy to migrate modules to alternative systems (like Firebase or Cloudflare R2).
+
+### 3. Backend Cloud Functions
+For administrative operations requiring elevated server-side privileges (e.g. promoting a student to an officer or bulk verification), requests are sent to the Appwrite Cloud Function ID defined by `VITE_FUNCTION_ID`.
+* The server-side Python codebase (`main.py` in the officer management function repository) runs within a secure execution context, verifying permissions and editing credentials inside the Appwrite Auth and Database services.
+* It safely updates roles and active states without exposing direct write scopes on the client.
 
 ---
 

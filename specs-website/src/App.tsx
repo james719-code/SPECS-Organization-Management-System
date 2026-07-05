@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
 import { 
@@ -10,9 +10,11 @@ import {
 // Core imports
 import { databases, account } from './shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants';
+import { setGlobalNavigate } from './shared/errors';
 
 // Import Layout
 import DashboardLayout from './components/DashboardLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Static import for LandingPage to optimize critical render path
 import LandingPage from './pages/LandingPage';
@@ -24,6 +26,7 @@ const PendingVerificationPage = lazy(() => import('./pages/PendingVerificationPa
 const StoryPage = lazy(() => import('./pages/StoryPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // Student Pages
 const StudentProfile = lazy(() => import('./pages/student/StudentProfile'));
@@ -48,12 +51,22 @@ const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'));
 const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'));
 const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
 const AdminStories = lazy(() => import('./pages/admin/AdminStories'));
-const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminOfficers = lazy(() => import('./pages/admin/AdminOfficers'));
 const AdminTasks = lazy(() => import('./pages/admin/AdminTasks'));
 
+const signRole = (userId: string, role: string) => {
+  const data = `${userId}:${role}`;
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    hash = (hash << 5) - hash + data.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString(36);
+};
+
 export default function App() {
+  const navigate = useNavigate();
   const isPending = useGlobalLoading();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
@@ -66,11 +79,18 @@ export default function App() {
     try {
       const stored = localStorage.getItem('appwrite_session');
       if (stored) {
-        return JSON.parse(stored).role || null;
+        const parsed = JSON.parse(stored);
+        if (parsed.sig === signRole(parsed.userId, parsed.role)) {
+          return parsed.role || null;
+        }
       }
     } catch (e) {}
     return null;
   });
+
+  useEffect(() => {
+    setGlobalNavigate(navigate);
+  }, [navigate]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -99,7 +119,7 @@ export default function App() {
           if (stored) {
             try {
               const parsed = JSON.parse(stored);
-              if (parsed.userId === loggedInUser.$id && parsed.role) {
+              if (parsed.userId === loggedInUser.$id && parsed.role && parsed.sig === signRole(parsed.userId, parsed.role)) {
                 setUserRole(parsed.role);
               }
             } catch (e) {}
@@ -112,7 +132,8 @@ export default function App() {
             localStorage.setItem('appwrite_session', JSON.stringify({
               userId: loggedInUser.$id,
               role: role,
-              username: accDoc.username || ''
+              username: accDoc.username || '',
+              sig: signRole(loggedInUser.$id, role)
             }));
           } catch (err) {
             console.warn('Fallback: Failed to fetch account profile for role lookup, using local session:', err);
@@ -120,7 +141,12 @@ export default function App() {
             const storedFallback = localStorage.getItem('appwrite_session');
             if (storedFallback) {
               try {
-                setUserRole(JSON.parse(storedFallback).role || null);
+                const parsed = JSON.parse(storedFallback);
+                if (parsed.sig === signRole(parsed.userId, parsed.role)) {
+                  setUserRole(parsed.role || null);
+                } else {
+                  setUserRole(null);
+                }
               } catch (e) {
                 setUserRole(null);
               }
@@ -179,7 +205,8 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={fallbackSpinner}>
+    <ErrorBoundary>
+      <Suspense fallback={fallbackSpinner}>
       <Routes>
       <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/story/:id" element={<StoryPage />} />
@@ -378,12 +405,13 @@ export default function App() {
       </Route>
 
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage theme={theme} toggleTheme={toggleTheme} />} />
     </Routes>
+      </Suspense>
       {isPending && (
         <>
           {/* Top progress line */}
-          <div className="fixed top-0 left-0 right-0 h-1 z-[9999] animate-shimmer-loading" />
+          <div className="fixed top-0 left-0 right-0 h-1 z-[9999] bg-gradient-to-r from-teal-500 via-[#0d6b66] to-teal-500 animate-shimmer-loading" />
           
           {/* Corner glassmorphic status indicator */}
           <div className="fixed bottom-4 right-4 z-[9999] pointer-events-none animate-slide-up">
@@ -397,6 +425,6 @@ export default function App() {
           </div>
         </>
       )}
-    </Suspense>
+    </ErrorBoundary>
   );
 }

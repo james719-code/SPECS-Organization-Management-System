@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RotateCw, BookOpen, Clock, Globe, Award, CheckCircle2, UserCheck, ShieldAlert, ShieldCheck, Eye, Trash2, Edit3, Search, Calendar, User, FileText, Check, X, ExternalLink, RefreshCw } from 'lucide-react';
-import { cachedApi } from '../../shared/api';
+import { api, cachedApi } from '../../shared/api';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
-import { databases, storage, functions } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_STORIES, COLLECTION_ID_STUDENTS, FUNCTION_ID } from '../../shared/constants';
+import { storage, functions } from '../../shared/appwrite';
+import { FUNCTION_ID } from '../../shared/constants';
 import { Query, ID } from 'appwrite';
 import type { StoryDoc } from '../../types/database';
 
@@ -56,13 +56,8 @@ const AdminStories: React.FC = () => {
       else setLoading(true);
 
       const [storiesRes, studentsRes] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_STORIES, [
-          Query.limit(500),
-          Query.orderDesc('$createdAt')
-        ]),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [
-          Query.limit(500)
-        ])
+        api.stories.list({ limit: 500 }),
+        api.students.listAllProfiles()
       ]);
 
       setStories(storiesRes.documents as StoryDoc[]);
@@ -180,7 +175,7 @@ const AdminStories: React.FC = () => {
       const urls = filteredLinks.map(l => l.url.trim());
       const meanings = filteredLinks.map(l => l.label.trim() || l.url.trim());
 
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, editingStory.$id, {
+      await api.stories.update(editingStory.$id, {
         title: editTitle.trim(),
         post_description: editDesc.trim(),
         post_details: editContent.trim(),
@@ -226,7 +221,7 @@ const AdminStories: React.FC = () => {
         } else {
           updates.officerApproval = true;
         }
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, publishConfirm.id, updates);
+        await api.stories.update(publishConfirm.id, updates);
       }
 
       addToast({ 
@@ -277,7 +272,7 @@ const AdminStories: React.FC = () => {
         }
       } else {
         // Fallback: direct delete if function ID not configured
-        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, deleteConfirm.id);
+        await api.stories.delete(deleteConfirm.id);
       }
 
       addToast({ type: 'success', title: 'Deleted', message: 'Story has been removed.' });

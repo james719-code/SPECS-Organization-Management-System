@@ -4,6 +4,7 @@
  */
 
 import { createAppwriteProviders } from './appwriteProvider.js';
+import { IAuthProvider, IDatabaseProvider, IStorageProvider } from './interface.js';
 
 // Check if using mock data (dev only)
 const USE_MOCK_DATA = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -14,15 +15,15 @@ const DB_PROVIDER = import.meta.env.VITE_DB_PROVIDER || 'appwrite';
 const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'appwrite';
 
 // Cached provider instances
-let _authProvider = null;
-let _databaseProvider = null;
-let _storageProvider = null;
+let _authProvider: any = null;
+let _databaseProvider: any = null;
+let _storageProvider: any = null;
 let _initialized = false;
 
 /**
  * Initialize providers based on configuration
  */
-async function initializeProviders() {
+async function initializeProviders(): Promise<void> {
     if (_initialized) return;
 
     // If using mock data in dev, use mock providers
@@ -31,29 +32,29 @@ async function initializeProviders() {
 
         _authProvider = {
             getCurrentUser: () => mockApi.getCurrentUser(),
-            login: (e, p) => mockApi.login(e, p),
+            login: (e: string, p: string) => mockApi.login(e, p),
             logout: () => mockApi.logout(),
-            register: (e, p, n) => mockApi.register(e, p, n),
-            sendPasswordRecovery: (email, redirectUrl) => mockApi.sendPasswordResetEmail(email, redirectUrl),
-            confirmPasswordRecovery: (userId, secret, password) => mockApi.confirmPasswordRecovery ? mockApi.confirmPasswordRecovery(userId, secret, password) : Promise.resolve(true),
+            register: (e: string, p: string, n: string) => mockApi.register(e, p, n),
+            sendPasswordRecovery: (email: string, redirectUrl: string) => mockApi.sendPasswordResetEmail(email, redirectUrl),
+            confirmPasswordRecovery: (userId: string, secret: string, password: string) => mockApi.confirmPasswordRecovery ? mockApi.confirmPasswordRecovery(userId, secret, password) : Promise.resolve(true),
             sendVerification: () => mockApi.sendVerificationEmail()
         };
 
         _databaseProvider = {
-            listDocuments: (...args) => mockApi.listDocuments(...args),
-            getDocument: (...args) => mockApi.getDocument(...args),
-            createDocument: (...args) => mockApi.createDocument(...args),
-            updateDocument: (...args) => mockApi.updateDocument(...args),
-            deleteDocument: (...args) => mockApi.deleteDocument(...args)
+            listDocuments: (...args: any[]) => (mockApi as any).listDocuments(...args),
+            getDocument: (...args: any[]) => (mockApi as any).getDocument(...args),
+            createDocument: (...args: any[]) => (mockApi as any).createDocument(...args),
+            updateDocument: (...args: any[]) => (mockApi as any).updateDocument(...args),
+            deleteDocument: (...args: any[]) => (mockApi as any).deleteDocument(...args)
         };
 
         _storageProvider = {
-            listFiles: (...args) => mockApi.listFiles(...args),
-            getFileView: (...args) => mockApi.getFileView(...args),
-            getFilePreview: (...args) => mockApi.getFileView(...args),
-            getFileDownload: (...args) => mockApi.getFileDownload(...args),
-            createFile: (...args) => mockApi.createFile(...args),
-            deleteFile: (...args) => mockApi.deleteFile(...args)
+            listFiles: (...args: any[]) => (mockApi as any).listFiles(...args),
+            getFileView: (...args: any[]) => (mockApi as any).getFileView(...args),
+            getFilePreview: (...args: any[]) => (mockApi as any).getFileView(...args),
+            getFileDownload: (...args: any[]) => (mockApi as any).getFileDownload(...args),
+            createFile: (...args: any[]) => (mockApi as any).createFile(...args),
+            deleteFile: (...args: any[]) => (mockApi as any).deleteFile(...args)
         };
 
         _initialized = true;
@@ -66,8 +67,8 @@ async function initializeProviders() {
     // Auth Provider
     if (AUTH_PROVIDER === 'appwrite') {
         const providers = createAppwriteProviders(
-            import.meta.env.VITE_APPWRITE_ENDPOINT,
-            import.meta.env.VITE_APPWRITE_PROJECT_ID
+            import.meta.env.VITE_APPWRITE_ENDPOINT as string,
+            import.meta.env.VITE_APPWRITE_PROJECT_ID as string
         );
         _authProvider = providers.auth;
     } else if (AUTH_PROVIDER === 'firebase') {
@@ -83,8 +84,8 @@ async function initializeProviders() {
     // Database Provider
     if (DB_PROVIDER === 'appwrite') {
         const providers = createAppwriteProviders(
-            import.meta.env.VITE_APPWRITE_ENDPOINT,
-            import.meta.env.VITE_APPWRITE_PROJECT_ID
+            import.meta.env.VITE_APPWRITE_ENDPOINT as string,
+            import.meta.env.VITE_APPWRITE_PROJECT_ID as string
         );
         _databaseProvider = providers.database;
     } else if (DB_PROVIDER === 'firebase') {
@@ -100,16 +101,16 @@ async function initializeProviders() {
     // Storage Provider
     if (STORAGE_PROVIDER === 'appwrite') {
         const providers = createAppwriteProviders(
-            import.meta.env.VITE_APPWRITE_ENDPOINT,
-            import.meta.env.VITE_APPWRITE_PROJECT_ID
+            import.meta.env.VITE_APPWRITE_ENDPOINT as string,
+            import.meta.env.VITE_APPWRITE_PROJECT_ID as string
         );
         _storageProvider = providers.storage;
     } else if (STORAGE_PROVIDER === 'cloudflare-r2') {
         const { createCloudflareR2Provider } = await import('./cloudflareR2Provider.js');
         const providers = createCloudflareR2Provider({
-            endpoint: import.meta.env.VITE_R2_ENDPOINT,
-            bucketName: import.meta.env.VITE_R2_BUCKET_NAME,
-            publicUrl: import.meta.env.VITE_R2_PUBLIC_URL
+            endpoint: import.meta.env.VITE_R2_ENDPOINT as string,
+            bucketName: import.meta.env.VITE_R2_BUCKET_NAME as string,
+            publicUrl: import.meta.env.VITE_R2_PUBLIC_URL as string
         });
         _storageProvider = providers.storage;
     }
@@ -120,36 +121,32 @@ async function initializeProviders() {
 
 /**
  * Get auth provider instance
- * @returns {Promise<IAuthProvider>}
  */
-export async function getAuthProvider() {
+export async function getAuthProvider(): Promise<IAuthProvider> {
     if (!_initialized) await initializeProviders();
     return _authProvider;
 }
 
 /**
  * Get database provider instance
- * @returns {Promise<IDatabaseProvider>}
  */
-export async function getDatabaseProvider() {
+export async function getDatabaseProvider(): Promise<IDatabaseProvider> {
     if (!_initialized) await initializeProviders();
     return _databaseProvider;
 }
 
 /**
  * Get storage provider instance
- * @returns {Promise<IStorageProvider>}
  */
-export async function getStorageProvider() {
+export async function getStorageProvider(): Promise<IStorageProvider> {
     if (!_initialized) await initializeProviders();
     return _storageProvider;
 }
 
 /**
  * Get all providers
- * @returns {Promise<{auth: IAuthProvider, database: IDatabaseProvider, storage: IStorageProvider}>}
  */
-export async function getProviders() {
+export async function getProviders(): Promise<{ auth: IAuthProvider; database: IDatabaseProvider; storage: IStorageProvider }> {
     if (!_initialized) await initializeProviders();
     return {
         auth: _authProvider,
@@ -160,15 +157,13 @@ export async function getProviders() {
 
 /**
  * Check if using mock mode
- * @returns {boolean}
  */
-export function isMockMode() {
+export function isMockMode(): boolean {
     return USE_MOCK_DATA;
 }
 
 /**
  * Get current provider configuration
- * @returns {Object}
  */
 export function getProviderConfig() {
     return {
