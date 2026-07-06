@@ -1432,19 +1432,14 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
           <script>
             window.onload = function() {
               window.print();
-              window.close();
+              if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                window.close();
+              }
             }
           </script>
         </body>
       </html>
     `;
-
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
-      const { downloadPdfFromHtml } = await import('../../shared/utils');
-      await downloadPdfFromHtml(htmlContent, `Finance_Report_${selectedScope === 'all' ? 'Full_Year' : selectedScope === '1st_semester' ? '1st_Semester' : selectedScope === '2nd_semester' ? '2nd_Semester' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
-      return;
-    }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1969,34 +1964,34 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
           <p className="text-sm text-slate-500 mt-1">Track organization revenues and expenses</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => navigate('/dashboard/admin/payments')}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
             Manage Payments
           </button>
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
             Export CSV
           </button>
           <button
             onClick={() => setPrintModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#0d6b66] bg-emerald-50/10 dark:bg-[#0d6b66]/10 text-[#0d6b66] dark:text-emerald-400 px-3.5 py-2 text-sm font-bold hover:bg-emerald-50 dark:hover:bg-[#0d6b66]/20 transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg border border-[#0d6b66] bg-emerald-50/10 dark:bg-[#0d6b66]/10 text-[#0d6b66] dark:text-emerald-400 px-3 py-2 text-xs sm:text-sm font-bold hover:bg-emerald-50 dark:hover:bg-[#0d6b66]/20 transition-colors shadow-sm"
             title="Print Financial Statements & Detailed Breakdown"
           >
-            <Printer className="h-4 w-4" />
-            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
+            <Printer className="h-4 w-4 shrink-0" />
+            <span>Print Report</span>
           </button>
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-sm"
           >
-            <RotateCw className={`h-4 w-4 text-slate-500 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            <RotateCw className={`h-3.5 w-3.5 text-slate-500 shrink-0 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -2547,7 +2542,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
                 >
-                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
+                  Print Report
                 </button>
               </div>
 

@@ -129,13 +129,11 @@ export async function downloadPdfFromHtml(
 
         // ── Create hidden container for html2canvas ──
         const container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.left = '0';
-        container.style.top = '0';
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '-9999px';
         container.style.width = '8.5in';
-        container.style.opacity = '0';
-        container.style.pointerEvents = 'none';
-        container.style.zIndex = '-1';
+        container.style.background = 'white';
         container.innerHTML = htmlContent;
 
         // Remove scripts
