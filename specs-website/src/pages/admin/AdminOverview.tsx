@@ -52,6 +52,8 @@ const AdminOverview: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [schoolYear, setSchoolYear] = useState<string>('');
+
 
   const { yearLevelCounts, totalStudentsWithYear, sectionCounts, totalStudentsWithSection } = React.useMemo(() => {
     if (!stats?.accounts) {
@@ -130,6 +132,12 @@ const AdminOverview: React.FC = () => {
         setLoading(true);
         const data = await cachedApi.dashboard.getStats();
         setStats(data);
+
+        // Fetch active school year from metadata
+        const metadata = await cachedApi.metadata.get();
+        if (metadata?.schoolYear) {
+          setSchoolYear(metadata.schoolYear);
+        }
       } catch (err: any) {
         console.error('[AdminOverview] Failed to load stats:', err);
         setError(err.message || 'Failed to load dashboard data');
@@ -139,6 +147,7 @@ const AdminOverview: React.FC = () => {
     }
     load();
   }, []);
+
 
   if (error) {
     return (
@@ -164,9 +173,17 @@ const AdminOverview: React.FC = () => {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
+          {schoolYear && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-[#0d6b66] border border-teal-100 dark:bg-[#0d6b66]/10 dark:text-emerald-400 dark:border-[#0d6b66]/20">
+              A.Y. {schoolYear}
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500 mt-1">Welcome back! Here's what's happening with your organization.</p>
       </div>
+
 
       {/* Stats Grid */}
       {loading ? (

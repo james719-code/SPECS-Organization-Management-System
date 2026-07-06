@@ -11,6 +11,7 @@ export const COLLECTION_ID_ATTENDANCE = import.meta.env.VITE_COLLECTION_ID_ATTEN
 export const COLLECTION_ID_PAYMENTS = import.meta.env.VITE_COLLECTION_ID_PAYMENTS as string;
 export const COLLECTION_ID_EXPENSES = import.meta.env.VITE_COLLECTION_ID_EXPENSES as string;
 export const COLLECTION_ID_REVENUE = import.meta.env.VITE_COLLECTION_ID_REVENUE as string;
+export const COLLECTION_ID_STARTING_BALANCES = import.meta.env.VITE_COLLECTION_ID_STARTING_BALANCES as string;
 
 export const COLLECTION_ID_STORIES = import.meta.env.VITE_COLLECTION_ID_STORIES as string;
 export const COLLECTION_ID_FILES = import.meta.env.VITE_COLLECTION_ID_FILES as string;

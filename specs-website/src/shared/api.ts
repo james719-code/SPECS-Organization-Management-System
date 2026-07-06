@@ -13,6 +13,7 @@ import {
     COLLECTION_ID_OFFICERS,
     COLLECTION_ID_TASKS,
     COLLECTION_ID_ADMINS,
+    COLLECTION_ID_STARTING_BALANCES,
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';
@@ -49,7 +50,8 @@ export const CacheTags = {
     STORIES: 'stories',
     DASHBOARD: 'dashboard',
     LANDING: 'landing',
-    TASKS: 'tasks'
+    TASKS: 'tasks',
+    STARTING_BALANCES: 'starting_balances'
 } as const;
 
 export interface PaginatedResponse<T> {
@@ -369,13 +371,26 @@ export const api = {
                 throw createApiError(error, 'Failed to list all attendance records');
             }
         },
-        async create(eventId: string, studentId: string, officerId: string | null | undefined, attendanceName: string): Promise<AttendanceDoc> {
+        async create(
+            eventId: string,
+            attendeeType: 'student' | 'officer' | 'non-member',
+            attendeeId: string | null,
+            nonMemberData: { name?: string; email?: string } | null,
+            officerId: string | null | undefined,
+            attendanceName: string
+        ): Promise<AttendanceDoc> {
             try {
                 const data: any = {
                     events: eventId,
-                    students: studentId,
+                    attendee_type: attendeeType,
                     name_attendance: attendanceName
                 };
+                if (attendeeType === 'student' || attendeeType === 'officer') {
+                    data.students = attendeeId;
+                } else if (attendeeType === 'non-member') {
+                    data.non_member_name = nonMemberData?.name || null;
+                    data.non_member_email = nonMemberData?.email || null;
+                }
                 if (officerId && officerId !== 'admin') {
                     data.officers = [officerId];
                 }
@@ -721,6 +736,65 @@ export const api = {
         }
     },
 
+    startingBalances: {
+        async get(schoolYear: string): Promise<any> {
+            try {
+                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYear);
+            } catch (error: any) {
+                if (error.code === 404) return null;
+                throw createApiError(error, `Failed to get starting balance for ${schoolYear}`);
+            }
+        },
+        async updateOrCreate(schoolYear: string, data: {
+            amount: number;
+            start_first_sem: string;
+            end_first_sem: string;
+            start_second_sem: string;
+            end_second_sem: string;
+        }): Promise<any> {
+            try {
+                let exists = false;
+                try {
+                    await databases.getDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYear);
+                    exists = true;
+                } catch (e: any) {
+                    if (e.code !== 404) throw e;
+                }
+
+                let result;
+                if (exists) {
+                    result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYear, data);
+                } else {
+                    result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYear, data);
+                }
+                dataCache.invalidateTags([CacheTags.STARTING_BALANCES, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to save starting balance for ${schoolYear}`);
+            }
+        },
+        async delete(schoolYearDocId: string): Promise<any> {
+            try {
+                const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYearDocId);
+                dataCache.invalidateTags([CacheTags.STARTING_BALANCES, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to delete starting balance for ${schoolYearDocId}`);
+            }
+        },
+        async list(): Promise<any> {
+            try {
+                return await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, [
+                    Query.orderDesc('start_first_sem'),
+                    Query.limit(100)
+                ]);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list starting balances');
+            }
+        }
+
+    },
+
     metadata: {
         async get(): Promise<any> {
             try {
@@ -1001,6 +1075,29 @@ export const cachedApi = {
             });
         }
     },
+
+    startingBalances: {
+        async get(schoolYear: string, ttl = 5 * 60 * 1000): Promise<any> {
+            const cacheKey = generateCacheKey('starting_balance', { schoolYear });
+            return dataCache.getOrFetch(cacheKey, () => api.startingBalances.get(schoolYear), {
+                ttl,
+                staleTtl: 10 * 60 * 1000,
+                tags: [CacheTags.STARTING_BALANCES, CacheTags.FINANCE]
+            });
+        },
+
+        async list(ttl = 2 * 60 * 1000): Promise<any> {
+            return dataCache.getOrFetch('starting_balances_list', () => api.startingBalances.list(), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.STARTING_BALANCES, CacheTags.FINANCE]
+            });
+        },
+        async delete(schoolYearDocId: string): Promise<any> {
+            return api.startingBalances.delete(schoolYearDocId);
+        }
+    },
+
 
     metadata: {
         async get(ttl = 2 * 60 * 1000): Promise<any> {

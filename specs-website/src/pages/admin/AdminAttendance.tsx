@@ -29,11 +29,16 @@ const AdminAttendance: React.FC = () => {
 
   // Student search autocomplete states
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; email?: string } | null>(null);
-  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string; email?: string }[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; email?: string; type: 'student' | 'officer' } | null>(null);
+  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string; email?: string; type: 'student' | 'officer' }[]>([]);
   const [attendanceLabel, setAttendanceLabel] = useState('Morning Check-in');
   const [notifyViaEmail, setNotifyViaEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Tab & non-member states
+  const [activeTab, setActiveTab] = useState<'member' | 'non-member'>('member');
+  const [nonMemberName, setNonMemberName] = useState('');
+  const [nonMemberEmail, setNonMemberEmail] = useState('');
 
   // Search filter on records
   const [recordFilterQuery, setRecordFilterQuery] = useState('');
@@ -150,7 +155,8 @@ const AdminAttendance: React.FC = () => {
         return {
           id: profile?.$id || acc.$id,
           name: profile?.name || acc.username || 'Unknown Student',
-          email: profile?.email || ''
+          email: profile?.email || '',
+          type: acc.type as 'student' | 'officer'
         };
       })
       .slice(0, 5);
@@ -158,8 +164,8 @@ const AdminAttendance: React.FC = () => {
     setAutocompleteResults(matches);
   };
 
-  const handleSelectAutocomplete = (id: string, name: string, email?: string) => {
-    setSelectedStudent({ id, name, email });
+  const handleSelectAutocomplete = (id: string, name: string, email?: string, type?: 'student' | 'officer') => {
+    setSelectedStudent({ id, name, email, type: type || 'student' });
     setStudentSearchTerm(name);
     setAutocompleteResults([]);
   };
@@ -169,6 +175,7 @@ const AdminAttendance: React.FC = () => {
     const totalCount = students.length;
     const uniquePresent = new Set(
       attendanceRecords
+        .filter(record => (record.attendee_type || 'student') !== 'non-member')
         .map(record => {
           const profile = record.students as any;
           return profile?.$id || record.students;
@@ -188,8 +195,14 @@ const AdminAttendance: React.FC = () => {
       addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
       return;
     }
-    if (!selectedStudent) {
+
+    if (activeTab === 'member' && !selectedStudent) {
       addToast({ type: 'warning', title: 'Student Required', message: 'Please select a student from the search autocomplete.' });
+      return;
+    }
+
+    if (activeTab === 'non-member' && !nonMemberName.trim()) {
+      addToast({ type: 'warning', title: 'Name Required', message: 'Please enter the non-member name.' });
       return;
     }
 
@@ -200,65 +213,127 @@ const AdminAttendance: React.FC = () => {
         ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
         : null;
 
-      await api.attendance.create(selectedEventId, selectedStudent.id, recorderId, attendanceLabel);
-      addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
-      
-      // Dispatch email notification if toggled and email is present (Background)
-      if (notifyViaEmail && selectedStudent.email) {
-        const studentEmail = selectedStudent.email;
-        const studentName = selectedStudent.name;
-        (async () => {
-          try {
-            const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-            const dateStr = selectedEvent?.date_to_held 
-              ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
+      if (activeTab === 'member' && selectedStudent) {
+        const attendeeType = selectedStudent.type || 'student';
+        await api.attendance.create(selectedEventId, attendeeType, selectedStudent.id, null, recorderId, attendanceLabel);
+        addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
+        
+        // Dispatch email notification if toggled and email is present (Background)
+        if (notifyViaEmail && selectedStudent.email) {
+          const studentEmail = selectedStudent.email;
+          const studentName = selectedStudent.name;
+          (async () => {
+            try {
+              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+              const dateStr = selectedEvent?.date_to_held 
+                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })
+                : new Date().toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+
+              const timeStr = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              const htmlBody = getAttendanceHtml(
+                studentName,
+                selectedEvent?.event_name || 'Organization Event',
+                dateStr,
+                'Present',
+                timeStr,
+                window.location.origin
+              );
+
+              await functions.createExecution(
+                EMAIL_FUNCTION_ID,
+                JSON.stringify({
+                  action: 'send_email',
+                  payload: {
+                    to: studentEmail,
+                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    body: htmlBody,
+                    html: true
+                  }
                 })
-              : new Date().toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
-                });
+              );
+              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${studentEmail}.` });
+            } catch (emailErr: any) {
+              console.error('[AdminAttendance] Failed to send email notification:', emailErr);
+            }
+          })();
+        }
 
-            const timeStr = new Date().toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit'
-            });
+        // Reset form
+        setStudentSearchTerm('');
+        setSelectedStudent(null);
+      } else if (activeTab === 'non-member') {
+        const name = nonMemberName.trim();
+        const email = nonMemberEmail.trim();
 
-            const htmlBody = getAttendanceHtml(
-              studentName,
-              selectedEvent?.event_name || 'Organization Event',
-              dateStr,
-              'Present',
-              timeStr,
-              window.location.origin
-            );
+        await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        addToast({ type: 'success', title: 'Recorded', message: `Non-Member: ${name} is marked present.` });
 
-            await functions.createExecution(
-              EMAIL_FUNCTION_ID,
-              JSON.stringify({
-                action: 'send_email',
-                payload: {
-                  to: studentEmail,
-                  subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
-                  body: htmlBody,
-                  html: true
-                }
-              })
-            );
-            addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${studentEmail}.` });
-          } catch (emailErr: any) {
-            console.error('[AdminAttendance] Failed to send email notification:', emailErr);
-            addToast({ type: 'warning', title: 'Notification Failed', message: `Recorded, but failed to send email to ${studentEmail}.` });
-          }
-        })();
+        // Dispatch email notification if toggled and email is present (Background)
+        if (notifyViaEmail && email) {
+          (async () => {
+            try {
+              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+              const dateStr = selectedEvent?.date_to_held 
+                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })
+                : new Date().toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+
+              const timeStr = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              const htmlBody = getAttendanceHtml(
+                name,
+                selectedEvent?.event_name || 'Organization Event',
+                dateStr,
+                'Present',
+                timeStr,
+                window.location.origin
+              );
+
+              await functions.createExecution(
+                EMAIL_FUNCTION_ID,
+                JSON.stringify({
+                  action: 'send_email',
+                  payload: {
+                    to: email,
+                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    body: htmlBody,
+                    html: true
+                  }
+                })
+              );
+              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${email}.` });
+            } catch (emailErr: any) {
+              console.error('[AdminAttendance] Failed to send email notification to non-member:', emailErr);
+            }
+          })();
+        }
+
+        // Reset form
+        setNonMemberName('');
+        setNonMemberEmail('');
       }
-
-      // Reset form
-      setStudentSearchTerm('');
-      setSelectedStudent(null);
 
       // Refresh listing
       loadAttendanceRecords(selectedEventId);
@@ -266,6 +341,145 @@ const AdminAttendance: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleExportNonMemberQr = async () => {
+    if (!nonMemberName.trim()) {
+      addToast({ type: 'warning', title: 'Name Required', message: 'Please enter a name to generate a QR code.' });
+      return;
+    }
+    
+    try {
+      const name = nonMemberName.trim();
+      const email = nonMemberEmail.trim();
+      const payload = { name, email };
+      const b64Payload = btoa(JSON.stringify(payload));
+      const qrData = `specs-nonmember:${b64Payload}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+      
+      addToast({ type: 'info', title: 'Generating Pass', message: 'Creating guest pass card...' });
+      
+      // Create an image element to load the QR code
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // critical for canvas exporting cross-origin images
+      
+      img.onload = () => {
+        try {
+          // Create canvas
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 560;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Could not get canvas context');
+          
+          // Draw white card background
+          ctx.fillStyle = '#ffffff';
+          const radius = 24;
+          
+          // Draw card with rounded corners
+          ctx.beginPath();
+          ctx.moveTo(radius, 0);
+          ctx.lineTo(400 - radius, 0);
+          ctx.quadraticCurveTo(400, 0, 400, radius);
+          ctx.lineTo(400, 560 - radius);
+          ctx.quadraticCurveTo(400, 560, 400 - radius, 560);
+          ctx.lineTo(radius, 560);
+          ctx.quadraticCurveTo(0, 560, 0, 560 - radius);
+          ctx.lineTo(0, radius);
+          ctx.quadraticCurveTo(0, 0, radius, 0);
+          ctx.closePath();
+          ctx.fill();
+          
+          // Draw a subtle border
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          // Top banner accent
+          ctx.fillStyle = '#0d6b66';
+          ctx.fillRect(2, 2, 396, 12); // subtle header bar
+          
+          // Draw Pass Title
+          ctx.fillStyle = '#0d6b66';
+          ctx.font = 'bold 18px "Inter", "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('SPECS GUEST PASS', 200, 50);
+          
+          // Draw generic SPECS tagline
+          ctx.fillStyle = '#64748b';
+          ctx.font = '500 11px "Inter", "Segoe UI", sans-serif';
+          ctx.fillText('EVENT ATTENDANCE CODE', 200, 75);
+          
+          // Draw the QR Code
+          ctx.drawImage(img, 60, 100, 280, 280);
+          
+          // Draw attendee name (with auto-fontsize scaling to prevent overflow)
+          ctx.fillStyle = '#0f172a';
+          let fontSize = 24;
+          ctx.font = `bold ${fontSize}px "Inter", "Segoe UI", sans-serif`;
+          
+          // Scale down font size if name is too long
+          while (ctx.measureText(name).width > 340 && fontSize > 14) {
+            fontSize -= 2;
+            ctx.font = `bold ${fontSize}px "Inter", "Segoe UI", sans-serif`;
+          }
+          ctx.fillText(name, 200, 435);
+          
+          // Draw role / badge
+          ctx.fillStyle = '#64748b';
+          ctx.font = '600 13px "Inter", "Segoe UI", sans-serif';
+          ctx.fillText('NON-MEMBER / GUEST', 200, 470);
+          
+          // Draw email if present
+          if (email) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'normal 11px "Inter", "Segoe UI", sans-serif';
+            ctx.fillText(email, 200, 495);
+          }
+          
+          // Draw footer separator line
+          ctx.strokeStyle = '#f1f5f9';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(40, 515);
+          ctx.lineTo(360, 515);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = '500 9px "Inter", "Segoe UI", sans-serif';
+          ctx.fillText('POWERED BY SPECS PORTAL', 200, 538);
+          
+          // Download the image
+          canvas.toBlob((blob) => {
+            if (!blob) throw new Error('Failed to generate image blob');
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `GUEST_PASS_${name.replace(/\s+/g, '_')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            
+            addToast({ type: 'success', title: 'Card Exported', message: `Guest Pass downloaded for ${name}.` });
+          }, 'image/png');
+        } catch (canvasErr: any) {
+          console.error('Canvas draw/export error:', canvasErr);
+          addToast({ type: 'error', title: 'Export Failed', message: 'Failed to generate guest pass image.' });
+        }
+      };
+      
+      img.onerror = () => {
+        addToast({ type: 'error', title: 'Export Failed', message: 'Failed to retrieve QR code image from server.' });
+      };
+      
+      // Trigger image loading
+      img.src = qrUrl;
+      
+    } catch (err: any) {
+      console.error('QR Export Error:', err);
+      addToast({ type: 'error', title: 'Export Failed', message: 'Failed to download QR code image.' });
     }
   };
 
@@ -296,6 +510,140 @@ const AdminAttendance: React.FC = () => {
     if (scanCooldown) return;
     
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // --- CHECK FOR NON-MEMBER QR CODE ---
+    if (decodedText.startsWith('specs-nonmember:')) {
+      setScanCooldown(true);
+      setTimeout(() => setScanCooldown(false), 1500);
+
+      try {
+        const base64Data = decodedText.split(':')[1];
+        if (!base64Data) throw new Error('Empty payload');
+        
+        // Decode base64 safely
+        const decodedJson = atob(base64Data);
+        const { name, email } = JSON.parse(decodedJson);
+
+        if (!name) throw new Error('Missing name');
+
+        const scanKey = `${selectedEventId}:non-member:${name}:${email || ''}:${attendanceLabel.trim()}`;
+        
+        // Check duplicate
+        const cacheKey = 'specs_scanned_qrs';
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        let cache: Record<string, number> = {};
+        try {
+          const raw = localStorage.getItem(cacheKey);
+          if (raw) {
+            const tempCache = JSON.parse(raw);
+            for (const [k, v] of Object.entries(tempCache)) {
+              if (now - (v as number) < oneDayMs) {
+                cache[k] = v as number;
+              }
+            }
+          }
+        } catch (e) {}
+
+        if (cache[scanKey]) {
+          addToast({ 
+            type: 'warning', 
+            title: 'Duplicate Scan', 
+            message: `This non-member has already been recorded for "${attendanceLabel}" in this event.` 
+          });
+          const errorLog = {
+            id: Math.random().toString(),
+            name: name,
+            time: timeStr,
+            status: 'warning' as const,
+            message: `Duplicate scan for "${attendanceLabel}"`
+          };
+          setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+          setScanFlash('warning');
+          setTimeout(() => setScanFlash(null), 1000);
+          return;
+        }
+
+        const recorderId = currentUserProfile && currentUserProfile.type === 'officer'
+          ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
+          : null;
+
+        await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        
+        // Cache scan
+        try {
+          cache[scanKey] = Date.now();
+          localStorage.setItem(cacheKey, JSON.stringify(cache));
+        } catch (e) {}
+
+        playBeep();
+        addToast({ type: 'success', title: 'Recorded via QR', message: `Non-Member: ${name} marked present.` });
+
+        const successLog = {
+          id: Math.random().toString(),
+          name: name,
+          time: timeStr,
+          status: 'success' as const,
+          message: `Recorded for "${attendanceLabel}"`
+        };
+        setFullscreenLogs(prev => [successLog, ...prev.slice(0, 9)]);
+        setScanFlash('success');
+        setTimeout(() => setScanFlash(null), 1000);
+
+        if (notifyViaEmail && email) {
+          (async () => {
+            try {
+              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+              const dateStr = selectedEvent?.date_to_held 
+                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+              const formattedTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+              const htmlBody = getAttendanceHtml(
+                name,
+                selectedEvent?.event_name || 'Organization Event',
+                dateStr,
+                'Present',
+                formattedTimeStr,
+                window.location.origin
+              );
+
+              await functions.createExecution(
+                EMAIL_FUNCTION_ID,
+                JSON.stringify({
+                  action: 'send_email',
+                  payload: {
+                    to: email,
+                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    body: htmlBody,
+                    html: true
+                  }
+                })
+              );
+              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${email}.` });
+            } catch (emailErr) {
+              console.error('[AdminAttendance Non-Member QR] Failed to send email:', emailErr);
+            }
+          })();
+        }
+
+        loadAttendanceRecords(selectedEventId);
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Scan Error', message: 'Failed to parse non-member data.' });
+        const errorLog = {
+          id: Math.random().toString(),
+          name: 'Non-Member QR',
+          time: timeStr,
+          status: 'error' as const,
+          message: 'Failed to parse QR data'
+        };
+        setFullscreenLogs(prev => [errorLog, ...prev.slice(0, 9)]);
+        setScanFlash('error');
+        setTimeout(() => setScanFlash(null), 1000);
+      }
+      return;
+    }
 
     if (!decodedText.startsWith('specs-member:')) {
       setScanCooldown(true);
@@ -437,7 +785,8 @@ const AdminAttendance: React.FC = () => {
         ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
         : null;
 
-      await api.attendance.create(selectedEventId, studentProfileId, recorderId, attendanceLabel);
+      const attendeeType = attendeeAccount?.type || 'student';
+      await api.attendance.create(selectedEventId, attendeeType, studentProfileId, null, recorderId, attendanceLabel);
       
       // Cache successful scan
       try {
@@ -778,7 +1127,8 @@ const AdminAttendance: React.FC = () => {
       return `
         <tr>
           <td>${index + 1}</td>
-          <td style="font-weight: bold;">${group.studentName}</td>
+          <td style="font-weight: bold;">${group.name}</td>
+          <td style="text-transform: capitalize;">${group.type === 'non-member' ? 'Non-Member' : group.type}</td>
           <td>${sessionsStr}</td>
         </tr>
       `;
@@ -972,12 +1322,13 @@ const AdminAttendance: React.FC = () => {
                     <thead>
                       <tr>
                         <th style="width: 8%;">No.</th>
-                        <th style="width: 42%;">Student Name</th>
-                        <th style="width: 50%;">Sessions Attended</th>
+                        <th style="width: 32%;">Attendee Name</th>
+                        <th style="width: 20%;">Role</th>
+                        <th style="width: 40%;">Sessions Attended</th>
                       </tr>
                     </thead>
                     <tbody>
-                      ${rowsHtml || '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
+                      ${rowsHtml || '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
                     </tbody>
                   </table>
 
@@ -1040,30 +1391,41 @@ const AdminAttendance: React.FC = () => {
     printWindow.document.close();
   };
 
-  // Group attendance records by student to prevent duplicate rows in the log sheet
+  // Group attendance records by attendee to prevent duplicate rows in the log sheet
   const groupedRecords = useMemo(() => {
     const groups: Record<string, {
-      studentId: string;
-      studentName: string;
+      id: string;
+      name: string;
+      type: 'student' | 'officer' | 'non-member';
       records: { id: string; sessionLabel: string; createdAt: string }[];
     }> = {};
 
     attendanceRecords.forEach(record => {
-      const profile = record.students as any;
-      const studentId = profile?.$id || record.students;
-      const studentName = profile?.name || 'Unknown Student';
+      const attendeeType = record.attendee_type || 'student';
+      let attendeeId = '';
+      let attendeeName = '';
 
-      if (!studentId) return;
+      if (attendeeType === 'student' || attendeeType === 'officer') {
+        const profile = record.students as any;
+        attendeeId = profile?.$id || record.students || '';
+        attendeeName = profile?.name || 'Unknown Student';
+      } else if (attendeeType === 'non-member') {
+        attendeeId = `nonmember:${record.non_member_name}:${record.non_member_email || ''}`;
+        attendeeName = record.non_member_name || 'Non-Member';
+      }
 
-      if (!groups[studentId]) {
-        groups[studentId] = {
-          studentId,
-          studentName,
+      if (!attendeeId) return;
+
+      if (!groups[attendeeId]) {
+        groups[attendeeId] = {
+          id: attendeeId,
+          name: attendeeName,
+          type: attendeeType,
           records: []
         };
       }
 
-      groups[studentId].records.push({
+      groups[attendeeId].records.push({
         id: record.$id,
         sessionLabel: record.name_attendance || 'Attendance',
         createdAt: record.$createdAt
@@ -1075,8 +1437,8 @@ const AdminAttendance: React.FC = () => {
       g.records.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     });
 
-    // Sort groups alphabetically by student name
-    return Object.values(groups).sort((a, b) => a.studentName.localeCompare(b.studentName));
+    // Sort groups alphabetically by attendee name
+    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [attendanceRecords]);
 
   // Filtered grouped records based on query
@@ -1084,7 +1446,7 @@ const AdminAttendance: React.FC = () => {
     if (!recordFilterQuery.trim()) return groupedRecords;
     const q = recordFilterQuery.toLowerCase();
     return groupedRecords.filter(group => {
-      if (group.studentName.toLowerCase().includes(q)) return true;
+      if (group.name.toLowerCase().includes(q)) return true;
       return group.records.some(r => r.sessionLabel.toLowerCase().includes(q));
     });
   }, [groupedRecords, recordFilterQuery]);
@@ -1252,31 +1614,96 @@ const AdminAttendance: React.FC = () => {
 
               {attendanceMode === 'manual' ? (
                 <form onSubmit={handleAddAttendance} className="space-y-4">
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendee</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Search member name..."
-                      value={studentSearchTerm}
-                      onChange={e => handleStudentSearchChange(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
-                    />
-                    {autocompleteResults.length > 0 && (
-                      <div className="absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white shadow-xl max-h-48 overflow-y-auto z-20">
-                        {autocompleteResults.map(match => (
-                          <button
-                            key={match.id}
-                            type="button"
-                            onClick={() => handleSelectAutocomplete(match.id, match.name, match.email)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0"
-                          >
-                            {match.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  {/* Tab Selector: Member vs Non-Member */}
+                  <div className="flex border-b border-slate-100 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('member')}
+                      className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+                        activeTab === 'member'
+                          ? 'border-[#0d6b66] text-[#0d6b66]'
+                          : 'border-transparent text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      System Member
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('non-member')}
+                      className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+                        activeTab === 'non-member'
+                          ? 'border-[#0d6b66] text-[#0d6b66]'
+                          : 'border-transparent text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      Non-Member
+                    </button>
                   </div>
+
+                  {activeTab === 'member' ? (
+                    <div className="relative">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendee</label>
+                      <input
+                        type="text"
+                        required={activeTab === 'member'}
+                        placeholder="Search member name..."
+                        value={studentSearchTerm}
+                        onChange={e => handleStudentSearchChange(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                      />
+                      {autocompleteResults.length > 0 && (
+                        <div className="absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white shadow-xl max-h-48 overflow-y-auto z-20">
+                          {autocompleteResults.map(match => (
+                            <button
+                              key={match.id}
+                              type="button"
+                              onClick={() => handleSelectAutocomplete(match.id, match.name, match.email, match.type)}
+                              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0 flex items-center justify-between"
+                            >
+                              <span>{match.name}</span>
+                              <span className="text-[10px] font-semibold text-slate-400 capitalize">{match.type}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Full Name</label>
+                        <input
+                          type="text"
+                          required={activeTab === 'non-member'}
+                          placeholder="Enter non-member name..."
+                          value={nonMemberName}
+                          onChange={e => setNonMemberName(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Email Address (Optional)</label>
+                        <input
+                          type="email"
+                          placeholder="Enter non-member email..."
+                          value={nonMemberEmail}
+                          onChange={e => setNonMemberEmail(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                        />
+                      </div>
+                      
+                      {/* Premium Generator / Export Utility for Non-Member QR */}
+                      <button
+                        type="button"
+                        onClick={handleExportNonMemberQr}
+                        className="w-full mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#0d6b66]/20 bg-[#0d6b66]/5 hover:bg-[#0d6b66]/10 px-3 py-2.5 text-xs font-bold text-[#0d6b66] transition-colors"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Generate & Export QR Code
+                      </button>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Attendance Session Name</label>
@@ -1429,15 +1856,34 @@ const AdminAttendance: React.FC = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          <th className="px-6 py-3 text-left w-1/3">Student</th>
+                          <th className="px-6 py-3 text-left w-1/3">Attendee</th>
                           <th className="px-6 py-3 text-left">Sessions Attended</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
                         {filteredGroupedRecords.map(group => {
                           return (
-                            <tr key={group.studentId} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-6 py-3.5 font-medium text-slate-900">{group.studentName}</td>
+                            <tr key={group.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-3.5 font-medium text-slate-900">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span>{group.name}</span>
+                                  {group.type === 'student' && (
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                                      Student
+                                    </span>
+                                  )}
+                                  {group.type === 'officer' && (
+                                    <span className="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[9px] font-semibold text-blue-700">
+                                      Officer
+                                    </span>
+                                  )}
+                                  {group.type === 'non-member' && (
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[9px] font-semibold text-slate-600">
+                                      Non-Member
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="px-6 py-3.5">
                                 <div className="flex flex-wrap gap-1.5">
                                   {group.records.map(r => {

@@ -25,7 +25,12 @@ interface AdminFinanceProps {
   isDetailsView?: boolean;
 }
 
+const getStartingBalanceDocId = (sy: string): string => {
+  return sy.trim().replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 36);
+};
+
 const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) => {
+
   const { name } = useParams<{ name: string }>();
   const decodedName = name ? decodeURIComponent(name) : '';
   const [activeTab, setActiveTab] = useState<'revenue' | 'expenses'>('revenue');
@@ -66,6 +71,11 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string | null; type: 'revenue' | 'expense' | null }>({ open: false, id: null, type: null });
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [startingBalance, setStartingBalance] = useState<number>(0);
+  const [schoolYearInfo, setSchoolYearInfo] = useState<{ start: string | null; end: string | null; year: string }>({ start: null, end: null, year: '' });
+  const [availableSchoolYears, setAvailableSchoolYears] = useState<any[]>([]);
+  const [printSchoolYear, setPrintSchoolYear] = useState('');
+
   const getRevenueGroupName = (r: RevenueDoc) => {
     let groupName = 'General Revenue';
     if (r.isEvent && r.event) {
@@ -105,6 +115,55 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     return groupName;
   };
 
+  const getActivityStartDate = (gName: string) => {
+    let earliestDate: Date | null = null;
+    revenue.forEach(r => {
+      let groupName = 'General Revenue';
+      if (r.isEvent && r.event) {
+        const matchedEvent = eventsList.find(e => e.$id === r.event);
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        }
+      } else if (r.activity) {
+        groupName = r.activity;
+      } else if (r.name) {
+        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+        groupName = match ? match[1].trim() : r.name;
+      }
+      
+      if (groupName === gName && r.date_earned) {
+        const d = new Date(r.date_earned);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      }
+    });
+
+    expenses.forEach(e => {
+      let groupName = 'General Expense';
+      if (e.isEvent && e.events) {
+        const matchedEvent = eventsList.find(ev => ev.$id === (typeof e.events === 'string' ? e.events : (e.events as any).$id));
+        if (matchedEvent && matchedEvent.event_name) {
+          groupName = matchedEvent.event_name;
+        } else if (e.name) {
+          groupName = e.name;
+        }
+      } else if (e.activity_name) {
+        groupName = e.activity_name;
+      } else if (e.name) {
+        groupName = e.name;
+      }
+
+      if (groupName === gName && e.date_buy) {
+        const d = new Date(e.date_buy);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      }
+    });
+
+    return earliestDate;
+  };
+
   const financeGroupsList = useMemo(() => {
     const groups = new Set<string>();
     revenue.forEach(r => {
@@ -113,7 +172,13 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     expenses.forEach(e => {
       groups.add(getExpenseGroupName(e));
     });
-    return Array.from(groups).sort((a, b) => a.localeCompare(b));
+    return Array.from(groups).sort((a, b) => {
+      const dateA = getActivityStartDate(a);
+      const dateB = getActivityStartDate(b);
+      const timeA = dateA ? dateA.getTime() : 0;
+      const timeB = dateB ? dateB.getTime() : 0;
+      return timeA - timeB;
+    });
   }, [revenue, expenses, eventsList]);
 
   const { addToast } = useToast();
@@ -124,15 +189,65 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
+      // 1. Fetch system metadata to know the active school year
+      const systemMetadata = await cachedApi.metadata.get();
+      const activeYear = systemMetadata?.schoolYear || '';
+
+      // Fetch available school years list
+      try {
+        const syList = await cachedApi.startingBalances.list();
+        setAvailableSchoolYears(syList.documents || []);
+        if (activeYear) {
+          setPrintSchoolYear(activeYear);
+        }
+      } catch (syErr) {
+        console.warn('Failed to load available school years list:', syErr);
+      }
+
+      let startBal = 0;
+      let startSchoolYearDate: string | null = null;
+      let endSchoolYearDate: string | null = null;
+
+      // 2. Fetch starting balance configuration for the active school year
+      if (activeYear) {
+        try {
+          const startingDoc = await cachedApi.startingBalances.get(getStartingBalanceDocId(activeYear));
+          if (startingDoc) {
+            startBal = Number(startingDoc.amount) || 0;
+            startSchoolYearDate = startingDoc.start_first_sem || null;
+            endSchoolYearDate = startingDoc.end_second_sem || null;
+          }
+        } catch (startingErr) {
+          console.warn('Failed to load starting balance configuration:', startingErr);
+        }
+      }
+
+      setStartingBalance(startBal);
+      setSchoolYearInfo({ start: startSchoolYearDate, end: endSchoolYearDate, year: activeYear });
+
+
+      // 3. Build queries for revenues/expenses based on school year date boundaries
+      const revenueQueries: any[] = [
+        Query.orderDesc('$createdAt'),
+        Query.limit(500)
+      ];
+      const expenseQueries: any[] = [
+        Query.orderDesc('$createdAt'),
+        Query.limit(500)
+      ];
+
+      if (startSchoolYearDate) {
+        revenueQueries.push(Query.greaterThanEqual('date_earned', startSchoolYearDate));
+        expenseQueries.push(Query.greaterThanEqual('date_buy', startSchoolYearDate));
+      }
+      if (endSchoolYearDate) {
+        revenueQueries.push(Query.lessThanEqual('date_earned', endSchoolYearDate));
+        expenseQueries.push(Query.lessThanEqual('date_buy', endSchoolYearDate));
+      }
+
       const [revenueRes, expensesRes, paymentsRes, eventsRes, officersRes] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
-          Query.orderDesc('$createdAt'),
-          Query.limit(500)
-        ]),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [
-          Query.orderDesc('$createdAt'),
-          Query.limit(500)
-        ]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, revenueQueries),
+        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseQueries),
         cachedApi.payments.listAll({}, isRefresh ? 0 : 2 * 60 * 1000),
         databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
           Query.orderAsc('event_name'),
@@ -334,54 +449,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     }
   };
 
-  const getActivityStartDate = (gName: string) => {
-    let earliestDate: Date | null = null;
-    revenue.forEach(r => {
-      let groupName = 'General Revenue';
-      if (r.isEvent && r.event) {
-        const matchedEvent = eventsList.find(e => e.$id === r.event);
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else if (r.name) {
-          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-          groupName = match ? match[1].trim() : r.name;
-        }
-      } else if (r.activity) {
-        groupName = r.activity;
-      } else if (r.name) {
-        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-        groupName = match ? match[1].trim() : r.name;
-      }
-      
-      if (groupName === gName && r.date_earned) {
-        const d = new Date(r.date_earned);
-        if (!earliestDate || d < earliestDate) earliestDate = d;
-      }
-    });
 
-    expenses.forEach(e => {
-      let groupName = 'General Expense';
-      if (e.isEvent && e.events) {
-        const matchedEvent = eventsList.find(ev => ev.$id === (typeof e.events === 'string' ? e.events : (e.events as any).$id));
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else if (e.name) {
-          groupName = e.name;
-        }
-      } else if (e.activity_name) {
-        groupName = e.activity_name;
-      } else if (e.name) {
-        groupName = e.name;
-      }
-
-      if (groupName === gName && e.date_buy) {
-        const d = new Date(e.date_buy);
-        if (!earliestDate || d < earliestDate) earliestDate = d;
-      }
-    });
-
-    return earliestDate;
-  };
 
   const getOrgBalanceBefore = (date: Date | null) => {
     if (!date) return 0;
@@ -409,8 +477,215 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     return totalRevBefore - totalExpBefore;
   };
 
-  const handlePrintCombinedReport = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
+  const handlePrintCombinedReport = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string, targetSchoolYear: string) => {
     const origin = window.location.origin;
+
+    const formatDateLong = (dStr: string | null) => {
+      if (!dStr) return '';
+      const date = new Date(dStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    };
+
+    const getActivityDateString = (gName: string, revs: RevenueDoc[], exps: ExpenseDoc[]) => {
+      // 1. Try finding matched event
+      const matchedEvent = eventsList.find(e => e.event_name === gName);
+      if (matchedEvent && matchedEvent.date_to_held) {
+        return formatDateLong(matchedEvent.date_to_held);
+      }
+
+      // 2. Otherwise find range of transactions
+      let earliest: Date | null = null;
+      let latest: Date | null = null;
+
+      revs.forEach(r => {
+        if (r.date_earned) {
+          const d = new Date(r.date_earned);
+          if (!earliest || d < earliest) earliest = d;
+          if (!latest || d > latest) latest = d;
+        }
+      });
+
+      exps.forEach(e => {
+        if (e.date_buy) {
+          const d = new Date(e.date_buy);
+          if (!earliest || d < earliest) earliest = d;
+          if (!latest || d > latest) latest = d;
+        }
+      });
+
+      if (earliest && latest) {
+        const earliestStr = earliest.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const latestStr = latest.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        return earliestStr === latestStr ? earliestStr : `${earliestStr} — ${latestStr}`;
+      }
+
+      return '';
+    };
+
+
+    let targetStartBal = 0;
+    let targetStart: string | null = null;
+    let targetEnd: string | null = null;
+    let targetRevenues: RevenueDoc[] = [];
+    let targetExpenses: ExpenseDoc[] = [];
+
+    let sem1Start: string | null = null;
+    let sem1End: string | null = null;
+    let sem2Start: string | null = null;
+    let sem2End: string | null = null;
+
+    try {
+      const startingDoc = await api.startingBalances.get(getStartingBalanceDocId(targetSchoolYear));
+      if (startingDoc) {
+        targetStartBal = Number(startingDoc.amount) || 0;
+        targetStart = startingDoc.start_first_sem || null;
+        targetEnd = startingDoc.end_second_sem || null;
+        sem1Start = startingDoc.start_first_sem || null;
+        sem1End = startingDoc.end_first_sem || null;
+        sem2Start = startingDoc.start_second_sem || null;
+        sem2End = startingDoc.end_second_sem || null;
+      }
+    } catch (err) {
+      console.error('Failed to load target school year configurations:', err);
+      addToast({ type: 'error', title: 'Data Loading Failed', message: `Could not fetch configurations for academic period ${targetSchoolYear}` });
+      return;
+    }
+
+    if (targetStart && targetEnd) {
+      try {
+        const [revRes, expRes] = await Promise.all([
+          databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
+            Query.greaterThanEqual('date_earned', targetStart),
+            Query.lessThanEqual('date_earned', targetEnd),
+            Query.limit(500)
+          ]),
+          databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [
+            Query.greaterThanEqual('date_buy', targetStart),
+            Query.lessThanEqual('date_buy', targetEnd),
+            Query.limit(500)
+          ])
+        ]);
+        targetRevenues = revRes.documents as RevenueDoc[];
+        targetExpenses = expRes.documents as ExpenseDoc[];
+      } catch (err) {
+        console.error('Failed to load target school year transaction logs:', err);
+        addToast({ type: 'error', title: 'Data Loading Failed', message: `Could not fetch transactions for academic period ${targetSchoolYear}` });
+        return;
+      }
+    }
+
+    // Apply semester filtering if selected
+    if (selectedScope === '1st_semester') {
+      if (sem1Start && sem1End) {
+        targetRevenues = targetRevenues.filter(r => r.date_earned && r.date_earned >= sem1Start! && r.date_earned <= sem1End!);
+        targetExpenses = targetExpenses.filter(e => e.date_buy && e.date_buy >= sem1Start! && e.date_buy <= sem1End!);
+        targetStart = sem1Start;
+        targetEnd = sem1End;
+      } else {
+        addToast({ type: 'error', title: 'Missing Configurations', message: '1st Semester dates are not configured.' });
+        return;
+      }
+    } else if (selectedScope === '2nd_semester') {
+      if (sem2Start && sem2End) {
+        // Carryover starting balance calculation of 2nd semester:
+        // starting balance of school year + sum of all revenues before 2nd sem start - sum of all expenses before 2nd sem start
+        const preTotalRev = targetRevenues
+          .filter(r => r.date_earned && r.date_earned < sem2Start!)
+          .reduce((sum, r) => sum + (r.price || 0) * (r.quantity || 1), 0);
+
+        const preTotalExp = targetExpenses
+          .filter(e => e.date_buy && e.date_buy < sem2Start!)
+          .reduce((sum, e) => sum + (e.price || 0) * (e.quantity || 1), 0);
+
+        targetStartBal = targetStartBal + preTotalRev - preTotalExp;
+
+        // Filter transactions bounded by 2nd semester
+        targetRevenues = targetRevenues.filter(r => r.date_earned && r.date_earned >= sem2Start! && r.date_earned <= sem2End!);
+        targetExpenses = targetExpenses.filter(e => e.date_buy && e.date_buy >= sem2Start! && e.date_buy <= sem2End!);
+        targetStart = sem2Start;
+        targetEnd = sem2End;
+      } else {
+        addToast({ type: 'error', title: 'Missing Configurations', message: '2nd Semester dates are not configured.' });
+        return;
+      }
+    }
+
+    const getTargetActivityStartDate = (gName: string) => {
+      let earliestDate: Date | null = null;
+      targetRevenues.forEach(r => {
+        let groupName = 'General Revenue';
+        if (r.isEvent && r.event) {
+          const matchedEvent = eventsList.find(e => e.$id === r.event);
+          if (matchedEvent && matchedEvent.event_name) {
+            groupName = matchedEvent.event_name;
+          } else if (r.name) {
+            const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+            groupName = match ? match[1].trim() : r.name;
+          }
+        } else if (r.activity) {
+          groupName = r.activity;
+        } else if (r.name) {
+          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
+          groupName = match ? match[1].trim() : r.name;
+        }
+        
+        if (groupName === gName && r.date_earned) {
+          const d = new Date(r.date_earned);
+          if (!earliestDate || d < earliestDate) earliestDate = d;
+        }
+      });
+
+      targetExpenses.forEach(e => {
+        let groupName = 'General Expense';
+        if (e.isEvent && e.events) {
+          const matchedEvent = eventsList.find(ev => ev.$id === (typeof e.events === 'string' ? e.events : (e.events as any).$id));
+          if (matchedEvent && matchedEvent.event_name) {
+            groupName = matchedEvent.event_name;
+          } else if (e.name) {
+            groupName = e.name;
+          }
+        } else if (e.activity_name) {
+          groupName = e.activity_name;
+        } else if (e.name) {
+          groupName = e.name;
+        }
+
+        if (groupName === gName && e.date_buy) {
+          const d = new Date(e.date_buy);
+          if (!earliestDate || d < earliestDate) earliestDate = d;
+        }
+      });
+
+      return earliestDate;
+    };
+
+    const getTargetOrgBalanceBefore = (date: Date | null) => {
+      if (!date) return targetStartBal;
+      let totalRevBefore = 0;
+      let totalExpBefore = 0;
+
+      targetRevenues.forEach(r => {
+        if (r.date_earned) {
+          const d = new Date(r.date_earned);
+          if (d.getTime() < date.getTime()) {
+            totalRevBefore += (r.price || 0) * (r.quantity || 1);
+          }
+        }
+      });
+
+      targetExpenses.forEach(e => {
+        if (e.date_buy) {
+          const d = new Date(e.date_buy);
+          if (d.getTime() < date.getTime()) {
+            totalExpBefore += (e.price || 0) * (e.quantity || 1);
+          }
+        }
+      });
+
+      return targetStartBal + totalRevBefore - totalExpBefore;
+    };
+
 
     const groups: Record<string, {
       name: string;
@@ -422,7 +697,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       netBalance: number;
     }> = {};
 
-    revenue.forEach(r => {
+    targetRevenues.forEach(r => {
       const gName = getRevenueGroupName(r);
       if (!groups[gName]) {
         groups[gName] = { name: gName, isEvent: r.isEvent || false, revenues: [], expenses: [], totalRev: 0, totalExp: 0, netBalance: 0 };
@@ -431,7 +706,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       groups[gName].totalRev += (r.price || 0) * (r.quantity || 1);
     });
 
-    expenses.forEach(e => {
+    targetExpenses.forEach(e => {
       const gName = getExpenseGroupName(e);
       if (!groups[gName]) {
         groups[gName] = { name: gName, isEvent: e.isEvent || false, revenues: [], expenses: [], totalRev: 0, totalExp: 0, netBalance: 0 };
@@ -445,11 +720,39 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       g.netBalance = g.totalRev - g.totalExp;
     });
 
-    const groupsList = Object.values(groups).sort((a, b) => b.totalRev + b.totalExp - (a.totalRev + a.totalExp));
+    const getGroupStartDate = (gName: string, revs: RevenueDoc[], exps: ExpenseDoc[]) => {
+      const matchedEvent = eventsList.find(e => e.event_name === gName);
+      if (matchedEvent && matchedEvent.date_to_held) {
+        return new Date(matchedEvent.date_to_held).getTime();
+      }
 
-    const overallRev = summaryMetrics.totalRev;
-    const overallExp = summaryMetrics.totalExp;
-    const overallBal = summaryMetrics.netBal;
+      let earliest: number = Infinity;
+      revs.forEach(r => {
+        if (r.date_earned) {
+          const t = new Date(r.date_earned).getTime();
+          if (t < earliest) earliest = t;
+        }
+      });
+      exps.forEach(e => {
+        if (e.date_buy) {
+          const t = new Date(e.date_buy).getTime();
+          if (t < earliest) earliest = t;
+        }
+      });
+
+      return earliest === Infinity ? 0 : earliest;
+    };
+
+    const groupsList = Object.values(groups).sort((a, b) => {
+      const startA = getGroupStartDate(a.name, a.revenues, a.expenses);
+      const startB = getGroupStartDate(b.name, b.revenues, b.expenses);
+      return startA - startB;
+    });
+
+
+    const overallRev = targetRevenues.reduce((sum, r) => sum + ((r.price || 0) * (r.quantity || 1)), 0);
+    const overallExp = targetExpenses.reduce((sum, e) => sum + ((e.price || 0) * (e.quantity || 1)), 0);
+    const overallBal = targetStartBal + overallRev - overallExp;
     
     const totalTransactions = overallRev + overallExp;
     const revPercent = totalTransactions > 0 ? Math.round((overallRev / totalTransactions) * 100) : 0;
@@ -458,7 +761,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     // Build timeline points for line graph
     const allTransactions: { date: Date; amount: number; type: 'revenue' | 'expense' }[] = [];
     
-    revenue.forEach(r => {
+    targetRevenues.forEach(r => {
       if (r.date_earned) {
         allTransactions.push({
           date: new Date(r.date_earned),
@@ -468,7 +771,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       }
     });
     
-    expenses.forEach(e => {
+    targetExpenses.forEach(e => {
       if (e.date_buy) {
         allTransactions.push({
           date: new Date(e.date_buy),
@@ -480,7 +783,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
     allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    let running = 0;
+    let running = targetStartBal;
     const historyPoints = allTransactions.map(t => {
       if (t.type === 'revenue') running += t.amount;
       else running -= t.amount;
@@ -489,6 +792,15 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         runningBal: running
       };
     });
+
+    if (targetStart) {
+      const startLabel = new Date(targetStart).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      historyPoints.unshift({
+        dateStr: startLabel,
+        runningBal: targetStartBal
+      });
+    }
+
 
     const generateSVGPieChart = (slices: { name: string; value: number }[]) => {
       const total = slices.reduce((sum, s) => sum + s.value, 0);
@@ -713,15 +1025,44 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
     const barChartActivities = groupsList.slice(0, 6);
 
-    const filteredGroupsList = selectedScope === 'all'
-      ? groupsList
-      : groupsList.filter(g => g.name === selectedScope);
+    // Pre-calculate sequential carryover standing funds for all groups chronologically
+    let runningBalance = targetStartBal;
+    const computedGroups = groupsList.map(g => {
+      const standing = runningBalance;
+      const current = standing + g.totalRev - g.totalExp;
+      runningBalance = current;
+      return {
+        ...g,
+        standingFunds: standing,
+        currentBalance: current
+      };
+    });
+
+    const filteredGroupsList = (selectedScope === 'all' || selectedScope === '1st_semester' || selectedScope === '2nd_semester')
+      ? computedGroups
+      : computedGroups.filter(g => g.name === selectedScope);
 
     const perEventHtml = filteredGroupsList.map((g, idx) => {
-      const eventStartDate = getActivityStartDate(g.name);
-      const standingFunds = getOrgBalanceBefore(eventStartDate);
+      const standingFunds = g.standingFunds;
+      const currentBalance = g.currentBalance;
 
-      const revRows = g.revenues.map((item, rIdx) => `
+
+
+      // Sort revenues by date earned ascending
+      const sortedRevenues = [...g.revenues].sort((a, b) => {
+        const da = a.date_earned ? new Date(a.date_earned).getTime() : 0;
+        const db = b.date_earned ? new Date(b.date_earned).getTime() : 0;
+        return da - db;
+      });
+
+      // Sort expenses by date bought ascending
+      const sortedExpenses = [...g.expenses].sort((a, b) => {
+        const da = a.date_buy ? new Date(a.date_buy).getTime() : 0;
+        const db = b.date_buy ? new Date(b.date_buy).getTime() : 0;
+        return da - db;
+      });
+
+      const revRows = sortedRevenues.map((item, rIdx) => `
         <tr>
           <td>${rIdx + 1}</td>
           <td>${item.date_earned ? formatDate(item.date_earned) : '—'}</td>
@@ -732,7 +1073,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         </tr>
       `).join('');
 
-      const expRows = g.expenses.map((item, eIdx) => `
+      const expRows = sortedExpenses.map((item, eIdx) => `
         <tr>
           <td>${eIdx + 1}</td>
           <td>${item.date_buy ? formatDate(item.date_buy) : '—'}</td>
@@ -743,12 +1084,22 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         </tr>
       `).join('');
 
+
+      const activityDateStr = getActivityDateString(g.name, g.revenues, g.expenses);
+
       return `
         <div class="activity-section-page">
           <h2 class="report-title">Financial Report</h2>
-          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">
+          <h3 style="text-align: center; color: #475569; margin-top: -5px; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">
             ${g.name}
           </h3>
+          ${activityDateStr ? `
+          <p style="text-align: center; font-size: 11px; color: #64748b; margin-top: 0; margin-bottom: 20px;">
+            ${activityDateStr}
+          </p>
+          ` : ''}
+
+
 
           <!-- Standing Funds & Balance Summary Box -->
           <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; font-size: 12px; text-align: center;">
@@ -766,10 +1117,11 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
             </div>
             <div style="padding-left: 10px;">
               <span style="font-weight: 800; color: #334155; display: block; text-transform: uppercase; font-size: 8px; letter-spacing: 0.5px; margin-bottom: 5px;">Current Balance</span>
-              <span style="font-weight: 900; ${standingFunds + g.totalRev - g.totalExp >= 0 ? 'color: #059669;' : 'color: #dc2626;'} font-size: 13px;">
-                ₱${(standingFunds + g.totalRev - g.totalExp).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <span style="font-weight: 900; ${currentBalance >= 0 ? 'color: #059669;' : 'color: #dc2626;'} font-size: 13px;">
+                ₱${currentBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
             </div>
+
           </div>
  
           <h4 class="table-group-header">Revenue Logs</h4>
@@ -820,19 +1172,27 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       `;
     }).join('');
 
-    const summaryPageHtml = selectedScope === 'all'
+    const semesterLabel = selectedScope === '1st_semester' ? '1st Semester' : selectedScope === '2nd_semester' ? '2nd Semester' : '';
+    const summaryPageHtml = (selectedScope === 'all' || selectedScope === '1st_semester' || selectedScope === '2nd_semester')
       ? `
           <div class="activity-section-page">
             <h2 class="report-title">SPECS Financial Report</h2>
-            <h3 style="text-align: center; color: #475569; margin-top: -4px; font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 15px;">
-              Annual Statement & Graphical Overview
+            <h3 style="text-align: center; color: #475569; margin-top: -4px; font-size: 13px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">
+              ${semesterLabel ? `${semesterLabel} Statement & Graphical Overview` : 'Annual Statement & Graphical Overview'}
             </h3>
+            <p style="text-align: center; font-size: 11px; color: #64748b; margin-top: 0; margin-bottom: 15px;">
+              Academic Year ${targetSchoolYear} ${targetStart && targetEnd ? `(${formatDateLong(targetStart)} — ${formatDateLong(targetEnd)})` : ''}${semesterLabel ? ` • ${semesterLabel}` : ''}
+            </p>
 
             <div class="meta-section">
-              <p class="meta-item"><strong>Standing Funds (Total Revenue):</strong> <span style="color: #059669; font-weight: bold;">₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Starting Balance:</strong> <span style="color: #059669; font-weight: bold;">₱${targetStartBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
+              <p class="meta-item"><strong>Active Revenue:</strong> <span style="color: #059669; font-weight: bold;">₱${overallRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
               <p class="meta-item"><strong>Total Expenditures:</strong> <span style="color: #dc2626; font-weight: bold;">₱${overallExp.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
               <p class="meta-item"><strong>Current Cash Balance:</strong> <span style="font-weight: bold; ${overallBal >= 0 ? 'color: #059669;' : 'color: #dc2626;'}">₱${overallBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>
             </div>
+
+
+
 
             <!-- Visual Dashboard Grid -->
             <div class="visuals-grid" style="grid-template-columns: 1fr; gap: 15px; flex-grow: 1; justify-content: center;">
@@ -960,11 +1320,12 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
               border-radius: 8px;
               padding: 15px;
               margin-bottom: 24px;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px 30px;
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 12px 30px;
               font-size: 13px;
             }
+
             .meta-item {
               margin: 0;
             }
@@ -1081,7 +1442,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
       const { downloadPdfFromHtml } = await import('../../shared/utils');
-      await downloadPdfFromHtml(htmlContent, `Finance_Report_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
+      await downloadPdfFromHtml(htmlContent, `Finance_Report_${selectedScope === 'all' ? 'Full_Year' : selectedScope === '1st_semester' ? '1st_Semester' : selectedScope === '2nd_semester' ? '2nd_Semester' : selectedScope.replace(/\s+/g, '_')}.pdf`, addToast);
       return;
     }
 
@@ -1095,22 +1456,48 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     printWindow.document.close();
   };
 
+  // Prepend virtual starting balance entry if startingBalance > 0
+  const displayedRevenues = useMemo(() => {
+    if (startingBalance <= 0) return revenue;
+    
+    // Check if starting balance is already visually represented to prevent double prepending
+    const hasStartingBalance = revenue.some(r => 
+      r.$id === 'virtual-carryover-starting-balance' ||
+      (r.activity && r.activity.toLowerCase() === 'passing of funds')
+    );
+    if (hasStartingBalance) return revenue;
+
+    const virtualCarryover: any = {
+      $id: 'virtual-carryover-starting-balance',
+      name: 'Old Funds (Passing of Funds)',
+      isEvent: false,
+      event: null,
+      activity: 'Passing of Funds',
+      quantity: 1,
+      price: startingBalance,
+      date_earned: schoolYearInfo.start || new Date().toISOString(),
+      recorder: 'System'
+    };
+    
+    return [virtualCarryover, ...revenue];
+  }, [revenue, startingBalance, schoolYearInfo]);
+
   // Metrics computation
   const summaryMetrics = useMemo(() => {
     const totalRev = revenue.reduce((sum, r) => sum + ((r.price || 0) * (r.quantity || 1)), 0);
     const totalExp = expenses.reduce((sum, e) => sum + ((e.price || 0) * (e.quantity || 1)), 0);
-    const netBal = totalRev - totalExp;
+    const netBal = startingBalance + totalRev - totalExp;
 
     const pendingCount = pendingPayments.length;
     const pendingSum = pendingPayments.reduce((sum, p) => sum + (p.price * p.quantity), 0);
 
     return { totalRev, totalExp, netBal, pendingCount, pendingSum };
-  }, [revenue, expenses, pendingPayments]);
+  }, [revenue, expenses, pendingPayments, startingBalance]);
 
   // Grouping Revenue by Event / Activity Name
   const groupedRevenue = useMemo(() => {
     const groups: { [key: string]: { name: string; isEvent: boolean; items: RevenueDoc[]; total: number } } = {};
-    revenue.forEach(r => {
+    displayedRevenues.forEach(r => {
       let groupName = 'General Revenue';
       
       if (r.isEvent && r.event) {
@@ -1142,7 +1529,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       groups[groupName].total += (r.price || 0) * (r.quantity || 1);
     });
     return Object.values(groups).sort((a, b) => b.total - a.total);
-  }, [revenue, eventsList]);
+  }, [displayedRevenues, eventsList]);
 
   // Grouping Expenses by Event / Activity Name
   const groupedExpenses = useMemo(() => {
@@ -1185,7 +1572,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const detailsData = useMemo(() => {
     if (!isDetailsView || !decodedName) return null;
 
-    const matchedRevenues = revenue.filter(r => {
+    const matchedRevenues = displayedRevenues.filter(r => {
       let groupName = 'General Revenue';
       if (r.isEvent && r.event) {
         const matchedEvent = eventsList.find(e => e.$id === r.event);
@@ -1241,7 +1628,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       netBalance,
       isEvent: matchedRevenues[0]?.isEvent || matchedExpenses[0]?.isEvent || false
     };
-  }, [isDetailsView, decodedName, revenue, expenses, eventsList]);
+  }, [isDetailsView, decodedName, displayedRevenues, expenses, eventsList]);
 
   const comparisonData = useMemo(() => {
     if (!detailsData) return [];
@@ -1482,13 +1869,17 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                             {formatCurrency((item.price || 0) * (item.quantity || 1))}
                           </td>
                           <td className="py-2.5 px-3 text-center">
-                            <button
-                              onClick={() => setDeleteConfirm({ open: true, id: item.$id, type: 'revenue' })}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-1.5 transition-colors border border-transparent hover:border-red-100"
-                              title="Delete revenue record"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            {item.$id !== 'virtual-carryover-starting-balance' ? (
+                              <button
+                                onClick={() => setDeleteConfirm({ open: true, id: item.$id, type: 'revenue' })}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-1.5 transition-colors border border-transparent hover:border-red-100"
+                                title="Delete revenue record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic font-semibold bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">Locked</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1567,9 +1958,17 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Finance Overview</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-slate-900">Finance Overview</h1>
+            {schoolYearInfo.year && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-[#0d6b66] border border-teal-100 dark:bg-[#0d6b66]/10 dark:text-emerald-400 dark:border-[#0d6b66]/20">
+                A.Y. {schoolYearInfo.year}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-slate-500 mt-1">Track organization revenues and expenses</p>
         </div>
+
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/dashboard/admin/payments')}
@@ -1604,21 +2003,30 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center flex flex-col justify-center">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Revenue</span>
           <span className="text-2xl font-bold text-emerald-600 block">{formatCurrency(summaryMetrics.totalRev)}</span>
+          {startingBalance > 0 && (
+            <span className="text-[9px] text-slate-400 mt-1 block">Excludes ₱{startingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} starting funds</span>
+          )}
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center flex flex-col justify-center">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Expenses</span>
           <span className="text-2xl font-bold text-red-600 block">{formatCurrency(summaryMetrics.totalExp)}</span>
+          {startingBalance > 0 && (
+            <span className="text-[9px] text-slate-400 mt-1 block">&nbsp;</span>
+          )}
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center flex flex-col justify-center">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Balance</span>
           <span className={`text-2xl font-bold block ${summaryMetrics.netBal >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
             {formatCurrency(summaryMetrics.netBal)}
           </span>
+          {startingBalance > 0 && (
+            <span className="text-[9px] text-slate-400 mt-1 block font-semibold text-emerald-600">Includes ₱{startingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} starting funds</span>
+          )}
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-center flex flex-col justify-center">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Pending Dues</span>
           <span className="text-2xl font-bold text-amber-500 block">{summaryMetrics.pendingCount} pending</span>
           <span className="text-[10px] text-slate-400 mt-1 block">Value: {formatCurrency(summaryMetrics.pendingSum)}</span>
@@ -2056,6 +2464,20 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
               <p className="text-sm text-slate-500 text-center mb-5">Configure the report scope and preparer signatory before printing.</p>
               
               <div className="w-full space-y-4 mb-6">
+                {/* School Year Selection */}
+                <div className="text-left">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">School Year</label>
+                  <select
+                    value={printSchoolYear}
+                    onChange={(e) => setPrintSchoolYear(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  >
+                    {availableSchoolYears.map(sy => (
+                      <option key={sy.$id} value={sy.$id}>{sy.$id}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Scope Selection */}
                 <div className="text-left">
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Report Scope</label>
@@ -2064,7 +2486,10 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                     onChange={(e) => setPrintScope(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
                   >
-                    <option value="all">All Activities & Events</option>
+                    <option value="all">Full Academic Year</option>
+                    <option value="1st_semester">1st Semester</option>
+                    <option value="2nd_semester">2nd Semester</option>
+                    <option disabled>── Activities ──</option>
                     {financeGroupsList.map(actName => (
                       <option key={actName} value={actName}>{actName}</option>
                     ))}
@@ -2117,7 +2542,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                     }
                     setPrintModalOpen(false);
                     setTimeout(() => {
-                      handlePrintCombinedReport(printSignatory, printScope);
+                      handlePrintCombinedReport(printSignatory, printScope, printSchoolYear);
                     }, 50);
                   }}
                   className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
@@ -2125,6 +2550,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
                   {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
                 </button>
               </div>
+
             </div>
           </div>
         </div>,

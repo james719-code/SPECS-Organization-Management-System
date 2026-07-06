@@ -507,8 +507,9 @@ class MockApiService {
 
             // If it's attendance collection, resolve nested student details
             if (collectionId && collectionId.toLowerCase().includes('attendance')) {
-                if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
-                    const student = mockStudents.find(s => s.$id === cloned.students.$id);
+                const studentId = cloned.students && typeof cloned.students === 'object' ? cloned.students.$id : cloned.students;
+                if (studentId) {
+                    const student = mockStudents.find(s => s.$id === studentId);
                     if (student) cloned.students = { ...student };
                 }
             }
@@ -564,8 +565,9 @@ class MockApiService {
         }
 
         if (collectionId && collectionId.toLowerCase().includes('attendance')) {
-            if (cloned.students && typeof cloned.students === 'object' && cloned.students.$id) {
-                const student = mockStudents.find(s => s.$id === cloned.students.$id);
+            const studentId = cloned.students && typeof cloned.students === 'object' ? cloned.students.$id : cloned.students;
+            if (studentId) {
+                const student = mockStudents.find(s => s.$id === studentId);
                 if (student) cloned.students = { ...student };
             }
         }
