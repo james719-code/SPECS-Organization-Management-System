@@ -10,6 +10,7 @@ import {
 import { COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, BUCKET_ID_EVENT_IMAGES } from '../shared/constants';
 const BUCKET_ID_PICTURES = (import.meta.env.VITE_BUCKET_ID_PICTURES as string) || 'pictures';
 import { SITE_LEADERSHIP, FAQS } from '../data/landingData';
+import { usePageMeta, SPECS_STRUCTURED_DATA } from '../shared/seo';
 import MockTerminal from '../components/MockTerminal';
 
 interface LandingPageProps {
@@ -95,10 +96,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
     fetchStats();
   }, []);
 
-  // Set Title on Load
-  useEffect(() => {
-    document.title = "SPECS Portal | College of Engineering and Computational Sciences";
-  }, []);
+  // Set page meta (title, description, OG tags) for SEO
+  usePageMeta({
+    title: 'Home',
+    description: 'Official organization management portal for SPECS — the Society of Programmers and Enthusiasts in Computer Science at Partido State University. Manage member profiles, track attendance, settle dues, explore events, and showcase student portfolios.',
+  });
 
   // Fetch Events and Stories with Fallback
   useEffect(() => {
@@ -208,7 +210,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans scroll-smooth">
+    <>
+      {/* JSON-LD Structured Data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: SPECS_STRUCTURED_DATA() }}
+      />
+      <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans scroll-smooth">
       <header className="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between transition-all duration-300">
         <div className="flex items-center gap-3">
           <img src="/logo.webp" alt="SPECS Logo" className="h-10 w-10 object-contain rounded-xl shadow-md" />
@@ -1290,6 +1298,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 

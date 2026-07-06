@@ -2,9 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { account } from '../shared/appwrite';
 import { AlertTriangle } from 'lucide-react';
+import { usePageMeta } from '../shared/seo';
 
 const PendingVerificationPage: React.FC = () => {
   const navigate = useNavigate();
+
+  usePageMeta({
+    title: 'Verification Pending',
+    description: 'Your SPECS Portal account is pending verification. Await approval from an officer or administrator to access your dashboard.',
+  });
 
   const handleLogout = async () => {
     try {

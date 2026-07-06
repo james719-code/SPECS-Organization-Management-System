@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Home, ArrowLeft, Sun, Moon } from 'lucide-react';
+import { usePageMeta } from '../shared/seo';
 
 interface NotFoundPageProps {
   theme?: 'light' | 'dark';
@@ -9,6 +10,11 @@ interface NotFoundPageProps {
 
 const NotFoundPage: React.FC<NotFoundPageProps> = ({ theme = 'light', toggleTheme }) => {
   const navigate = useNavigate();
+
+  usePageMeta({
+    title: 'Page Not Found',
+    description: 'The page you requested could not be found. Return to the SPECS Organization Portal home page.',
+  });
 
   return (
     <div className="min-h-screen w-screen flex flex-col justify-between bg-slate-50 dark:bg-slate-950 transition-colors duration-200">

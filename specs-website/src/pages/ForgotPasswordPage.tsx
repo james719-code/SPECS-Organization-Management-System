@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { account, databases } from '../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle, CheckCircle2, ArrowLeft, Sparkles } from 'lucide-react';
+import { usePageMeta } from '../shared/seo';
 
 interface ForgotPasswordPageProps {
   theme: 'light' | 'dark';
@@ -30,6 +31,11 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
 
   const navigate = useNavigate();
   const isMock = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+  usePageMeta({
+    title: 'Reset Password',
+    description: 'Reset your SPECS Organization Portal account password. Recover access to your student or officer dashboard at Partido State University.',
+  });
 
   // If already logged in, redirect to dashboard or home
   useEffect(() => {

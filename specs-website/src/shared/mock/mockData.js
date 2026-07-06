@@ -23,6 +23,7 @@ export const mockAccounts = [
         username: 'admin',
         type: 'admin',
         verified: true,
+        deactivated: false,
         students: null,
         admins: { $id: 'admin-1' },
         officers: null
@@ -35,6 +36,7 @@ export const mockAccounts = [
         username: 'msantos',
         type: 'officer',
         verified: true,
+        deactivated: false,
         students: { $id: 'student-officer-1' },
         admins: null,
         officers: { $id: 'officer-1' }
@@ -47,6 +49,7 @@ export const mockAccounts = [
         username: 'johndoe',
         type: 'student',
         verified: true,
+        deactivated: false,
         students: { $id: 'student-1' },
         admins: null,
         officers: null
@@ -59,6 +62,7 @@ export const mockAccounts = [
         username: 'janesmith',
         type: 'student',
         verified: true,
+        deactivated: false,
         students: { $id: 'student-2' },
         admins: null,
         officers: null
@@ -71,6 +75,7 @@ export const mockAccounts = [
         username: 'mikej',
         type: 'student',
         verified: true,
+        deactivated: false,
         students: { $id: 'student-3' },
         admins: null,
         officers: null
@@ -83,6 +88,7 @@ export const mockAccounts = [
         username: 'alexr',
         type: 'student',
         verified: true,
+        deactivated: false,
         students: { $id: 'student-4' },
         admins: null,
         officers: null
@@ -171,7 +177,9 @@ export const mockOfficers = [
         $updatedAt: '2025-12-15T00:00:00.000Z',
         students: { $id: 'student-officer-1' },
         isSchedule: true,
-        scheduleId: 'schedule-officer-1'
+        scheduleId: 'schedule-officer-1',
+        position: 'president',
+        pictureId: null
     }
 ];
 
@@ -199,6 +207,7 @@ export const mockEvents = [
         image_file: null,
         description: 'Join us for the biggest tech event of the year featuring industry speakers, workshops, and networking opportunities.',
         event_ended: false,
+        archived: false,
         collab: ['GDSC', 'AWS Cloud Club'],
         related_links: ['https://techsummit.specs.org'],
         meaning: ['Tech Summit', 'Technology Conference'],
@@ -215,6 +224,7 @@ export const mockEvents = [
         image_file: null,
         description: 'A hands-on workshop covering modern web development with HTML, CSS, and JavaScript.',
         event_ended: false,
+        archived: false,
         collab: [],
         related_links: [],
         meaning: [],
@@ -231,6 +241,7 @@ export const mockEvents = [
         image_file: null,
         description: 'Monthly general assembly for all SPECS members. Important announcements and updates.',
         event_ended: true,
+        archived: false,
         collab: [],
         related_links: [],
         meaning: [],
@@ -288,7 +299,8 @@ export const mockPayments = [
         is_outside_bscs: false,
         non_bscs_name: null,
         is_paid: true,
-        modal_paid: 'cash'
+        modal_paid: 'cash',
+        verified_by_name: 'Maria Santos'
     },
     {
         $id: 'payment-2',
@@ -324,7 +336,8 @@ export const mockPayments = [
         is_outside_bscs: false,
         non_bscs_name: null,
         is_paid: true,
-        modal_paid: 'gcash'
+        modal_paid: 'gcash',
+        verified_by_name: 'Maria Santos'
     }
 ];
 
@@ -386,6 +399,30 @@ export const mockRevenue = [
     }
 ];
 
+// Collection: starting_balances (starting_balances)
+export const mockStartingBalances = [
+    {
+        $id: '2025-2026',
+        $createdAt: '2025-08-01T00:00:00.000Z',
+        $updatedAt: '2025-08-01T00:00:00.000Z',
+        amount: 15000,
+        start_first_sem: '2025-08-15T00:00:00.000Z',
+        end_first_sem: '2025-12-20T00:00:00.000Z',
+        start_second_sem: '2026-01-10T00:00:00.000Z',
+        end_second_sem: '2026-05-30T00:00:00.000Z'
+    },
+    {
+        $id: '2024-2025',
+        $createdAt: '2024-08-01T00:00:00.000Z',
+        $updatedAt: '2024-08-01T00:00:00.000Z',
+        amount: 12000,
+        start_first_sem: '2024-08-15T00:00:00.000Z',
+        end_first_sem: '2024-12-20T00:00:00.000Z',
+        start_second_sem: '2025-01-10T00:00:00.000Z',
+        end_second_sem: '2025-05-30T00:00:00.000Z'
+    }
+];
+
 // Collection: stories
 export const mockStories = [
     {
@@ -395,6 +432,8 @@ export const mockStories = [
         post_description: 'SPECS member wins national innovation competition with IoT project',
         image_bucket: null,
         isAccepted: true,
+        officerApproval: true,
+        adminApproval: true,
         title: 'Student Innovation Award Winner',
         post_details: 'We are proud to announce that John Doe, a 3rd year Computer Science student and active SPECS member, has won the National Student Innovation Award for his groundbreaking IoT project that monitors air quality in urban areas.',
         related_links: ['https://innovation.edu.ph/winners-2025'],
@@ -408,6 +447,8 @@ export const mockStories = [
         post_description: 'Record attendance at SPECS Tech Talk series featuring industry experts',
         image_bucket: null,
         isAccepted: true,
+        officerApproval: true,
+        adminApproval: true,
         title: 'Successful Tech Talk Series Concluded',
         post_details: 'The SPECS Tech Talk series concluded last week with record attendance figures. Over 500 students participated across the five sessions, engaging with industry experts from leading tech companies.',
         related_links: [],
@@ -421,6 +462,8 @@ export const mockStories = [
         post_description: 'Excited to share my experience at the recent hackathon',
         image_bucket: null,
         isAccepted: false,
+        officerApproval: false,
+        adminApproval: false,
         title: 'My First Hackathon Experience',
         post_details: 'Last weekend I participated in my first hackathon and it was an amazing experience. Our team built a mobile app that helps students manage their study schedules more effectively.',
         related_links: [],
@@ -577,7 +620,9 @@ export function getMockData(collectionId) {
         // Volunteer requests
         'volunteer_requests': mockVolunteerRequests,
         // Tasks
-        'tasks': mockTasks
+        'tasks': mockTasks,
+        // Starting Balances
+        'starting_balances': mockStartingBalances
     };
 
     // Try exact match first
@@ -599,6 +644,7 @@ export function getMockData(collectionId) {
     if (collectionIdLower.includes('file')) return mockFiles;
     if (collectionIdLower.includes('volunteer')) return mockVolunteerRequests;
     if (collectionIdLower.includes('task')) return mockTasks;
+    if (collectionIdLower.includes('starting') || collectionIdLower.includes('balance')) return mockStartingBalances;
 
     console.warn('[Mock] No mock data found for collection:', collectionId);
     return [];

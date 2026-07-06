@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { account, databases, ID } from '../shared/appwrite';
 import { Mail, Lock, User, Sun, Moon, AlertCircle } from 'lucide-react';
+import { usePageMeta } from '../shared/seo';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
 
 interface SignupPageProps {
@@ -25,6 +26,11 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  usePageMeta({
+    title: 'Student Registration',
+    description: 'Register as a SPECS member — the official Computer Science student organization at Partido State University. Create your account to access events, track attendance, and manage dues.',
+  });
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();

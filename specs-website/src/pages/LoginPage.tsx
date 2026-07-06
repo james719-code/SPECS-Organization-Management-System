@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { account, databases } from '../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
+import { usePageMeta } from '../shared/seo';
 
 interface LoginPageProps {
   theme: 'light' | 'dark';
@@ -16,6 +17,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  usePageMeta({
+    title: 'Sign In',
+    description: 'Sign in to the SPECS Organization Portal to access your dashboard, manage your profile, track attendance, view events, and settle membership dues.',
+  });
 
   useEffect(() => {
     const checkActiveSession = async () => {

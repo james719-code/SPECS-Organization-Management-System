@@ -1,9 +1,9 @@
-# 🗄️ Database Schema Documentation (v2.5)
+# 🗄️ Database Schema Documentation (v2.6)
 
-This document describes all 14 database collections (11 active, 3 unused) and 6 storage buckets in the database used by the SPECS Organization Management System.
+This document describes all 15 database collections (13 active, 2 unused) and 7 storage buckets in the database used by the SPECS Organization Management System.
 
 > **Referenced by:** [README.md](README.md) — see the Database Schema section for a relationship overview.
-> **Last audited:** 2026-07-02 via `scripts/audit-collections.mjs` against live Appwrite database `6858fee6003b57a2b4b7`.
+> **Last audited:** 2026-07-03 via `specs-website/scripts/audit-collections.mjs` against live Appwrite database `6858fee6003b57a2b4b7`.
 
 ---
 
@@ -142,6 +142,7 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`meaning[]`** | string | Size: 10000 | - | - | `NULL` | Array |
 | **`location`** | text | - | - | - | `NULL` | - |
 | **`rating_links`** | text | - | - | - | `NULL` | - |
+| **`related_links[]`** | url | - | - | - | `NULL` | Array of related external URLs |
 | **`related_links_name[]`** | text | - | - | - | `NULL` | Array — display names / labels for related links |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
@@ -301,7 +302,27 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 
 ---
 
-## 12. Collection: `metadata` (Unused)
+## 12. Collection: `starting_balances`
+
+**Collection ID:** `starting_balances`
+**Env var:** `VITE_COLLECTION_ID_STARTING_BALANCES`
+
+Stores per-school-year starting balances for financial calculations and semester date ranges.
+
+| Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`$id`** | string | - | - | ✅ | - | School year identifier (e.g. `2025-2026`) |
+| **`amount`** | double | - | ✅ | - | - | Starting balance amount for the school year |
+| **`start_first_sem`** | datetime | - | ✅ | - | - | Start date of first semester |
+| **`end_first_sem`** | datetime | - | ✅ | - | - | End date of first semester |
+| **`start_second_sem`** | datetime | - | ✅ | - | - | Start date of second semester |
+| **`end_second_sem`** | datetime | - | ✅ | - | - | End date of second semester |
+| **`$createdAt`** | datetime | - | - | - | - | - |
+| **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## 13. Collection: `metadata` (Unused)
 
 **Collection ID:** `metadata`
 
@@ -319,7 +340,7 @@ Auxiliary collection for system-wide flags and configuration. Not currently wire
 
 ---
 
-## 13. Collection: `event_non_org` (Unused)
+## 14. Collection: `event_non_org` (Unused)
 
 **Collection ID:** `event_non_org`
 
@@ -333,11 +354,12 @@ Auxiliary collection not active or referenced by the application code. No `VITE_
 
 ---
 
-## 14. Collection: `tasks` (Unused)
+## 11. Collection: `tasks`
 
 **Collection ID:** `tasks`
+**Env var:** `VITE_COLLECTION_ID_TASKS`
 
-Auxiliary collection not active or referenced by the application code. No `VITE_COLLECTION_ID_*` entry in `.env`. Likely a leftover from an earlier experiment.
+Task management collection for tracking to-do items with file attachments and completion status.
 
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -365,6 +387,7 @@ The application uses 6 storage buckets for file management:
 | **Schedules** | `VITE_BUCKET_ID_SCHEDULES` | Officer schedule files |
 | **Public Files** | `VITE_BUCKET_PUBLIC_FILES` | Downloadable resources on the landing page |
 | **Highlight Images** | `VITE_BUCKET_ID_HIGHLIGHT_IMAGES` | Cover images for volunteer stories/highlights |
+| **Pictures** | `VITE_BUCKET_ID_PICTURES` | Officer profile pictures |
 
 ---
 
