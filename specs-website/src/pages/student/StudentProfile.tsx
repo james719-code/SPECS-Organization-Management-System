@@ -7,7 +7,7 @@ import {
   Loader2, Heart, Award, CheckCircle2, XCircle, Clock, Send, PenTool, ShieldAlert,
   BookOpen, Globe, LayoutGrid
 } from 'lucide-react';
-import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
+import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS } from '../../shared/constants';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
@@ -43,6 +43,13 @@ const StudentProfile: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [updatingAccount, setUpdatingAccount] = useState(false);
 
+  // SMTP Credentials states (officer only)
+  const [officerEmail, setOfficerEmail] = useState('');
+  const [officerToken, setOfficerToken] = useState('');
+  const [officerDocId, setOfficerDocId] = useState<string | null>(null);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [showSmtpTutorial, setShowSmtpTutorial] = useState(false);
+
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -68,6 +75,20 @@ const StudentProfile: React.FC = () => {
         setStudentData(studentDoc);
       } else {
         addToast({ type: 'error', title: 'Data Missing', message: 'No student record linked to this account.' });
+      }
+
+      // Fetch officer SMTP credentials if user is an officer
+      if (accountDoc.type === 'officer' && accountDoc.officers) {
+        try {
+          let offId = accountDoc.officers;
+          if (typeof offId === 'object' && offId.$id) offId = offId.$id;
+          const offDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, offId);
+          setOfficerDocId(offDoc.$id);
+          setOfficerEmail(offDoc.email || '');
+          setOfficerToken(offDoc.token_email || '');
+        } catch (err) {
+          console.warn('Could not fetch officer SMTP credentials:', err);
+        }
       }
     } catch (err: any) {
       console.error('Failed to load profile:', err);
@@ -169,6 +190,23 @@ const StudentProfile: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update credentials.' });
     } finally {
       setUpdatingAccount(false);
+    }
+  };
+
+  const handleSmtpSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!officerDocId) return;
+    setSavingSmtp(true);
+    try {
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, officerDocId, {
+        email: officerEmail.trim() || null,
+        token_email: officerToken.trim() || null
+      });
+      addToast({ type: 'success', title: 'Saved', message: 'SMTP credentials updated successfully!' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to save SMTP credentials.' });
+    } finally {
+      setSavingSmtp(false);
     }
   };
 
@@ -414,6 +452,133 @@ const StudentProfile: React.FC = () => {
             </form>
           </div>
         </div>
+
+        {/* SMTP Credentials Card (officer only) */}
+        {accountType === 'officer' && officerDocId && (
+          <div className="col-span-1 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
+              <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              SMTP Email Credentials
+            </h3>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg p-3">
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                To send official emails using your account, configure your Google App Passkey here.
+                <button
+                  type="button"
+                  onClick={() => setShowSmtpTutorial(true)}
+                  className="ml-1 text-[#0d6b66] dark:text-teal-400 font-bold hover:underline inline-flex items-center gap-1"
+                >
+                  Learn how
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              </p>
+            </div>
+
+            <form onSubmit={handleSmtpSave} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Officer Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={officerEmail}
+                    onChange={e => setOfficerEmail(e.target.value)}
+                    placeholder="your.email@gmail.com"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-950 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">App Passkey (Token)</label>
+                  <input
+                    type="password"
+                    value={officerToken}
+                    onChange={e => setOfficerToken(e.target.value)}
+                    placeholder="16-character Google App Password"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-950 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingSmtp}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {savingSmtp && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Save SMTP Credentials
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* App Passkey Tutorial Dialog */}
+        {showSmtpTutorial && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in" onClick={() => setShowSmtpTutorial(false)}>
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-800">Google App Passkey Setup</h2>
+                <button onClick={() => setShowSmtpTutorial(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6 space-y-4 text-sm text-slate-700 leading-relaxed">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0d6b66] text-white text-xs font-bold">1</span>
+                    <div>
+                      <p className="font-semibold text-slate-900">Enable 2-Step Verification</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Go to <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="text-[#0d6b66] hover:underline font-medium">myaccount.google.com/security</a> &rarr;
+                        Sign in to Google &rarr; 2-Step Verification &rarr; Get Started. Follow the prompts to turn it on.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0d6b66] text-white text-xs font-bold">2</span>
+                    <div>
+                      <p className="font-semibold text-slate-900">Generate an App Password</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        In the same Google Account security page, search for "App passwords" or go to{' '}
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-[#0d6b66] hover:underline font-medium">myaccount.google.com/apppasswords</a>.
+                        Select <strong>Mail</strong> as the app and <strong>Other</strong> as the device (name it "SPECS Portal").
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0d6b66] text-white text-xs font-bold">3</span>
+                    <div>
+                      <p className="font-semibold text-slate-900">Copy &amp; Paste the 16-Character Password</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Google will display a yellow bar with a 16-character password (no spaces). Copy it and paste it into the <strong>App Passkey (Token)</strong> field above. Then enter your Gmail address in the <strong>Officer Email</strong> field and save.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500">
+                  <strong className="text-slate-700">Note:</strong> App Passwords are only available when 2-Step Verification is enabled. The password shown by Google will never be displayed again &mdash; if lost, simply generate a new one.
+                </div>
+              </div>
+              <div className="px-6 py-3 border-t bg-slate-50 flex justify-end">
+                <button
+                  onClick={() => setShowSmtpTutorial(false)}
+                  className="rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors"
+                >
+                  Got it, Thanks!
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
         {/* Volunteer program info card */}
         {accountType === 'student' && (

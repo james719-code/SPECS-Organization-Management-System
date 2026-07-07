@@ -3,6 +3,9 @@ import { cachedApi } from '../../shared/api';
 import { formatCurrency } from '../../shared/formatters';
 import StatsCard from '../../components/ui/StatsCard';
 import { SkeletonCard, SkeletonChart } from '../../components/ui/SkeletonLoader';
+import { account, databases } from '../../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS } from '../../shared/constants';
+import { Mail, X, ChevronRight } from 'lucide-react';
 
 // Icons as inline SVGs
 const UsersIcon = () => (
@@ -48,12 +51,19 @@ interface DashboardStats {
   accounts: any[];
 }
 
+const getStartingBalanceDocId = (sy: string): string => {
+  return sy.trim().replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 36);
+};
+
 const AdminOverview: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [schoolYear, setSchoolYear] = useState<string>('');
 
+  // SMTP reminder state (officer only)
+  const [showSmtpReminder, setShowSmtpReminder] = useState(false);
+  const [smtpReminderDismissed, setSmtpReminderDismissed] = useState(false);
 
   const { yearLevelCounts, totalStudentsWithYear, sectionCounts, totalStudentsWithSection } = React.useMemo(() => {
     if (!stats?.accounts) {
@@ -130,14 +140,34 @@ const AdminOverview: React.FC = () => {
     async function load() {
       try {
         setLoading(true);
-        const data = await cachedApi.dashboard.getStats();
-        setStats(data);
 
-        // Fetch active school year from metadata
+        // Fetch active school year from metadata first
         const metadata = await cachedApi.metadata.get();
+        let activeYear = '';
+        let startSchoolYearDate: string | null = null;
+        let endSchoolYearDate: string | null = null;
+
         if (metadata?.schoolYear) {
-          setSchoolYear(metadata.schoolYear);
+          activeYear = metadata.schoolYear;
+          setSchoolYear(activeYear);
+
+          // Retrieve starting balance config to get date boundaries
+          try {
+            const startingDoc = await cachedApi.startingBalances.get(getStartingBalanceDocId(activeYear));
+            if (startingDoc) {
+              startSchoolYearDate = startingDoc.start_first_sem || null;
+              endSchoolYearDate = startingDoc.end_second_sem || null;
+            }
+          } catch (startingErr) {
+            console.warn('[AdminOverview] Failed to load starting balance config:', startingErr);
+          }
         }
+
+        const data = await cachedApi.dashboard.getStats({
+          startDate: startSchoolYearDate || undefined,
+          endDate: endSchoolYearDate || undefined
+        });
+        setStats(data);
       } catch (err: any) {
         console.error('[AdminOverview] Failed to load stats:', err);
         setError(err.message || 'Failed to load dashboard data');
@@ -147,6 +177,39 @@ const AdminOverview: React.FC = () => {
     }
     load();
   }, []);
+
+  // Check SMTP credentials for officer users
+  useEffect(() => {
+    const checkSmtp = async () => {
+      try {
+        const user = await account.get();
+        const accDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+        if (accDoc.type !== 'officer') return;
+        // Check if dismissed this session
+        if (sessionStorage.getItem('specs_smtp_reminder_dismissed') === '1') {
+          setSmtpReminderDismissed(true);
+          return;
+        }
+        if (accDoc.officers) {
+          let offId = accDoc.officers;
+          if (typeof offId === 'object' && offId.$id) offId = offId.$id;
+          const offDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, offId);
+          if (!offDoc.email || !offDoc.token_email) {
+            setShowSmtpReminder(true);
+          }
+        }
+      } catch {
+        // Silently fail — SMTP reminder is non-critical
+      }
+    };
+    checkSmtp();
+  }, []);
+
+  const dismissSmtpReminder = () => {
+    setShowSmtpReminder(false);
+    setSmtpReminderDismissed(true);
+    sessionStorage.setItem('specs_smtp_reminder_dismissed', '1');
+  };
 
 
   if (error) {
@@ -184,6 +247,46 @@ const AdminOverview: React.FC = () => {
         <p className="text-sm text-slate-500 mt-1">Welcome back! Here's what's happening with your organization.</p>
       </div>
 
+      {/* SMTP Reminder Banner (officer only, when credentials missing) */}
+      {showSmtpReminder && !smtpReminderDismissed && (
+        <div className="rounded-xl border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-orange-50 p-5 shadow-md animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-sm font-bold text-amber-900">Configure Your Email Credentials</h3>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                To send official SPECS emails using your officer account, you need to configure your Google App Passkey.
+                Without this, email functions (attendance notifications, announcements, etc.) will not be available.
+              </p>
+              <div className="flex items-center gap-3 pt-1">
+                <a
+                  href="/dashboard/officer/profile"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2 text-xs font-semibold transition-colors shadow-sm"
+                >
+                  Set Up Now
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </a>
+                <button
+                  onClick={dismissSmtpReminder}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-800 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Remind Me Later
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={dismissSmtpReminder}
+              className="shrink-0 p-1.5 rounded-lg text-amber-400 hover:text-amber-600 hover:bg-amber-100 transition-colors"
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       {loading ? (

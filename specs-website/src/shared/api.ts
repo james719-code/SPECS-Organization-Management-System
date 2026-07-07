@@ -14,6 +14,8 @@ import {
     COLLECTION_ID_TASKS,
     COLLECTION_ID_ADMINS,
     COLLECTION_ID_STARTING_BALANCES,
+    COLLECTION_ID_SIGNATORIES,
+    COLLECTION_ID_EVENT_NON_ORG,
     BUCKET_ID_EVENT_IMAGES
 } from './constants.js';
 import { Query, ID } from 'appwrite';
@@ -502,18 +504,30 @@ export const api = {
 
     // --- DASHBOARD ---
     dashboard: {
-        async getStats(): Promise<any> {
+        async getStats(options: { startDate?: string; endDate?: string } = {}): Promise<any> {
             try {
                 const now = new Date();
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(now.getDate() - 30);
 
+                const revenueQueries: any[] = [];
+                const expenseQueries: any[] = [];
+
+                if (options.startDate) {
+                    revenueQueries.push(Query.greaterThanEqual('date_earned', options.startDate));
+                    expenseQueries.push(Query.greaterThanEqual('date_buy', options.startDate));
+                }
+                if (options.endDate) {
+                    revenueQueries.push(Query.lessThanEqual('date_earned', options.endDate));
+                    expenseQueries.push(Query.lessThanEqual('date_buy', options.endDate));
+                }
+
                 const [accountsRes, upcomingEventsCount, filesCount, revenueRes, expensesRes] = await Promise.all([
                     listAllDocuments<AccountDoc>(COLLECTION_ID_ACCOUNTS, [], { maxPages: 10 }),
                     countDocuments(COLLECTION_ID_EVENTS, [Query.greaterThan('date_to_held', now.toISOString())]),
                     countDocuments(COLLECTION_ID_FILES),
-                    listAllDocuments<RevenueDoc>(COLLECTION_ID_REVENUE, [], { maxPages: 4 }),
-                    listAllDocuments<ExpenseDoc>(COLLECTION_ID_EXPENSES, [], { maxPages: 4 })
+                    listAllDocuments<RevenueDoc>(COLLECTION_ID_REVENUE, revenueQueries, { maxPages: 4 }),
+                    listAllDocuments<ExpenseDoc>(COLLECTION_ID_EXPENSES, expenseQueries, { maxPages: 4 })
                 ]);
 
                 const accounts = accountsRes.documents;
@@ -795,6 +809,80 @@ export const api = {
 
     },
 
+    signatories: {
+        async list(): Promise<PaginatedResponse<any>> {
+            try {
+                return await listAllDocuments<any>(COLLECTION_ID_SIGNATORIES, [Query.orderDesc('$createdAt')]);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list signatories');
+            }
+        },
+        async create(data: { name_officer: string; notation_line?: string; position?: string }): Promise<any> {
+            try {
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_SIGNATORIES, ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.FILES, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create signatory');
+            }
+        },
+        async update(signatoryId: string, data: Partial<{ name_officer: string; notation_line: string; position: string }>): Promise<any> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_SIGNATORIES, signatoryId, data);
+                dataCache.invalidateTags([CacheTags.FILES, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update signatory ${signatoryId}`);
+            }
+        },
+        async delete(signatoryId: string): Promise<any> {
+            try {
+                const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_SIGNATORIES, signatoryId);
+                dataCache.invalidateTags([CacheTags.FILES, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to delete signatory ${signatoryId}`);
+            }
+        }
+    },
+
+    eventNonOrg: {
+        async list(): Promise<PaginatedResponse<any>> {
+            try {
+                return await listAllDocuments<any>(COLLECTION_ID_EVENT_NON_ORG, [Query.orderDesc('date_event')]);
+            } catch (error) {
+                throw createApiError(error, 'Failed to list non-org events');
+            }
+        },
+        async create(data: { name: string; description?: string; date_event?: string; no_participants?: number }): Promise<any> {
+            try {
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENT_NON_ORG, ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create non-org event');
+            }
+        },
+        async update(eventId: string, data: Partial<{ name: string; description: string; date_event: string; no_participants: number }>): Promise<any> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENT_NON_ORG, eventId, data);
+                dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to update non-org event ${eventId}`);
+            }
+        },
+        async delete(eventId: string): Promise<any> {
+            try {
+                const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EVENT_NON_ORG, eventId);
+                dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, `Failed to delete non-org event ${eventId}`);
+            }
+        }
+    },
+
     metadata: {
         async get(): Promise<any> {
             try {
@@ -956,8 +1044,9 @@ export const cachedApi = {
     },
 
     dashboard: {
-        async getStats(ttl = 2 * 60 * 1000): Promise<any> {
-            return dataCache.getOrFetch('dashboard_stats', () => api.dashboard.getStats(), {
+        async getStats(options: { startDate?: string; endDate?: string } = {}, ttl = 2 * 60 * 1000): Promise<any> {
+            const cacheKey = generateCacheKey('dashboard_stats', options);
+            return dataCache.getOrFetch(cacheKey, () => api.dashboard.getStats(options), {
                 ttl,
                 staleTtl: 5 * 60 * 1000,
                 tags: [CacheTags.DASHBOARD, CacheTags.ACCOUNTS, CacheTags.EVENTS, CacheTags.FINANCE, CacheTags.FILES]
@@ -1098,6 +1187,28 @@ export const cachedApi = {
         }
     },
 
+
+    signatories: {
+        async list(ttl = 2 * 60 * 1000): Promise<PaginatedResponse<any>> {
+            const cacheKey = generateCacheKey('signatories_all', {});
+            return dataCache.getOrFetch(cacheKey, () => api.signatories.list(), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.FILES, CacheTags.DASHBOARD]
+            });
+        }
+    },
+
+    eventNonOrg: {
+        async list(ttl = 2 * 60 * 1000): Promise<PaginatedResponse<any>> {
+            const cacheKey = generateCacheKey('event_non_org_all', {});
+            return dataCache.getOrFetch(cacheKey, () => api.eventNonOrg.list(), {
+                ttl,
+                staleTtl: 5 * 60 * 1000,
+                tags: [CacheTags.EVENTS, CacheTags.DASHBOARD]
+            });
+        }
+    },
 
     metadata: {
         async get(ttl = 2 * 60 * 1000): Promise<any> {

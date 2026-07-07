@@ -2,9 +2,9 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
-import { 
-  LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings, 
-  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2, BookOpen
+import {
+  LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings,
+  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2, BookOpen, ScrollText, Printer
 } from 'lucide-react';
 
 // Core imports
@@ -54,6 +54,10 @@ const AdminStories = lazy(() => import('./pages/admin/AdminStories'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminOfficers = lazy(() => import('./pages/admin/AdminOfficers'));
 const AdminTasks = lazy(() => import('./pages/admin/AdminTasks'));
+const AdminFileExports = lazy(() => import('./pages/admin/AdminFileExports'));
+const AdminNonOrgEvents = lazy(() => import('./pages/admin/AdminNonOrgEvents'));
+const StudentTutorials = lazy(() => import('./pages/student/StudentTutorials'));
+const OfficerTutorials = lazy(() => import('./pages/shared/OfficerTutorials'));
 
 const signRole = (userId: string, role: string) => {
   const data = `${userId}:${role}`;
@@ -230,6 +234,7 @@ export default function App() {
                   groupName: 'General',
                   items: [
                     { to: '/dashboard/student', label: 'My Profile', icon: <User className="h-4 w-4" /> },
+                    { to: '/dashboard/student/tutorials', label: 'Student Tutorials', icon: <ScrollText className="h-4 w-4" /> },
                     { to: '/dashboard/student/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> }
                   ]
                 },
@@ -258,6 +263,7 @@ export default function App() {
         <Route path="attendance" element={<StudentAttendance />} />
         <Route path="posts" element={<StudentPosts />} />
         <Route path="constitution" element={<StudentConstitution />} />
+        <Route path="tutorials" element={<StudentTutorials />} />
         <Route path="profile" element={<Navigate to="/dashboard/student" replace />} />
       </Route>
 
@@ -278,7 +284,8 @@ export default function App() {
                     { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
                     { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> },
                     { to: '/dashboard/officer/my-attendance', label: 'My Attendance', icon: <CheckSquare className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/tutorials', label: 'Officer Tutorials', icon: <ScrollText className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -287,7 +294,8 @@ export default function App() {
                     { to: '/dashboard/officer/students', label: 'Students', icon: <UserCheck className="h-4 w-4" /> },
                     { to: '/dashboard/officer/volunteers', label: 'Volunteers', icon: <Users className="h-4 w-4" /> },
                     { to: '/dashboard/officer/events', label: 'Events', icon: <Calendar className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/attendance', label: 'Attendance logs', icon: <CheckSquare className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/attendance', label: 'Attendance logs', icon: <CheckSquare className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/non-org-events', label: 'Non-Org Events', icon: <ScrollText className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -295,7 +303,8 @@ export default function App() {
                   items: [
                     { to: '/dashboard/officer/stories', label: 'Stories', icon: <Award className="h-4 w-4" /> },
                     { to: '/dashboard/officer/files', label: 'Files', icon: <FileText className="h-4 w-4" /> },
-                    { to: '/dashboard/officer/tasks', label: 'Tasks', icon: <CheckSquare className="h-4 w-4" /> }
+                    { to: '/dashboard/officer/tasks', label: 'Tasks', icon: <CheckSquare className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/file-exports', label: 'File Exports', icon: <Printer className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -325,7 +334,10 @@ export default function App() {
         <Route path="events" element={<AdminEvents />} />
         <Route path="stories" element={<AdminStories />} />
         <Route path="tasks" element={<AdminTasks />} />
+        <Route path="file-exports" element={<AdminFileExports />} />
+        <Route path="non-org-events" element={<AdminNonOrgEvents />} />
         <Route path="constitution" element={<OfficerConstitution />} />
+        <Route path="tutorials" element={<OfficerTutorials />} />
       </Route>
 
       {/* Role-Guarded Admin Routes */}
@@ -342,7 +354,8 @@ export default function App() {
                 {
                   groupName: 'General',
                   items: [
-                    { to: '/dashboard/admin', label: 'Stats Overview', icon: <LayoutDashboard className="h-4 w-4" /> }
+                    { to: '/dashboard/admin', label: 'Stats Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/tutorials', label: 'Admin Tutorials', icon: <ScrollText className="h-4 w-4" /> }
                   ]
                 },
                 {
@@ -359,6 +372,7 @@ export default function App() {
                   items: [
                     { to: '/dashboard/admin/events', label: 'Events Manager', icon: <Calendar className="h-4 w-4" /> },
                     { to: '/dashboard/admin/attendance', label: 'Attendance logs', icon: <CheckSquare className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/non-org-events', label: 'Non-Org Events', icon: <ScrollText className="h-4 w-4" /> },
                     { to: '/dashboard/admin/announcements', label: 'Announcements', icon: <Bell className="h-4 w-4" /> },
                     { to: '/dashboard/admin/tasks', label: 'Tasks Manager', icon: <CheckSquare className="h-4 w-4" /> }
                   ]
@@ -374,6 +388,7 @@ export default function App() {
                   groupName: 'Auditing & System',
                   items: [
                     { to: '/dashboard/admin/files', label: 'Document Files', icon: <FileText className="h-4 w-4" /> },
+                    { to: '/dashboard/admin/file-exports', label: 'File Exports', icon: <Printer className="h-4 w-4" /> },
                     { to: '/dashboard/admin/stories', label: 'Student Stories', icon: <Award className="h-4 w-4" /> },
                     { to: '/dashboard/admin/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> },
                     { to: '/dashboard/admin/settings', label: 'System Settings', icon: <Settings className="h-4 w-4" /> }
@@ -400,8 +415,11 @@ export default function App() {
         <Route path="stories" element={<AdminStories />} />
         <Route path="tasks" element={<AdminTasks />} />
         <Route path="announcements" element={<AdminAnnouncements />} />
+        <Route path="file-exports" element={<AdminFileExports />} />
+        <Route path="non-org-events" element={<AdminNonOrgEvents />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="constitution" element={<OfficerConstitution />} />
+        <Route path="tutorials" element={<OfficerTutorials />} />
       </Route>
 
       {/* Fallback */}

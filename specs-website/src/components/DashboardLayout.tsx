@@ -120,10 +120,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
     setUploadError('');
     
     try {
-      const position = officerDoc.position || 'officer';
+      // Use officer's sanitized name from student relationship (e.g., james_dean.jpg)
+      const officerName = (officerDoc.students && typeof officerDoc.students === 'object' && officerDoc.students.name)
+        ? officerDoc.students.name
+        : (officerDoc.position || 'officer');
+      const sanitizedName = officerName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
       const originalName = uploadFile.name;
       const extension = originalName.substring(originalName.lastIndexOf('.'));
-      const newFileName = `${position}${extension}`;
+      const newFileName = `${sanitizedName}${extension}`;
       
       // Rename Javascript File object
       const renamedFile = new File([uploadFile], newFileName, { type: uploadFile.type });

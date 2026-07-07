@@ -102,6 +102,8 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`scheduleId`** | string | Size: 150 | - | - | `NULL` | - |
 | **`position`** | enum | `president`, `vice-president-internal`, `vice-president-external`, `secretary`, `asst-secretary`, `treasurer`, `asst-treasurer`, `auditor`, `p.i.o`, `business-mngr-1`, `business-mngr-2`, `srgt-arms-1`, `sgrt-arms-2`, `representative` | - | - | `NULL` | - |
 | **`pictureId`** | string | Size: 255 | - | - | `NULL` | Storage file ID for the officer's profile picture |
+| **`email`** | email | - | - | - | `NULL` | Officer's email address for SMTP sending (populated on promotion) |
+| **`token_email`** | string | Size: 255 | - | - | `NULL` | Google App Passkey token for SMTP authentication (configured by officer) |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
@@ -340,15 +342,38 @@ Auxiliary collection for system-wide flags and configuration. Not currently wire
 
 ---
 
-## 14. Collection: `event_non_org` (Unused)
+## 14. Collection: `event_non_org`
 
 **Collection ID:** `event_non_org`
+**Env var:** `VITE_COLLECTION_ID_EVENT_NON_ORG`
 
-Auxiliary collection not active or referenced by the application code. No `VITE_COLLECTION_ID_*` entry in `.env`.
+Stores non-organization events (external activities outside of official org events).
 
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
 | **`$id`** | string | - | - | ✅ | - | - |
+| **`name`** | string | Size: 255 | ✅ | - | - | Name of the non-org event |
+| **`description`** | string | Size: 5000 | - | - | `NULL` | Description of the event |
+| **`date_event`** | datetime | - | - | - | `NULL` | Date the event takes place |
+| **`no_participants`** | integer | Min: 1 | - | - | `NULL` | Number of participants |
+| **`$createdAt`** | datetime | - | - | - | - | - |
+| **`$updatedAt`** | datetime | - | - | - | - | - |
+
+---
+
+## 15. Collection: `signatories`
+
+**Collection ID:** `signatories`
+**Env var:** `VITE_COLLECTION_ID_SIGNATORIES`
+
+Stores signatory entries used in report PDF generation (e.g., officer names with position and notation line).
+
+| Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`$id`** | string | - | - | ✅ | - | - |
+| **`name_officer`** | string | Size: 255 | ✅ | - | - | Full name of the signing officer |
+| **`notation_line`** | string | Size: 500 | - | - | `NULL` | Notation / title line displayed below the signature |
+| **`position`** | string | Size: 100 | - | - | `NULL` | Position/role of the signatory (e.g. President, Treasurer) |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 
