@@ -18,6 +18,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 // Static import for LandingPage to optimize critical render path
 import LandingPage from './pages/LandingPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import CookieBanner from './components/CookieBanner';
 
 // Lazy-load Pages
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -217,6 +220,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/signup" element={<SignupPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage theme={theme} toggleTheme={toggleTheme} />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage theme={theme} toggleTheme={toggleTheme} />} />
+      <Route path="/terms" element={<TermsOfServicePage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/pending" element={<PendingVerificationPage />} />
 
       {/* Role-Guarded Student Routes */}
@@ -426,6 +431,7 @@ export default function App() {
       <Route path="*" element={<NotFoundPage theme={theme} toggleTheme={toggleTheme} />} />
     </Routes>
       </Suspense>
+      <CookieBanner />
       {isPending && (
         <>
           {/* Top progress line */}

@@ -1291,9 +1291,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
         <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pt-8 border-t border-slate-900 text-center text-xs text-slate-600 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p>© {new Date().getFullYear()} Society of Programmers and Enthusiasts in Computer Science (SPECS). All Rights Reserved.</p>
           <div className="flex gap-4">
-            <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>
+            <Link to="/privacy" className="hover:text-slate-200 transition-colors">Privacy Policy</Link>
             <span>•</span>
-            <span className="hover:text-slate-400 cursor-pointer">Terms of Service</span>
+            <Link to="/terms" className="hover:text-slate-200 transition-colors">Terms of Service</Link>
           </div>
         </div>
       </footer>

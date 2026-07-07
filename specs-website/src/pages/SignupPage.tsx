@@ -368,7 +368,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
               required 
             />
             <label htmlFor="privacy" className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none">
-              I consent to the collection and processing of my student data by the Society of Programmers and Enthusiasts in Computer Science (SPECS) for membership administration purposes under the Philippines Data Privacy Act of 2012.
+              I consent to the collection and processing of my student data by the Society of Programmers and Enthusiasts in Computer Science (SPECS) for membership administration purposes under the Philippines Data Privacy Act of 2012, in accordance with the{' '}
+              <Link to="/privacy" className="text-[#0d6b66] dark:text-teal-400 font-semibold hover:underline">Privacy Policy</Link>
+              {' '}and{' '}
+              <Link to="/terms" className="text-[#0d6b66] dark:text-teal-400 font-semibold hover:underline">Terms of Service</Link>.
             </label>
           </div>
 
