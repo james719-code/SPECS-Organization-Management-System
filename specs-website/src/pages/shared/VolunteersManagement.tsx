@@ -32,10 +32,8 @@ const VolunteersManagement: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STUDENTS, [
-        Query.limit(500),
-        Query.orderDesc('$updatedAt')
-      ]);
+      const ttl = isRefresh ? 0 : 2 * 60 * 1000;
+      const res = await cachedApi.students.listAllProfiles({ orderDesc: '$updatedAt' }, ttl);
 
       setStudents(res.documents as StudentDoc[]);
       if (isRefresh) {

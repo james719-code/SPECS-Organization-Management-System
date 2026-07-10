@@ -77,6 +77,12 @@ export default defineConfig(({ mode }) => {
           main: resolve(__dirname, 'src/index.html'),
         },
         output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-router': ['react-router-dom'],
+            'vendor-appwrite': ['appwrite'],
+            'vendor-charts': ['recharts', 'chart.js'],
+          },
         },
       },
     }

@@ -7,11 +7,8 @@ import {
 import { cachedApi, api } from '../../shared/api';
 import { useToast } from '../../components/ui/Toast';
 import ConfirmModal from '../../components/ui/ConfirmModal';
-import { databases, storage } from '../../shared/appwrite';
+import { storage } from '../../shared/appwrite';
 import { 
-  DATABASE_ID, 
-  COLLECTION_ID_TASKS, 
-  COLLECTION_ID_FILES, 
   BUCKET_ID_UPLOADS 
 } from '../../shared/constants';
 import { Query } from 'appwrite';
@@ -62,14 +59,10 @@ const AdminTasks: React.FC = () => {
       }
 
       // Fetch all tasks and file references in parallel
+      const ttl = isRefresh ? 0 : 2 * 60 * 1000;
       const [tasksRes, filesRes] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_TASKS, [
-          Query.limit(100),
-          Query.orderDesc('$createdAt')
-        ]),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_FILES, [
-          Query.limit(500)
-        ])
+        cachedApi.tasks.list({ limit: 100, orderDesc: true }, ttl),
+        cachedApi.files.listDocuments({ limit: 500, orderDesc: '$createdAt' }, ttl)
       ]);
 
       setTasks(tasksRes.documents as TaskDoc[]);

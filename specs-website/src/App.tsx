@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
 import {
@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 
 // Core imports
-import { databases, account } from './shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from './shared/constants';
+import { cachedApi } from './shared/api';
 import { setGlobalNavigate } from './shared/errors';
 
 // Import Layout
@@ -79,7 +78,6 @@ export default function App() {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
 
-  const location = useLocation();
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -111,17 +109,14 @@ export default function App() {
   useEffect(() => {
     const checkMaintenanceAndRole = async () => {
       try {
-        // Check if user is logged in
         let loggedInUser: any = null;
         try {
-          loggedInUser = await account.get();
+          loggedInUser = await cachedApi.users.getCurrent();
         } catch (e) {
           // not logged in
         }
 
-        // Fetch user role if logged in
         if (loggedInUser) {
-          // Initial sync from localStorage if present to prevent flashes
           const stored = localStorage.getItem('appwrite_session');
           if (stored) {
             try {
@@ -133,7 +128,7 @@ export default function App() {
           }
 
           try {
-            const accDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, loggedInUser.$id);
+            const accDoc = await cachedApi.users.getAccount(loggedInUser.$id);
             const role = accDoc.type || null;
             setUserRole(role);
             localStorage.setItem('appwrite_session', JSON.stringify({
@@ -144,7 +139,6 @@ export default function App() {
             }));
           } catch (err) {
             console.warn('Fallback: Failed to fetch account profile for role lookup, using local session:', err);
-            // Fallback to localStorage if document fetch fails due to collection permissions
             const storedFallback = localStorage.getItem('appwrite_session');
             if (storedFallback) {
               try {
@@ -166,14 +160,9 @@ export default function App() {
           localStorage.removeItem('appwrite_session');
         }
 
-        // Fetch maintenance mode state
         try {
-          const metaRes = await databases.listDocuments(DATABASE_ID, 'metadata');
-          if (metaRes.documents.length > 0) {
-            setIsMaintenance(!!metaRes.documents[0].ismaintenance);
-          } else {
-            setIsMaintenance(false);
-          }
+          const meta = await cachedApi.metadata.get();
+          setIsMaintenance(!!meta?.ismaintenance);
         } catch (err) {
           console.warn('Failed to load system metadata collection:', err);
           setIsMaintenance(false);
@@ -186,7 +175,7 @@ export default function App() {
     };
 
     checkMaintenanceAndRole();
-  }, [location.pathname]);
+  }, []);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 

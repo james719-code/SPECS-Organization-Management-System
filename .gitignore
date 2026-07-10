@@ -38,3 +38,5 @@ Desktop.ini
 
 .reasonix/
 reasonix.toml
+.commandcode/
+.claude/

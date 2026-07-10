@@ -1341,14 +1341,21 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   }, [outsidePayments]);
 
   // Aggregate student & officer payments for list grid
+  const paymentsByStudent = useMemo(() => {
+    const map = new Map<string, PaymentDoc[]>();
+    payments.forEach(p => {
+      const pStdId = p.students ? (typeof p.students === 'object' ? p.students.$id : p.students) : '';
+      if (!map.has(pStdId)) map.set(pStdId, []);
+      map.get(pStdId)!.push(p);
+    });
+    return map;
+  }, [payments]);
+
   const studentLedger = useMemo(() => {
     const list = students.map(std => {
       const profile = std.students as any;
       const sId = profile?.$id || std.$id;
-      const stdPayments = payments.filter(p => {
-        const pStdId = p.students ? (typeof p.students === 'object' ? p.students.$id : p.students) : '';
-        return pStdId === sId;
-      });
+      const stdPayments = paymentsByStudent.get(sId) || [];
 
       const outstanding = stdPayments.filter(p => !p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
       const paid = stdPayments.filter(p => p.is_paid).reduce((sum, p) => sum + (p.price * p.quantity), 0);
@@ -1377,7 +1384,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     const remainingList = [...withoutDues, ...restWithDues].sort((a, b) => a.name.localeCompare(b.name));
 
     return [...top20WithDues, ...remainingList];
-  }, [students, payments]);
+  }, [students, paymentsByStudent]);
 
   // Filter student ledger items
   const filteredLedger = useMemo(() => {

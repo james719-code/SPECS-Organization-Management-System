@@ -3,8 +3,8 @@ import { cachedApi } from '../../shared/api';
 import { formatCurrency } from '../../shared/formatters';
 import StatsCard from '../../components/ui/StatsCard';
 import { SkeletonCard, SkeletonChart } from '../../components/ui/SkeletonLoader';
-import { account, databases } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS } from '../../shared/constants';
+import { databases } from '../../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_OFFICERS } from '../../shared/constants';
 import { Mail, X, ChevronRight } from 'lucide-react';
 
 // Icons as inline SVGs
@@ -182,8 +182,8 @@ const AdminOverview: React.FC = () => {
   useEffect(() => {
     const checkSmtp = async () => {
       try {
-        const user = await account.get();
-        const accDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+        const user = await cachedApi.users.getCurrent();
+        const accDoc = await cachedApi.users.getAccount(user.$id);
         if (accDoc.type !== 'officer') return;
         // Check if dismissed this session
         if (sessionStorage.getItem('specs_smtp_reminder_dismissed') === '1') {

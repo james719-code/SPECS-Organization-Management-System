@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
+import { dataCache, generateCacheKey } from '../../shared/cache';
+import { CacheTags } from '../../shared/api';
 import { formatCurrency, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -76,110 +78,82 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const [availableSchoolYears, setAvailableSchoolYears] = useState<any[]>([]);
   const [printSchoolYear, setPrintSchoolYear] = useState('');
 
+  const eventNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    eventsList.forEach(e => { if (e.event_name) map.set(e.$id, e.event_name); });
+    return map;
+  }, [eventsList]);
+
+  const eventDateMap = useMemo(() => {
+    const map = new Map<string, Date>();
+    eventsList.forEach(e => { if (e.date_to_held) map.set(e.$id, new Date(e.date_to_held)); });
+    return map;
+  }, [eventsList]);
+
   const getRevenueGroupName = (r: RevenueDoc) => {
-    let groupName = 'General Revenue';
     if (r.isEvent && r.event) {
-      const matchedEvent = eventsList.find(e => e.$id === r.event);
-      if (matchedEvent && matchedEvent.event_name) {
-        groupName = matchedEvent.event_name;
-      } else if (r.name) {
+      const eventName = eventNameMap.get(r.event);
+      if (eventName) return eventName;
+      if (r.name) {
         const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-        groupName = match ? match[1].trim() : r.name;
-      } else {
-        groupName = 'Event Payments';
+        if (match) return match[1].trim();
       }
-    } else if (r.activity) {
-      groupName = r.activity;
+      return 'Event Payments';
     }
-    return groupName;
+    if (r.activity) return r.activity;
+    return 'General Revenue';
   };
 
   const getExpenseGroupName = (e: ExpenseDoc) => {
-    let groupName = 'General Expenses';
     if (e.isEvent) {
       if (e.events && typeof e.events === 'object' && (e.events as any).event_name) {
-        groupName = (e.events as any).event_name;
-      } else if (e.events && typeof e.events === 'string') {
-        const matchedEvent = eventsList.find(ev => ev.$id === e.events);
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else {
-          groupName = 'Event Expenses';
-        }
-      } else {
-        groupName = 'Event Expenses';
+        return (e.events as any).event_name;
       }
-    } else if (e.activity_name) {
-      groupName = e.activity_name;
+      if (e.events && typeof e.events === 'string') {
+        const eventName = eventNameMap.get(e.events);
+        if (eventName) return eventName;
+        return 'Event Expenses';
+      }
+      return 'Event Expenses';
     }
-    return groupName;
+    if (e.activity_name) return e.activity_name;
+    return 'General Expenses';
   };
 
-  const getActivityStartDate = (gName: string) => {
-    let earliestDate: Date | null = null;
+  const groupEarliestDateMap = useMemo(() => {
+    const map = new Map<string, number>();
     revenue.forEach(r => {
-      let groupName = 'General Revenue';
-      if (r.isEvent && r.event) {
-        const matchedEvent = eventsList.find(e => e.$id === r.event);
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else if (r.name) {
-          const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-          groupName = match ? match[1].trim() : r.name;
-        }
-      } else if (r.activity) {
-        groupName = r.activity;
-      } else if (r.name) {
-        const match = r.name.match(/^(.*?)\s*\(Paid by.*\)$/i);
-        groupName = match ? match[1].trim() : r.name;
-      }
-      
-      if (groupName === gName && r.date_earned) {
-        const d = new Date(r.date_earned);
-        if (!earliestDate || d < earliestDate) earliestDate = d;
+      const gName = getRevenueGroupName(r);
+      const d = r.date_earned ? new Date(r.date_earned).getTime() : null;
+      if (d !== null && (!map.has(gName) || d < map.get(gName)!)) {
+        map.set(gName, d);
       }
     });
-
     expenses.forEach(e => {
-      let groupName = 'General Expense';
-      if (e.isEvent && e.events) {
-        const matchedEvent = eventsList.find(ev => ev.$id === (typeof e.events === 'string' ? e.events : (e.events as any).$id));
-        if (matchedEvent && matchedEvent.event_name) {
-          groupName = matchedEvent.event_name;
-        } else if (e.name) {
-          groupName = e.name;
-        }
-      } else if (e.activity_name) {
-        groupName = e.activity_name;
-      } else if (e.name) {
-        groupName = e.name;
-      }
-
-      if (groupName === gName && e.date_buy) {
-        const d = new Date(e.date_buy);
-        if (!earliestDate || d < earliestDate) earliestDate = d;
+      const gName = getExpenseGroupName(e);
+      const d = e.date_buy ? new Date(e.date_buy).getTime() : null;
+      if (d !== null && (!map.has(gName) || d < map.get(gName)!)) {
+        map.set(gName, d);
       }
     });
+    return map;
+  }, [revenue, expenses, eventNameMap]);
 
-    return earliestDate;
+  const getActivityStartDate = (gName: string): Date | null => {
+    const ts = groupEarliestDateMap.get(gName);
+    return ts ? new Date(ts) : null;
   };
 
   const financeGroupsList = useMemo(() => {
     const groups = new Set<string>();
-    revenue.forEach(r => {
-      groups.add(getRevenueGroupName(r));
-    });
-    expenses.forEach(e => {
-      groups.add(getExpenseGroupName(e));
-    });
+    revenue.forEach(r => groups.add(getRevenueGroupName(r)));
+    expenses.forEach(e => groups.add(getExpenseGroupName(e)));
     return Array.from(groups).sort((a, b) => {
-      const dateA = getActivityStartDate(a);
-      const dateB = getActivityStartDate(b);
-      const timeA = dateA ? dateA.getTime() : 0;
-      const timeB = dateB ? dateB.getTime() : 0;
-      return timeA - timeB;
+      const dateA = groupEarliestDateMap.get(a) ?? 0;
+      const dateB = groupEarliestDateMap.get(b) ?? 0;
+      return dateA - dateB;
     });
-  }, [revenue, expenses, eventsList]);
+  }, [revenue, expenses, groupEarliestDateMap]);
 
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -245,14 +219,18 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         expenseQueries.push(Query.lessThanEqual('date_buy', endSchoolYearDate));
       }
 
+      const revenueCacheKey = generateCacheKey('finance_revenue', { startSchoolYearDate, endSchoolYearDate });
+      const expensesCacheKey = generateCacheKey('finance_expenses', { startSchoolYearDate, endSchoolYearDate });
+      const ttl = isRefresh ? 0 : 2 * 60 * 1000;
+
       const [revenueRes, expensesRes, paymentsRes, eventsRes, officersRes] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, revenueQueries),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseQueries),
+        dataCache.getOrFetch(revenueCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, revenueQueries), { ttl, tags: [CacheTags.FINANCE, CacheTags.DASHBOARD] }),
+        dataCache.getOrFetch(expensesCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseQueries), { ttl, tags: [CacheTags.FINANCE, CacheTags.DASHBOARD] }),
         cachedApi.payments.listAll({}, isRefresh ? 0 : 2 * 60 * 1000),
-        databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
+        dataCache.getOrFetch('events_list_all', () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
           Query.orderAsc('event_name'),
           Query.limit(100)
-        ]),
+        ]), { ttl: isRefresh ? 0 : 5 * 60 * 1000, tags: [CacheTags.EVENTS] }),
         cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000)
       ]);
 
@@ -554,20 +532,9 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
     if (targetStart && targetEnd) {
       try {
-        const [revRes, expRes] = await Promise.all([
-          databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
-            Query.greaterThanEqual('date_earned', targetStart),
-            Query.lessThanEqual('date_earned', targetEnd),
-            Query.limit(500)
-          ]),
-          databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, [
-            Query.greaterThanEqual('date_buy', targetStart),
-            Query.lessThanEqual('date_buy', targetEnd),
-            Query.limit(500)
-          ])
-        ]);
-        targetRevenues = revRes.documents as RevenueDoc[];
-        targetExpenses = expRes.documents as ExpenseDoc[];
+        const summary = await cachedApi.finance.getRangeSummary({ start: targetStart, end: targetEnd }, 0);
+        targetRevenues = summary.revenue;
+        targetExpenses = summary.expenses;
       } catch (err) {
         console.error('Failed to load target school year transaction logs:', err);
         addToast({ type: 'error', title: 'Data Loading Failed', message: `Could not fetch transactions for academic period ${targetSchoolYear}` });
