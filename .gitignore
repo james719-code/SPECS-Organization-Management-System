@@ -40,3 +40,10 @@ Desktop.ini
 reasonix.toml
 .commandcode/
 .claude/
+
+# Playwright
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
+**/playwright/.auth/

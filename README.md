@@ -1,6 +1,6 @@
 # SPECS Organization Management System
 
-![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=appwrite) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge) ![Tests](https://img.shields.io/badge/Tests-212%20passed-brightgreen?style=for-the-badge)
+![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=appwrite) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge) ![Tests](https://img.shields.io/badge/Tests-283%20passed-brightgreen?style=for-the-badge)
 
 A centralized web application built with **React 19**, **TypeScript**, **TailwindCSS**, and **Appwrite** to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
 
@@ -282,9 +282,10 @@ In development mode with mock data enabled, a floating panel provides instant ac
 
 ## Testing
 
-The project includes a comprehensive test suite with **212 tests across 6 test files** using Vitest and jsdom.
+The project includes a comprehensive test suite with **283 passed tests** across both unit (Vitest) and End-to-End (Playwright) layers.
 
-### Test Files
+### Unit Tests (Vitest)
+There are **212 unit tests** verifying API state, cache eviction, and service layers:
 
 | File | Type | Tests |
 |------|------|-------|
@@ -295,19 +296,45 @@ The project includes a comprehensive test suite with **212 tests across 6 test f
 | [api-cache.test.js](specs-website/src/__tests__/unit/api-cache.test.js) | Cached API integration | ~25 |
 | [api-coverage.test.js](specs-website/src/__tests__/unit/api-coverage.test.js) | API coverage edge cases | ~25 |
 
-### Running Tests
-```bash
-# Run all tests in watch mode
-npm test
+### End-to-End Tests (Playwright)
+There are **71 E2E tests** verifying user paths, routing, role protection, and page navigation under mock state:
 
-# Run tests with UI
+| File | Description | Tests |
+|------|-------------|-------|
+| [auth-flows.spec.ts](specs-website/tests/e2e/auth-flows.spec.ts) | Login/signup redirection, forgot password, validations | 8 |
+| [route-protection.spec.ts](specs-website/tests/e2e/route-protection.spec.ts) | Role-Based Access Control redirects, deep route 404s | 7 |
+| [public-pages.spec.ts](specs-website/tests/e2e/public-pages.spec.ts) | Landing page, privacy, terms, cookie banners | 11 |
+| [admin-dashboard.spec.ts](specs-website/tests/e2e/admin-dashboard.spec.ts) | Navigation to all 17 Admin dashboard sub-routes without errors | 21 |
+| [student-dashboard.spec.ts](specs-website/tests/e2e/student-dashboard.spec.ts) | Navigation to all 7 Student dashboard sub-routes without errors | 8 |
+| [officer-dashboard.spec.ts](specs-website/tests/e2e/officer-dashboard.spec.ts) | Navigation to all 16 Officer dashboard sub-routes without errors | 17 |
+
+### Running Tests
+
+All test commands must be run from the `specs-website` directory:
+
+```bash
+# --- Unit Tests (Vitest) ---
+# Run all unit tests in watch mode
+npm run test
+
+# Run unit tests in interactive UI
 npm run test:ui
 
-# Run tests with coverage
+# Run unit tests with code coverage
 npm run test:coverage
 
-# Run tests once (CI mode)
+# Run unit tests once (CI mode)
 npm run test:run
+
+# --- E2E Tests (Playwright) ---
+# Run all E2E tests headlessly
+npm run test:e2e
+
+# Run E2E tests in interactive UI
+npm run test:e2e:ui
+
+# Open the HTML test report
+npm run test:e2e:report
 ```
 
 ---
