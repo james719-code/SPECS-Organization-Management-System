@@ -1476,39 +1476,43 @@ const AdminAttendance: React.FC = () => {
             }
             .print-header {
               position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
+              top: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 5cm;
-              display: flex;
-              align-items: flex-start;
-              justify-content: center;
               z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .print-header img {
-              width: 100%;
-              height: auto;
-              max-height: 5cm;
-              object-fit: contain;
-              display: block;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .print-footer {
               position: fixed;
-              bottom: 0;
-              left: 0;
-              right: 0;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 3cm;
-              display: flex;
-              align-items: flex-end;
-              justify-content: center;
               z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .print-footer img {
-              width: 100%;
-              height: auto;
-              max-height: 3cm;
-              object-fit: contain;
-              display: block;
+              position: absolute !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .print-layout-table {
               width: 100%;
@@ -1646,10 +1650,17 @@ const AdminAttendance: React.FC = () => {
           </table>
 
           <script>
-            window.onload = function() {
+            let printed = false;
+            function doPrint() {
+              if (printed) return;
+              printed = true;
               window.print();
-              window.close();
             }
+            window.onload = doPrint;
+            window.onafterprint = function() {
+              window.close();
+            };
+            setTimeout(doPrint, 500);
           </script>
         </body>
       </html>

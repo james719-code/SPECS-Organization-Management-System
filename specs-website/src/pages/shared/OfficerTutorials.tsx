@@ -464,7 +464,8 @@ const OfficerTutorials: React.FC = () => {
                   <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>Narrative Report:</strong> Summary of active events with a standard events table and conclusion.</span></li>
                   <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>Documentation Report:</strong> Events with photo evidence columns and related links.</span></li>
                   <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>Rating Report:</strong> Events with rating/review link columns.</span></li>
-                  <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>Dynamic Memorandum:</strong> Custom form with title, date, to/from fields, subject, and body text.</span></li>
+                  <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>SPECS Resolution:</strong> Custom resolution form supporting meeting excerpt details, multiple rationale (WHEREAS) clauses, resolving action items, and conformed officer grid layouts.</span></li>
+                  <li className="flex items-start gap-2"><ChevronRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" /><span><strong>Activity Proposal:</strong> Structured format for planning events (including proponents, implementation specs, rationales, objectives list, dynamic budget tables, and expected outcomes).</span></li>
                 </ul>
               </div>
 

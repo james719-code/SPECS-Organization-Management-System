@@ -6,7 +6,7 @@ import {
   Users, Printer, Loader2, ChevronDown, ChevronUp, Download, RefreshCw
 } from 'lucide-react';
 
-type ReportType = 'narrative' | 'documentation' | 'rating' | 'memorandum';
+type ReportType = 'narrative' | 'documentation' | 'rating' | 'resolution' | 'proposal';
 
 interface Signatory {
   $id: string;
@@ -32,7 +32,8 @@ const REPORT_LABELS: Record<ReportType, string> = {
   narrative: 'Narrative Report',
   documentation: 'Documentation Report',
   rating: 'Rating Report',
-  memorandum: 'Dynamic Memorandum',
+  resolution: 'SPECS Resolution',
+  proposal: 'Activity Proposal',
 };
 
 interface ReportImage {
@@ -152,13 +153,78 @@ const AdminFileExports: React.FC = () => {
     };
   }, []);
 
-  // Memorandum form
-  const [memoTitle, setMemoTitle] = useState('');
-  const [memoDate, setMemoDate] = useState(new Date().toISOString().split('T')[0]);
-  const [memoTo, setMemoTo] = useState('');
-  const [memoFrom, setMemoFrom] = useState('');
-  const [memoSubject, setMemoSubject] = useState('');
-  const [memoBody, setMemoBody] = useState('');
+  // Resolution form
+  const [resNumber, setResNumber] = useState(() => localStorage.getItem('specs_res_number') || '01');
+  const [resAcademicYear, setResAcademicYear] = useState(() => {
+    const saved = localStorage.getItem('specs_res_academic_year');
+    if (saved) return saved;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const nextYear = currentYear + 1;
+    return `${currentYear}-${nextYear}`;
+  });
+  const [resExcerpt, setResExcerpt] = useState(() => localStorage.getItem('specs_res_excerpt') || '');
+  const [resTitle, setResTitle] = useState(() => localStorage.getItem('specs_res_title') || '');
+  const [resWhereasClauses, setResWhereasClauses] = useState<string[]>(() => {
+    const saved = localStorage.getItem('specs_res_whereas_clauses');
+    return saved ? JSON.parse(saved) : [''];
+  });
+  const [resActionClause, setResActionClause] = useState(() => localStorage.getItem('specs_res_action_clause') || '');
+  const [resResolvedFurther, setResResolvedFurther] = useState(() => localStorage.getItem('specs_res_resolved_further') || '');
+  const [resConformed, setResConformed] = useState(() => localStorage.getItem('specs_res_conformed') === 'true');
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('specs_res_number', resNumber);
+    localStorage.setItem('specs_res_academic_year', resAcademicYear);
+    localStorage.setItem('specs_res_excerpt', resExcerpt);
+    localStorage.setItem('specs_res_title', resTitle);
+    localStorage.setItem('specs_res_whereas_clauses', JSON.stringify(resWhereasClauses));
+    localStorage.setItem('specs_res_action_clause', resActionClause);
+    localStorage.setItem('specs_res_resolved_further', resResolvedFurther);
+    localStorage.setItem('specs_res_conformed', String(resConformed));
+  }, [resNumber, resAcademicYear, resExcerpt, resTitle, resWhereasClauses, resActionClause, resResolvedFurther, resConformed]);
+
+  // Activity Proposal form
+  const [propTitle, setPropTitle] = useState(() => localStorage.getItem('specs_prop_title') || '');
+  const [propProponents, setPropProponents] = useState(() => localStorage.getItem('specs_prop_proponents') || 'SOCIETY OF PROGRAMMERS AND ENTHUSIASTS IN COMPUTER SCIENCE (SPECS)');
+  const [propDate, setPropDate] = useState(() => localStorage.getItem('specs_prop_date') || '');
+  const [propTime, setPropTime] = useState(() => localStorage.getItem('specs_prop_time') || '');
+  const [propVenue, setPropVenue] = useState(() => localStorage.getItem('specs_prop_venue') || '');
+  const [propParticipants, setPropParticipants] = useState(() => localStorage.getItem('specs_prop_participants') || '');
+  const [propRationale, setPropRationale] = useState(() => localStorage.getItem('specs_prop_rationale') || '');
+  const [propObjectives, setPropObjectives] = useState<string[]>(() => {
+    const saved = localStorage.getItem('specs_prop_objectives');
+    return saved ? JSON.parse(saved) : [''];
+  });
+  const [propDescription, setPropDescription] = useState(() => localStorage.getItem('specs_prop_description') || '');
+  const [propBudgetItems, setPropBudgetItems] = useState<Array<{ item: string; quantity: string; cost: string }>>(() => {
+    const saved = localStorage.getItem('specs_prop_budget_items');
+    return saved ? JSON.parse(saved) : [{ item: '', quantity: '', cost: '' }];
+  });
+  const [propSourceOfFunds, setPropSourceOfFunds] = useState(() => localStorage.getItem('specs_prop_source_of_funds') || 'S.P.E.C.S. Funds');
+  const [propExpectedOutputs, setPropExpectedOutputs] = useState<string[]>(() => {
+    const saved = localStorage.getItem('specs_prop_expected_outputs');
+    return saved ? JSON.parse(saved) : [''];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('specs_prop_title', propTitle);
+    localStorage.setItem('specs_prop_proponents', propProponents);
+    localStorage.setItem('specs_prop_date', propDate);
+    localStorage.setItem('specs_prop_time', propTime);
+    localStorage.setItem('specs_prop_venue', propVenue);
+    localStorage.setItem('specs_prop_participants', propParticipants);
+    localStorage.setItem('specs_prop_rationale', propRationale);
+    localStorage.setItem('specs_prop_objectives', JSON.stringify(propObjectives));
+    localStorage.setItem('specs_prop_description', propDescription);
+    localStorage.setItem('specs_prop_budget_items', JSON.stringify(propBudgetItems));
+    localStorage.setItem('specs_prop_source_of_funds', propSourceOfFunds);
+    localStorage.setItem('specs_prop_expected_outputs', JSON.stringify(propExpectedOutputs));
+  }, [
+    propTitle, propProponents, propDate, propTime, propVenue, propParticipants,
+    propRationale, propObjectives, propDescription, propBudgetItems, propSourceOfFunds, propExpectedOutputs
+  ]);
 
   // Signatory layout — row-based
   const [layout, setLayout] = useState<SignatoryLayout>({ rows: [] });
@@ -425,6 +491,122 @@ const AdminFileExports: React.FC = () => {
     }
   };
 
+  const renderConformedSignatoriesHtml = () => {
+    const getOfficerDetails = (positionCode: string, defaultTitle: string) => {
+      const officer = officers.find(o => o.position === positionCode);
+      if (officer && officer.students) {
+        const student = typeof officer.students === 'object' ? (officer.students as any) : null;
+        if (student?.name) {
+          return {
+            name: student.name.toUpperCase(),
+            title: `${defaultTitle}, SPECS`
+          };
+        }
+      }
+      return {
+        name: '_______________________',
+        title: `${defaultTitle.toUpperCase()}, SPECS`
+      };
+    };
+
+    const secretaryDetails = getOfficerDetails('secretary', 'Executive Secretary');
+    const presidentDetails = getOfficerDetails('president', 'President');
+    
+    const POSITION_RANK: Record<string, number> = {
+      'vice-president-internal': 1,
+      'vice-president-external': 2,
+      'asst-secretary': 3,
+      'treasurer': 4,
+      'asst-treasurer': 5,
+      'auditor': 6,
+      'p.i.o': 7,
+      'business-mngr-1': 8,
+      'business-mngr-2': 9,
+      'srgt-arms-1': 10,
+      'sgrt-arms-2': 11,
+      'representative': 12,
+    };
+
+    const getRoleLabel = (pos: string, officer: any) => {
+      const labels: Record<string, string> = {
+        'vice-president-internal': 'Vice-President Internal Affairs',
+        'vice-president-external': 'Vice-President External Affairs',
+        'asst-secretary': 'Assistant Secretary',
+        'treasurer': 'Treasurer',
+        'asst-treasurer': 'Assistant Treasurer',
+        'auditor': 'Auditor',
+        'p.i.o': 'Public Information Officer',
+        'business-mngr-1': 'Business Manager',
+        'business-mngr-2': 'Business Manager',
+        'srgt-arms-1': 'Sergeant at Arms',
+        'sgrt-arms-2': 'Sergeant at Arms',
+      };
+      if (pos === 'representative') {
+        const student = officer.students && typeof officer.students === 'object' ? officer.students : null;
+        if (student && student.yearLevel && student.section) {
+          const sec = student.section.toUpperCase();
+          const prefix = /^\d/.test(sec) ? '' : student.yearLevel;
+          return `${prefix}${sec} Representative`;
+        }
+        return 'Representative';
+      }
+      return labels[pos] || pos;
+    };
+
+    const conformedOfficersList = officers
+      .filter(o => o.position !== 'president' && o.position !== 'secretary')
+      .sort((a, b) => {
+        const rankA = POSITION_RANK[a.position || ''] || 99;
+        const rankB = POSITION_RANK[b.position || ''] || 99;
+        return rankA - rankB;
+      });
+
+    const conformedGridItems = conformedOfficersList.map(o => {
+      const student = o.students && typeof o.students === 'object' ? o.students : null;
+      const name = student?.name ? student.name.toUpperCase() : '_______________________';
+      const role = getRoleLabel(o.position || '', o);
+      return `
+        <div style="text-align: left; page-break-inside: avoid;">
+          <p style="font-weight: bold; font-size: 11pt; margin: 0 0 2px 0; text-transform: uppercase;">${name}</p>
+          <p style="font-size: 9.5pt; font-style: italic; margin: 0; color: #475569;">${role}, SPECS</p>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="margin-top: 50px; font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.5; page-break-inside: avoid;">
+        <!-- Certification -->
+        <div style="text-align: right; margin-bottom: 30px; page-break-inside: avoid; margin-left: auto; width: 300px;">
+          <p style="font-style: italic; margin: 0 0 35px 0;">Certified true and correct;</p>
+          <p style="font-weight: bold; font-size: 11.5pt; margin: 0 0 2px 0; text-transform: uppercase;">${secretaryDetails.name}</p>
+          <p style="font-size: 10pt; font-style: italic; margin: 0; color: #475569;">Executive Secretary, SPECS</p>
+        </div>
+
+        <!-- Attestation -->
+        <div style="text-align: left; margin-bottom: 40px; page-break-inside: avoid; width: 300px;">
+          <p style="font-style: italic; margin: 0 0 35px 0;">Attested by;</p>
+          <p style="font-weight: bold; font-size: 11.5pt; margin: 0 0 2px 0; text-transform: uppercase;">${presidentDetails.name}</p>
+          <p style="font-size: 10pt; font-style: italic; margin: 0; color: #475569;">President, SPECS</p>
+        </div>
+
+        <!-- Conformed by grid -->
+        <div style="text-align: left; margin-bottom: 40px; page-break-inside: avoid;">
+          <p style="font-style: italic; margin: 0 0 25px 0;">Conformed by;</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px 40px; width: 100%;">
+            ${conformedGridItems || '<div style="grid-column: span 2; font-style: italic; color: #94a3b8;">No other officers conformed.</div>'}
+          </div>
+        </div>
+
+        <!-- Adviser Approval -->
+        <div style="text-align: left; page-break-inside: avoid; width: 300px; margin-top: 40px;">
+          <p style="font-style: italic; margin: 0 0 35px 0;">Approved by:</p>
+          <p style="font-weight: bold; font-size: 11.5pt; margin: 0 0 2px 0; text-transform: uppercase;">NICOLAS A. PURA</p>
+          <p style="font-size: 10pt; font-style: italic; margin: 0; color: #475569;">Adviser, SPECS</p>
+        </div>
+      </div>
+    `;
+  };
+
   // --- PDF Generation ---
   const getCompiledHtml = (): string => {
     const origin = window.location.origin;
@@ -555,21 +737,184 @@ const AdminFileExports: React.FC = () => {
         </table>
         ${signatoriesHtml}
       `;
-    } else if (activeReport === 'memorandum') {
+    } else if (activeReport === 'resolution') {
+      const whereasItems = resWhereasClauses
+        .filter(c => c.trim() !== '')
+        .map(c => {
+          const trimmed = c.trim();
+          const suffix = trimmed.endsWith(';') || trimmed.endsWith(',') || trimmed.endsWith('.') ? '' : ';';
+          return `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none;"><strong>WHEREAS,</strong> ${trimmed}${suffix}</p>`;
+        })
+        .join('');
+
+      const actionSuffix = resActionClause.trim().endsWith(';') || resActionClause.trim().endsWith('.') ? '' : ';';
+      const resolvedSuffix = resResolvedFurther.trim().endsWith('.') || resResolvedFurther.trim().endsWith(';') ? '' : '.';
+
       reportBodyHtml = `
-        <div style="border: 1px solid black; padding: 20px; font-family: 'Times New Roman', Times, serif; font-size: 11pt;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div><strong>Title:</strong> ${memoTitle || '____________________'}</div>
-            <div><strong>Date:</strong> ${memoDate || '____________________'}</div>
-            <div><strong>To:</strong> ${memoTo || '____________________'}</div>
-            <div><strong>From:</strong> ${memoFrom || '____________________'}</div>
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none;">
+          ${resExcerpt ? `<p style="text-align: center; font-style: italic; font-size: 10pt; margin-bottom: 25px; line-height: 1.4;">${resExcerpt}</p>` : ''}
+          
+          <p style="text-align: center; font-weight: bold; font-size: 12pt; margin: 0 0 15px 0; letter-spacing: 0.5px; text-transform: none;">
+            Resolution No. ${resNumber || '01'}, Series of A/Y ${resAcademicYear || '2025-2026'}
+          </p>
+          
+          <h2 style="text-align: center; font-weight: bold; font-size: 12pt; text-transform: uppercase; margin: 0 0 35px 0; line-height: 1.5; padding: 0 10px;">
+            ${resTitle || 'A RESOLUTION APPROVING...' }
+          </h2>
+
+          <div style="margin-bottom: 25px;">
+            ${whereasItems || '<p style="text-align: center; font-style: italic; color: #94a3b8;">No rationale clauses added.</p>'}
           </div>
-          <div style="margin-bottom: 15px;">
-            <strong>Subject:</strong> ${memoSubject || '____________________'}
+
+          <p style="text-align: justify; text-indent: 0.5in; margin-bottom: 20px; font-size: 11pt; line-height: 1.6; text-transform: none;">
+            <strong>NOW, THEREFORE, BE IT RESOLVED,</strong> ${resActionClause || 'as it is hereby approved...'}${actionSuffix}
+          </p>
+
+          ${resResolvedFurther ? `
+            <p style="text-align: justify; text-indent: 0.5in; margin-bottom: 30px; font-size: 11pt; line-height: 1.6; text-transform: none;">
+              <strong>RESOLVED FURTHER,</strong> ${resResolvedFurther}${resolvedSuffix}
+            </p>
+          ` : ''}
+        </div>
+        ${resConformed ? renderConformedSignatoriesHtml() : signatoriesHtml}
+      `;
+    } else if (activeReport === 'proposal') {
+      const objectivesHtml = propObjectives
+        .filter(o => o.trim() !== '')
+        .map(o => `<li style="margin-bottom: 8px;">${o.trim()}</li>`)
+        .join('');
+
+      const expectedHtml = propExpectedOutputs
+        .filter(o => o.trim() !== '')
+        .map(o => `<li style="margin-bottom: 8px;">${o.trim()}</li>`)
+        .join('');
+
+      const rationaleParagraphs = propRationale
+        .split('\n')
+        .filter(p => p.trim() !== '')
+        .map(p => `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; text-transform: none;">${p.trim()}</p>`)
+        .join('');
+
+      const descriptionParagraphs = propDescription
+        .split('\n')
+        .filter(p => p.trim() !== '')
+        .map(p => `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; text-transform: none;">${p.trim()}</p>`)
+        .join('');
+
+      const budgetRows = propBudgetItems
+        .filter(b => b.item.trim() !== '')
+        .map(b => {
+          const cost = parseFloat(b.cost.replace(/[^\d.]/g, '')) || 0;
+          return `
+            <tr>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: left; font-family: 'Times New Roman', Times, serif; text-transform: none;">${b.item}</td>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: center; font-family: 'Times New Roman', Times, serif;">${b.quantity}</td>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: right; font-family: 'Times New Roman', Times, serif;">₱${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const totalBudget = propBudgetItems.reduce((acc, b) => {
+        const cost = parseFloat(b.cost.replace(/[^\d.]/g, '')) || 0;
+        return acc + cost;
+      }, 0);
+
+      reportBodyHtml = `
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; font-size: 11pt;">
+          <h2 style="text-align: center; font-weight: bold; font-size: 13pt; text-transform: uppercase; margin: 0 0 30px 0;">
+            ACTIVITY PROPOSAL
+          </h2>
+
+          <!-- Specifications Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: none;">
+            <tbody>
+              <tr>
+                <td style="width: 32%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">I. &nbsp; TITLE OF ACTIVITY</td>
+                <td style="width: 3%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="width: 65%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase;">${propTitle || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">II. &nbsp; PROPONENTS</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propProponents || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">III. &nbsp; DATE OF IMPLEMENTATION</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propDate || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">IV. &nbsp; TIME</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propTime || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">V. &nbsp; VENUE</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propVenue || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">VI. &nbsp; TARGET PARTICIPANTS</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propParticipants || '_______________________'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- VII. Rationale -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">VII. &nbsp; RATIONALE</p>
+            ${rationaleParagraphs || '<p style="font-style: italic; color: #94a3b8;">No rationale text added.</p>'}
           </div>
-          <hr style="border: none; border-top: 1px solid black; margin-bottom: 15px;" />
-          <div style="white-space: pre-wrap; line-height: 1.6;">
-            ${memoBody || 'Enter memorandum content.'}
+
+          <!-- VIII. Objectives -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">VIII. &nbsp; OBJECTIVES</p>
+            <p style="margin: 0 0 8px 0;">This activity aims to:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin: 0; text-transform: none;">
+              ${objectivesHtml || '<li style="font-style: italic; color: #94a3b8;">No objectives added.</li>'}
+            </ul>
+          </div>
+
+          <!-- IX. Activity Description -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">IX. &nbsp; ACTIVITY DESCRIPTION</p>
+            ${descriptionParagraphs || '<p style="font-style: italic; color: #94a3b8;">No description text added.</p>'}
+          </div>
+
+          <!-- X. Budgetary Requirements -->
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">X. &nbsp; BUDGETARY REQUIREMENTS</p>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+              <thead>
+                <tr style="background-color: #f8fafc;">
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: left; font-family: 'Times New Roman', Times, serif;">Items</th>
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: center; font-family: 'Times New Roman', Times, serif; width: 20%;">Quantity</th>
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: right; font-family: 'Times New Roman', Times, serif; width: 25%;">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${budgetRows || '<tr><td colspan="3" style="border: 1px solid black; padding: 6px; text-align: center; font-style: italic;">No items specified.</td></tr>'}
+                <tr style="font-weight: bold;">
+                  <td style="border: 1px solid black; padding: 6px; text-align: left; font-family: 'Times New Roman', Times, serif;">Total</td>
+                  <td style="border: 1px solid black; padding: 6px;"></td>
+                  <td style="border: 1px solid black; padding: 6px; text-align: right; font-family: 'Times New Roman', Times, serif;">₱${totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size: 11pt; margin-top: 10px; font-family: 'Times New Roman', Times, serif; text-transform: none;">
+              Source of Funds: ${propSourceOfFunds || 'S.P.E.C.S. Funds'}
+            </p>
+          </div>
+
+          <!-- XI. Expected Output -->
+          <div style="margin-bottom: 35px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">XI. &nbsp; EXPECTED OUTPUT</p>
+            <p style="margin: 0 0 8px 0;">By the end of the activity, the following outcomes are expected:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin: 0; text-transform: none;">
+              ${expectedHtml || '<li style="font-style: italic; color: #94a3b8;">No outcomes added.</li>'}
+            </ul>
           </div>
         </div>
         ${signatoriesHtml}
@@ -596,39 +941,43 @@ const AdminFileExports: React.FC = () => {
             }
             .print-header {
               position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
+              top: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 5cm;
-              display: flex;
-              align-items: flex-start;
-              justify-content: center;
               z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .print-header img {
-              width: 100%;
-              height: auto;
-              max-height: 5cm;
-              object-fit: contain;
-              display: block;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .print-footer {
               position: fixed;
-              bottom: 0;
-              left: 0;
-              right: 0;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 3cm;
-              display: flex;
-              align-items: flex-end;
-              justify-content: center;
               z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .print-footer img {
-              width: 100%;
-              height: auto;
-              max-height: 3cm;
-              object-fit: contain;
-              display: block;
+              position: absolute !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .print-layout-table {
               width: 100%;
@@ -692,13 +1041,15 @@ const AdminFileExports: React.FC = () => {
             <tbody>
               <tr>
                 <td>
-                  <h2 class="report-title">${eventTitle}</h2>
-                  <h3 style="text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 20px 0; color: #334155; font-family: 'Times New Roman', Times, serif;">
-                    ${activeReport === 'narrative' ? 'Narrative Report' : REPORT_LABELS[activeReport]}
-                  </h3>
-                  <p style="text-align: center; font-size: 10pt; font-style: italic; margin-top: -15px; margin-bottom: 25px;">
-                    Date of Event: ${formattedDate}
-                  </p>
+                  ${(activeReport !== 'resolution' && activeReport !== 'proposal') ? `
+                    <h2 class="report-title">${eventTitle}</h2>
+                    <h3 style="text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 20px 0; color: #334155; font-family: 'Times New Roman', Times, serif;">
+                      ${activeReport === 'narrative' ? 'Narrative Report' : REPORT_LABELS[activeReport]}
+                    </h3>
+                    <p style="text-align: center; font-size: 10pt; font-style: italic; margin-top: -15px; margin-bottom: 25px;">
+                      Date of Event: ${formattedDate}
+                    </p>
+                  ` : ''}
                   
                   ${reportBodyHtml}
                 </td>
@@ -865,21 +1216,186 @@ const AdminFileExports: React.FC = () => {
           ${signatoriesHtml}
         </div>
       `;
-    } else if (activeReport === 'memorandum') {
+    } else if (activeReport === 'resolution') {
+      const whereasItems = resWhereasClauses
+        .filter(c => c.trim() !== '')
+        .map(c => {
+          const trimmed = c.trim();
+          const suffix = trimmed.endsWith(';') || trimmed.endsWith(',') || trimmed.endsWith('.') ? '' : ';';
+          return `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none;"><strong>WHEREAS,</strong> ${trimmed}${suffix}</p>`;
+        })
+        .join('');
+
+      const actionSuffix = resActionClause.trim().endsWith(';') || resActionClause.trim().endsWith('.') ? '' : ';';
+      const resolvedSuffix = resResolvedFurther.trim().endsWith('.') || resResolvedFurther.trim().endsWith(';') ? '' : '.';
+
       reportBodyHtml = `
-        <div style="border: 1px solid black; padding: 20px; font-family: 'Times New Roman', Times, serif; font-size: 11pt;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div><strong>Title:</strong> ${memoTitle || '____________________'}</div>
-            <div><strong>Date:</strong> ${memoDate || '____________________'}</div>
-            <div><strong>To:</strong> ${memoTo || '____________________'}</div>
-            <div><strong>From:</strong> ${memoFrom || '____________________'}</div>
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none;">
+          ${resExcerpt ? `<p style="text-align: center; font-style: italic; font-size: 10pt; margin-bottom: 25px; line-height: 1.4;">${resExcerpt}</p>` : ''}
+          
+          <p style="text-align: center; font-weight: bold; font-size: 12pt; margin: 0 0 15px 0; letter-spacing: 0.5px; text-transform: none;">
+            Resolution No. ${resNumber || '01'}, Series of A/Y ${resAcademicYear || '2025-2026'}
+          </p>
+          
+          <h2 style="text-align: center; font-weight: bold; font-size: 12pt; text-transform: uppercase; margin: 0 0 35px 0; line-height: 1.5; padding: 0 10px;">
+            ${resTitle || 'A RESOLUTION APPROVING...' }
+          </h2>
+
+          <div style="margin-bottom: 25px;">
+            ${whereasItems || '<p style="text-align: center; font-style: italic; color: #94a3b8;">No rationale clauses added.</p>'}
           </div>
-          <div style="margin-bottom: 15px;">
-            <strong>Subject:</strong> ${memoSubject || '____________________'}
+
+          <p style="text-align: justify; text-indent: 0.5in; margin-bottom: 20px; font-size: 11pt; line-height: 1.6; text-transform: none;">
+            <strong>NOW, THEREFORE, BE IT RESOLVED,</strong> ${resActionClause || 'as it is hereby approved...'}${actionSuffix}
+          </p>
+
+          ${resResolvedFurther ? `
+            <p style="text-align: justify; text-indent: 0.5in; margin-bottom: 30px; font-size: 11pt; line-height: 1.6; text-transform: none;">
+              <strong>RESOLVED FURTHER,</strong> ${resResolvedFurther}${resolvedSuffix}
+            </p>
+          ` : ''}
+        </div>
+        <div id="signatories-wrapper">
+          ${resConformed ? renderConformedSignatoriesHtml() : signatoriesHtml}
+        </div>
+      `;
+    } else if (activeReport === 'proposal') {
+      const objectivesHtml = propObjectives
+        .filter(o => o.trim() !== '')
+        .map(o => `<li style="margin-bottom: 8px;">${o.trim()}</li>`)
+        .join('');
+
+      const expectedHtml = propExpectedOutputs
+        .filter(o => o.trim() !== '')
+        .map(o => `<li style="margin-bottom: 8px;">${o.trim()}</li>`)
+        .join('');
+
+      const rationaleParagraphs = propRationale
+        .split('\n')
+        .filter(p => p.trim() !== '')
+        .map(p => `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; text-transform: none;">${p.trim()}</p>`)
+        .join('');
+
+      const descriptionParagraphs = propDescription
+        .split('\n')
+        .filter(p => p.trim() !== '')
+        .map(p => `<p style="text-align: justify; text-indent: 0.5in; margin-bottom: 15px; font-size: 11pt; line-height: 1.6; text-transform: none;">${p.trim()}</p>`)
+        .join('');
+
+      const budgetRows = propBudgetItems
+        .filter(b => b.item.trim() !== '')
+        .map(b => {
+          const cost = parseFloat(b.cost.replace(/[^\d.]/g, '')) || 0;
+          return `
+            <tr>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: left; font-family: 'Times New Roman', Times, serif; text-transform: none;">${b.item}</td>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: center; font-family: 'Times New Roman', Times, serif;">${b.quantity}</td>
+              <td style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: right; font-family: 'Times New Roman', Times, serif;">₱${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const totalBudget = propBudgetItems.reduce((acc, b) => {
+        const cost = parseFloat(b.cost.replace(/[^\d.]/g, '')) || 0;
+        return acc + cost;
+      }, 0);
+
+      reportBodyHtml = `
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; font-size: 11pt;">
+          <h2 style="text-align: center; font-weight: bold; font-size: 13pt; text-transform: uppercase; margin: 0 0 30px 0;">
+            ACTIVITY PROPOSAL
+          </h2>
+
+          <!-- Specifications Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: none;">
+            <tbody>
+              <tr>
+                <td style="width: 32%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">I. &nbsp; TITLE OF ACTIVITY</td>
+                <td style="width: 3%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="width: 65%; font-weight: bold; padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase;">${propTitle || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">II. &nbsp; PROPONENTS</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propProponents || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">III. &nbsp; DATE OF IMPLEMENTATION</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propDate || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">IV. &nbsp; TIME</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propTime || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">V. &nbsp; VENUE</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propVenue || '_______________________'}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">VI. &nbsp; TARGET PARTICIPANTS</td>
+                <td style="font-weight: bold; padding: 4px 0; vertical-align: top; border: none;">:</td>
+                <td style="padding: 4px 0; vertical-align: top; border: none; text-transform: uppercase; font-weight: bold;">${propParticipants || '_______________________'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- VII. Rationale -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">VII. &nbsp; RATIONALE</p>
+            ${rationaleParagraphs || '<p style="font-style: italic; color: #94a3b8;">No rationale text added.</p>'}
           </div>
-          <hr style="border: none; border-top: 1px solid black; margin-bottom: 15px;" />
-          <div style="white-space: pre-wrap; line-height: 1.6;">
-            ${memoBody || 'Enter memorandum content.'}
+
+          <!-- VIII. Objectives -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">VIII. &nbsp; OBJECTIVES</p>
+            <p style="margin: 0 0 8px 0;">This activity aims to:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin: 0; text-transform: none;">
+              ${objectivesHtml || '<li style="font-style: italic; color: #94a3b8;">No objectives added.</li>'}
+            </ul>
+          </div>
+
+          <!-- IX. Activity Description -->
+          <div style="margin-bottom: 25px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">IX. &nbsp; ACTIVITY DESCRIPTION</p>
+            ${descriptionParagraphs || '<p style="font-style: italic; color: #94a3b8;">No description text added.</p>'}
+          </div>
+
+          <!-- X. Budgetary Requirements -->
+          <div style="margin-bottom: 25px; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">X. &nbsp; BUDGETARY REQUIREMENTS</p>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+              <thead>
+                <tr style="background-color: #f8fafc;">
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: left; font-family: 'Times New Roman', Times, serif;">Items</th>
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: center; font-family: 'Times New Roman', Times, serif; width: 20%;">Quantity</th>
+                  <th style="border: 1px solid black; padding: 6px; font-size: 11pt; text-align: right; font-family: 'Times New Roman', Times, serif; width: 25%;">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${budgetRows || '<tr><td colspan="3" style="border: 1px solid black; padding: 6px; text-align: center; font-style: italic;">No items specified.</td></tr>'}
+                <tr style="font-weight: bold;">
+                  <td style="border: 1px solid black; padding: 6px; text-align: left; font-family: 'Times New Roman', Times, serif;">Total</td>
+                  <td style="border: 1px solid black; padding: 6px;"></td>
+                  <td style="border: 1px solid black; padding: 6px; text-align: right; font-family: 'Times New Roman', Times, serif;">₱${totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size: 11pt; margin-top: 10px; font-family: 'Times New Roman', Times, serif; text-transform: none;">
+              Source of Funds: ${propSourceOfFunds || 'S.P.E.C.S. Funds'}
+            </p>
+          </div>
+
+          <!-- XI. Expected Output -->
+          <div style="margin-bottom: 35px;">
+            <p style="font-weight: bold; margin: 0 0 10px 0;">XI. &nbsp; EXPECTED OUTPUT</p>
+            <p style="margin: 0 0 8px 0;">By the end of the activity, the following outcomes are expected:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin: 0; text-transform: none;">
+              ${expectedHtml || '<li style="font-style: italic; color: #94a3b8;">No outcomes added.</li>'}
+            </ul>
           </div>
         </div>
         <div id="signatories-wrapper">
@@ -922,37 +1438,41 @@ const AdminFileExports: React.FC = () => {
             }
             .print-header {
               position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
+              top: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 5cm;
-              display: flex;
-              align-items: flex-start;
-              justify-content: center;
+              margin: 0 !important;
+              padding: 0 !important;
             }
-            .print-header img {
-              width: 100%;
-              height: auto;
-              max-height: 5cm;
-              object-fit: contain;
-              display: block;
+             .print-header img {
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .print-footer {
               position: absolute;
-              bottom: 0;
-              left: 0;
-              right: 0;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
               height: 3cm;
-              display: flex;
-              align-items: flex-end;
-              justify-content: center;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .print-footer img {
-              width: 100%;
-              height: auto;
-              max-height: 3cm;
-              object-fit: contain;
-              display: block;
+              position: absolute !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
             }
             .content-area {
               padding-top: 5.5cm;
@@ -1000,13 +1520,15 @@ const AdminFileExports: React.FC = () => {
               </div>
               <div class="content-area">
                 <div id="page-1-content">
-                  <h2 class="report-title">${eventTitle}</h2>
-                  <h3 style="text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 20px 0; color: #334155;">
-                    ${activeReport === 'narrative' ? 'Narrative Report' : REPORT_LABELS[activeReport]}
-                  </h3>
-                  <p style="text-align: center; font-size: 10pt; font-style: italic; margin-top: -15px; margin-bottom: 25px;">
-                    Date of Event: ${formattedDate}
-                  </p>
+                  ${(activeReport !== 'resolution' && activeReport !== 'proposal') ? `
+                    <h2 class="report-title">${eventTitle}</h2>
+                    <h3 style="text-align: center; font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 20px 0; color: #334155;">
+                      ${activeReport === 'narrative' ? 'Narrative Report' : REPORT_LABELS[activeReport]}
+                    </h3>
+                    <p style="text-align: center; font-size: 10pt; font-style: italic; margin-top: -15px; margin-bottom: 25px;">
+                      Date of Event: ${formattedDate}
+                    </p>
+                  ` : ''}
                   ${reportBodyHtml}
                 </div>
               </div>
@@ -1101,15 +1623,21 @@ const AdminFileExports: React.FC = () => {
   const handlePrint = () => {
     const htmlContent = getCompiledHtml();
     
-    // Inject print and close script matching AdminFinance.tsx style
+    // Inject print and close script with onafterprint handler
     const printHtml = htmlContent.replace('</body>', `
       <script>
-        window.onload = function() {
+        let printed = false;
+        function doPrint() {
+          if (printed) return;
+          printed = true;
           window.print();
-          if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            window.close();
-          }
         }
+        window.onload = doPrint;
+        window.onafterprint = function() {
+          window.close();
+        };
+        // Fallback for onload
+        setTimeout(doPrint, 500);
       </script>
       </body>
     `);
@@ -1266,7 +1794,8 @@ const AdminFileExports: React.FC = () => {
               {type === 'narrative' && <FileText className="h-3.5 w-3.5" />}
               {type === 'documentation' && <Image className="h-3.5 w-3.5" />}
               {type === 'rating' && <Star className="h-3.5 w-3.5" />}
-              {type === 'memorandum' && <FileEdit className="h-3.5 w-3.5" />}
+              {type === 'resolution' && <FileEdit className="h-3.5 w-3.5" />}
+              {type === 'proposal' && <FileText className="h-3.5 w-3.5" />}
               {REPORT_LABELS[type]}
             </button>
           ))}
@@ -1363,43 +1892,371 @@ const AdminFileExports: React.FC = () => {
         </div>
       )}
 
-      {/* Memorandum Form */}
-      {activeReport === 'memorandum' && (
+
+
+      {/* Resolution Form */}
+      {activeReport === 'resolution' && (
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
-            Memorandum Details
+            Resolution Details
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Title</label>
-              <input type="text" value={memoTitle} onChange={e => setMemoTitle(e.target.value)}
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Resolution Number</label>
+              <input type="text" value={resNumber} onChange={e => setResNumber(e.target.value)} placeholder="e.g. 01"
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date</label>
-              <input type="date" value={memoDate} onChange={e => setMemoDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">To</label>
-              <input type="text" value={memoTo} onChange={e => setMemoTo(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">From</label>
-              <input type="text" value={memoFrom} onChange={e => setMemoFrom(e.target.value)}
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Academic Year</label>
+              <input type="text" value={resAcademicYear} onChange={e => setResAcademicYear(e.target.value)} placeholder="e.g. 2025-2026"
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Subject</label>
-              <input type="text" value={memoSubject} onChange={e => setMemoSubject(e.target.value)}
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Meeting Excerpt / Date metadata (Optional)</label>
+              <input type="text" value={resExcerpt} onChange={e => setResExcerpt(e.target.value)} placeholder="e.g. Excerpt from the Minutes of the 2nd regular meeting of SPECS held last August 23, 2025, on Google Meet"
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Memorandum Body</label>
-              <textarea value={memoBody} onChange={e => setMemoBody(e.target.value)} rows={8}
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Resolution Title</label>
+              <textarea value={resTitle} onChange={e => setResTitle(e.target.value)} placeholder="A RESOLUTION APPROVING THE USE OF..." rows={2}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y" />
             </div>
+
+            {/* Dynamic WHEREAS clauses */}
+            <div className="sm:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">WHEREAS Clauses (Rationale)</label>
+                <button
+                  type="button"
+                  onClick={() => setResWhereasClauses([...resWhereasClauses, ''])}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0d6b66] hover:text-[#0a524e] transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Clause
+                </button>
+              </div>
+              
+              {resWhereasClauses.map((clause, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <span className="text-xs font-bold text-slate-400 mt-2.5 w-20 flex-shrink-0">WHEREAS,</span>
+                  <div className="flex-1">
+                    <textarea
+                      value={clause}
+                      onChange={e => {
+                        const newClauses = [...resWhereasClauses];
+                        newClauses[idx] = e.target.value;
+                        setResWhereasClauses(newClauses);
+                      }}
+                      placeholder="e.g. the organization aims to support..."
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (resWhereasClauses.length > 1) {
+                        setResWhereasClauses(resWhereasClauses.filter((_, i) => i !== idx));
+                      } else {
+                        const newClauses = [...resWhereasClauses];
+                        newClauses[idx] = '';
+                        setResWhereasClauses(newClauses);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors mt-1"
+                    title="Remove clause"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Primary Resolution Body (NOW, THEREFORE...)</label>
+              <textarea value={resActionClause} onChange={e => setResActionClause(e.target.value)} placeholder="e.g. as it is hereby approved, that the necessary expenses for the representing band shall be covered..." rows={3}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y" />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Secondary Action / Distribution (RESOLVED FURTHER...)</label>
+              <textarea value={resResolvedFurther} onChange={e => setResResolvedFurther(e.target.value)} placeholder="e.g. that copies of this resolution shall be furnished to the Office of Student Affairs and Services..." rows={3}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y" />
+            </div>
+
+            <div className="sm:col-span-2 flex items-center gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="res-conformed"
+                checked={resConformed}
+                onChange={e => setResConformed(e.target.checked)}
+                className="h-4 w-4 text-[#0d6b66] focus:ring-[#0d6b66] border-slate-300 rounded"
+              />
+              <label htmlFor="res-conformed" className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide cursor-pointer">
+                Include Full Conformed Grid (General Assembly / Officers Signature Grid)
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Proposal Form */}
+      {activeReport === 'proposal' && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-4">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+            Activity Proposal Details
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Title of Activity</label>
+              <input type="text" value={propTitle} onChange={e => setPropTitle(e.target.value)} placeholder="e.g. AIDEATHON: HACKATHON WITH AI"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Proponents</label>
+              <input type="text" value={propProponents} onChange={e => setPropProponents(e.target.value)} placeholder="e.g. SOCIETY OF PROGRAMMERS AND ENTHUSIASTS IN COMPUTER SCIENCE (SPECS)"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Date of Implementation</label>
+              <input type="text" value={propDate} onChange={e => setPropDate(e.target.value)} placeholder="e.g. OCTOBER 21 – NOVEMBER 18, 2025"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Time</label>
+              <input type="text" value={propTime} onChange={e => setPropTime(e.target.value)} placeholder="e.g. 8:00 A.M. – 12:00 P.M. (PRESENTATION DAY ON NOVEMBER 18, 2025)"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Venue</label>
+              <input type="text" value={propVenue} onChange={e => setPropVenue(e.target.value)} placeholder="e.g. ROOMS 22, IIT BUILDING (PRESENTATION DAY)"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Target Participants</label>
+              <input type="text" value={propParticipants} onChange={e => setPropParticipants(e.target.value)} placeholder="e.g. BS COMPUTER SCIENCE AND BS INFORMATION TECHNOLOGY MAJORS (ALL YEAR LEVELS)"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">VII. Rationale</label>
+              <textarea value={propRationale} onChange={e => setPropRationale(e.target.value)} placeholder="Enter rationale paragraphs..." rows={6}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y" />
+            </div>
+
+            {/* Objectives */}
+            <div className="sm:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">VIII. Objectives</label>
+                <button
+                  type="button"
+                  onClick={() => setPropObjectives([...propObjectives, ''])}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0d6b66] hover:text-[#0a524e] transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Objective
+                </button>
+              </div>
+              
+              {propObjectives.map((obj, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <span className="text-xs font-bold text-slate-400 flex-shrink-0">Bullet {idx + 1}</span>
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={obj}
+                      onChange={e => {
+                        const newObjs = [...propObjectives];
+                        newObjs[idx] = e.target.value;
+                        setPropObjectives(newObjs);
+                      }}
+                      placeholder="Provide an accessible platform..."
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (propObjectives.length > 1) {
+                        setPropObjectives(propObjectives.filter((_, i) => i !== idx));
+                      } else {
+                        const newObjs = [...propObjectives];
+                        newObjs[idx] = '';
+                        setPropObjectives(newObjs);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                    title="Remove objective"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">IX. Activity Description</label>
+              <textarea value={propDescription} onChange={e => setPropDescription(e.target.value)} placeholder="Describe the event phases, mechanics, prizes..." rows={6}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y" />
+            </div>
+
+            {/* Budgetary requirements */}
+            <div className="sm:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">X. Budgetary Requirements</label>
+                <button
+                  type="button"
+                  onClick={() => setPropBudgetItems([...propBudgetItems, { item: '', quantity: '', cost: '' }])}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0d6b66] hover:text-[#0a524e] transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Budget Item
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full border-collapse text-left text-sm text-slate-500 dark:text-slate-400">
+                  <thead className="bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2">Item Description</th>
+                      <th className="px-4 py-2 w-28">Quantity</th>
+                      <th className="px-4 py-2 w-36">Unit Cost (₱)</th>
+                      <th className="px-4 py-2 w-16 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    {propBudgetItems.map((bItem, idx) => (
+                      <tr key={idx}>
+                        <td className="px-4 py-2">
+                          <input
+                            type="text"
+                            value={bItem.item}
+                            onChange={e => {
+                              const newItems = [...propBudgetItems];
+                              newItems[idx].item = e.target.value;
+                              setPropBudgetItems(newItems);
+                            }}
+                            placeholder="e.g. Certificate"
+                            className="w-full bg-transparent border-0 outline-none text-slate-900 dark:text-white"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="text"
+                            value={bItem.quantity}
+                            onChange={e => {
+                              const newItems = [...propBudgetItems];
+                              newItems[idx].quantity = e.target.value;
+                              setPropBudgetItems(newItems);
+                            }}
+                            placeholder="e.g. 8"
+                            className="w-full bg-transparent border-0 outline-none text-slate-900 dark:text-white text-center"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="text"
+                            value={bItem.cost}
+                            onChange={e => {
+                              const newItems = [...propBudgetItems];
+                              newItems[idx].cost = e.target.value;
+                              setPropBudgetItems(newItems);
+                            }}
+                            placeholder="e.g. 800.00"
+                            className="w-full bg-transparent border-0 outline-none text-slate-900 dark:text-white text-right"
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (propBudgetItems.length > 1) {
+                                setPropBudgetItems(propBudgetItems.filter((_, i) => i !== idx));
+                              } else {
+                                setPropBudgetItems([{ item: '', quantity: '', cost: '' }]);
+                              }
+                            }}
+                            className="text-slate-400 hover:text-red-500 rounded-md p-1 transition-colors"
+                            title="Delete item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50 dark:bg-slate-800/50 font-semibold text-slate-900 dark:text-white">
+                      <td className="px-4 py-2">Total Budget Required</td>
+                      <td className="px-4 py-2 text-center">
+                        {propBudgetItems.reduce((acc, current) => {
+                          const qty = parseFloat(current.quantity) || 0;
+                          return acc + (qty ? 1 : 0);
+                        }, 0)} item lines
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        ₱{propBudgetItems.reduce((acc, current) => {
+                          const cost = parseFloat(current.cost.replace(/[^\d.]/g, '')) || 0;
+                          return acc + cost;
+                        }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Source of Funds</label>
+                <input type="text" value={propSourceOfFunds} onChange={e => setPropSourceOfFunds(e.target.value)} placeholder="e.g. S.P.E.C.S. Funds"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none" />
+              </div>
+            </div>
+
+            {/* Expected Outputs */}
+            <div className="sm:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">XI. Expected Output</label>
+                <button
+                  type="button"
+                  onClick={() => setPropExpectedOutputs([...propExpectedOutputs, ''])}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0d6b66] hover:text-[#0a524e] transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Expected Output
+                </button>
+              </div>
+
+              {propExpectedOutputs.map((out, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <span className="text-xs font-bold text-slate-400 flex-shrink-0">Outcome {idx + 1}</span>
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={out}
+                      onChange={e => {
+                        const newOuts = [...propExpectedOutputs];
+                        newOuts[idx] = e.target.value;
+                        setPropExpectedOutputs(newOuts);
+                      }}
+                      placeholder="e.g. Increased student confidence in using AI tools..."
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (propExpectedOutputs.length > 1) {
+                        setPropExpectedOutputs(propExpectedOutputs.filter((_, i) => i !== idx));
+                      } else {
+                        const newOuts = [...propExpectedOutputs];
+                        newOuts[idx] = '';
+                        setPropExpectedOutputs(newOuts);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                    title="Remove expected output"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
           </div>
         </div>
       )}
