@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RotateCw, Loader2, Check, Camera, Search, Printer } from 'lucide-react';
+import { RotateCw, Loader2, Check, Camera, Search, Printer, GripVertical, X, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { formatDateTime, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
@@ -12,6 +12,21 @@ import { functions } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID } from '../../shared/constants';
 import { getAttendanceHtml } from '../../shared/emailTemplates';
 import { Html5Qrcode } from 'html5-qrcode';
+
+interface SignatoryRow {
+  left: string | null;
+  right: string | null;
+}
+interface SignatoryLayout {
+  rows: SignatoryRow[];
+}
+type DropTarget = 'available' | { row: number; side: 'left' | 'right' };
+interface Signatory {
+  $id: string;
+  name_officer: string;
+  notation_line?: string;
+  position?: string;
+}
 
 const AdminAttendance: React.FC = () => {
   const [events, setEvents] = useState<EventDoc[]>([]);
@@ -47,6 +62,197 @@ const AdminAttendance: React.FC = () => {
   const [officersList, setOfficersList] = useState<OfficerDoc[]>([]);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printSignatory, setPrintSignatory] = useState<'secretary' | 'asst-secretary'>('secretary');
+  
+  // Custom Signatories
+  const [signatories, setSignatories] = useState<any[]>([]);
+  const [printPreparedBy, setPrintPreparedBy] = useState<string>('default');
+  const [printAttestedBy, setPrintAttestedBy] = useState<string>('default');
+  const [printNotedBy, setPrintNotedBy] = useState<string>('default');
+
+  // Drag-and-drop Signatory Layout states
+  const [layout, setLayout] = useState<SignatoryLayout>({ rows: [] });
+  const [showSignatorySection, setShowSignatorySection] = useState(false);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const STORAGE_KEY = 'specs_signatory_layout_v2_attendance';
+
+  const loadLayout = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.rows)) {
+          setLayout(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setLayout({ rows: [] });
+  };
+
+  const saveLayout = (newLayout: SignatoryLayout) => {
+    const cleaned = { ...newLayout };
+    while (cleaned.rows.length > 0 && !cleaned.rows[cleaned.rows.length - 1].left && !cleaned.rows[cleaned.rows.length - 1].right) {
+      cleaned.rows = cleaned.rows.slice(0, -1);
+    }
+    setLayout(cleaned);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadLayout();
+  }, []);
+
+  const getById = (id: string | null): Signatory | null =>
+    signatories.find(s => s.$id === id) || null;
+
+  const availableSignatories = useMemo(() => {
+    const placed = new Set<string>();
+    layout.rows.forEach(r => {
+      if (r.left) placed.add(r.left);
+      if (r.right) placed.add(r.right);
+    });
+    return signatories.filter(s => !placed.has(s.$id));
+  }, [signatories, layout]);
+
+  const handleDragStart = (e: React.DragEvent, signatoryId: string, source: { type: 'available' } | { type: 'row'; row: number; side: 'left' | 'right' }) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ signatoryId, source }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDropOnSlot = (e: React.DragEvent, target: DropTarget) => {
+    e.preventDefault();
+    setDragOverId(null);
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+    let data: { signatoryId: string; source: any };
+    try { data = JSON.parse(raw); } catch { return; }
+
+    const { signatoryId, source } = data;
+    const newRows = layout.rows.map(r => ({ left: r.left, right: r.right }));
+
+    if (source.type === 'row') {
+      if (source.side === 'left' && newRows[source.row]?.left === signatoryId) {
+        newRows[source.row].left = null;
+      } else if (source.side === 'right' && newRows[source.row]?.right === signatoryId) {
+        newRows[source.row].right = null;
+      }
+    }
+
+    newRows.forEach(r => {
+      if (r.left === signatoryId) r.left = null;
+      if (r.right === signatoryId) r.right = null;
+    });
+
+    if (target === 'available') {
+      // just removed — nothing to do
+    } else if (typeof target === 'object' && 'row' in target) {
+      while (newRows.length <= target.row) {
+        newRows.push({ left: null, right: null });
+      }
+      if (target.side === 'left') {
+        if (newRows[target.row].left && newRows[target.row].left !== signatoryId) {
+          const displaced = newRows[target.row].left;
+          newRows[target.row].left = signatoryId;
+          newRows.splice(target.row + 1, 0, { left: displaced, right: null });
+        } else {
+          newRows[target.row].left = signatoryId;
+        }
+      } else {
+        if (newRows[target.row].right && newRows[target.row].right !== signatoryId) {
+          const displaced = newRows[target.row].right;
+          newRows[target.row].right = signatoryId;
+          newRows.splice(target.row + 1, 0, { left: null, right: displaced });
+        } else {
+          newRows[target.row].right = signatoryId;
+        }
+      }
+    }
+
+    saveLayout({ rows: newRows });
+  };
+
+  const removeFromSlot = (rowIdx: number, side: 'left' | 'right') => {
+    const newRows = layout.rows.map((r, i) =>
+      i === rowIdx ? { ...r, [side]: null } : { ...r }
+    );
+    saveLayout({ rows: newRows });
+  };
+
+  const addRow = () => {
+    const newRows = [...layout.rows, { left: null, right: null }];
+    setLayout({ rows: newRows });
+  };
+
+  const removeRow = (rowIdx: number) => {
+    const newRows = layout.rows.filter((_, i) => i !== rowIdx);
+    saveLayout({ rows: newRows });
+  };
+
+  // --- Draggable chip for available signatories ---
+  const DraggableChip = ({ signatory }: { signatory: Signatory }) => (
+    <div
+      draggable
+      onDragStart={(e) => handleDragStart(e, signatory.$id, { type: 'available' })}
+      className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-[#0d6b66] hover:shadow-md transition-all group"
+    >
+      <GripVertical className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+      <div>
+        {signatory.notation_line && <p className="text-[10px] text-slate-500 italic">{signatory.notation_line}</p>}
+        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{signatory.name_officer}</p>
+        {signatory.position && <p className="text-[10px] text-slate-500">{signatory.position}</p>}
+      </div>
+    </div>
+  );
+
+  // --- Draggable placed signatory in a slot ---
+  const DraggableSlotChip = ({ signatory, rowIdx, side }: { signatory: Signatory; rowIdx: number; side: 'left' | 'right' }) => (
+    <div
+      draggable
+      onDragStart={(e) => handleDragStart(e, signatory.$id, { type: 'row', row: rowIdx, side })}
+      className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-[#0d6b66] hover:shadow-md transition-all group"
+    >
+      <GripVertical className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        {signatory.notation_line && <p className="text-[10px] text-slate-500 italic truncate">{signatory.notation_line}</p>}
+        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{signatory.name_officer}</p>
+        {signatory.position && <p className="text-[10px] text-slate-500 truncate">{signatory.position}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={() => removeFromSlot(rowIdx, side)}
+        className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+        title="Remove from this slot"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+
+  // --- Drop-zone for a single slot ---
+  const SlotDropZone = ({ rowIdx, side, signatory }: { rowIdx: number; side: 'left' | 'right'; signatory: Signatory | null }) => {
+    const zoneId = `row-${rowIdx}-${side}`;
+    return (
+      <div
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverId(zoneId); }}
+        onDragLeave={() => setDragOverId(null)}
+        onDrop={(e) => handleDropOnSlot(e, { row: rowIdx, side })}
+        className={`rounded-lg border-2 border-dashed p-2 min-h-[60px] flex items-center justify-center transition-colors ${
+          dragOverId === zoneId
+            ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20'
+            : 'border-slate-200 dark:border-slate-700'
+        }`}
+      >
+        {signatory ? (
+          <DraggableSlotChip signatory={signatory} rowIdx={rowIdx} side={side} />
+        ) : (
+          <p className="text-[10px] text-slate-400 italic text-center">Drop here</p>
+        )}
+      </div>
+    );
+  };
   const [isFullScreenScan, setIsFullScreenScan] = useState(false);
   const [fullscreenLogs, setFullscreenLogs] = useState<{ id: string; name: string; time: string; status: 'success' | 'error' | 'warning'; message: string }[]>([]);
   const [scanFlash, setScanFlash] = useState<'success' | 'error' | 'warning' | null>(null);
@@ -76,15 +282,17 @@ const AdminAttendance: React.FC = () => {
       if (isRefresh) setRefreshing(true);
       else setInitialLoading(true);
 
-      const [eventsRes, studentsRes, officersRes, activeOfficersRes] = await Promise.all([
+      const [eventsRes, studentsRes, officersRes, activeOfficersRes, signatoriesRes] = await Promise.all([
         cachedApi.events.listAll({ orderDesc: 'date_to_held' }, isRefresh ? 0 : 2 * 60 * 1000),
         cachedApi.users.listAllAccounts({ type: 'student' }, isRefresh ? 0 : 5 * 60 * 1000),
         cachedApi.users.listAllAccounts({ type: 'officer' }, isRefresh ? 0 : 5 * 60 * 1000),
-        cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000)
+        cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000),
+        api.signatories.list()
       ]);
 
       setEvents(eventsRes.documents);
       setOfficersList(activeOfficersRes.documents);
+      setSignatories(signatoriesRes.documents);
       
       // Combine students and officers as eligible attendees
       const combinedAttendees = [...studentsRes.documents, ...officersRes.documents];
@@ -112,6 +320,9 @@ const AdminAttendance: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
+    setPrintPreparedBy(localStorage.getItem('specs_attendance_print_prepared_by') || 'default');
+    setPrintAttestedBy(localStorage.getItem('specs_attendance_print_attested_by') || 'default');
+    setPrintNotedBy(localStorage.getItem('specs_attendance_print_noted_by') || 'default');
   }, []);
 
   const loadAttendanceRecords = async (eventId: string) => {
@@ -1153,10 +1364,98 @@ const AdminAttendance: React.FC = () => {
       };
     };
 
-    const presidentDetails = getOfficerDetails('president', 'President');
-    const preparedByDetails = selectedSignatory === 'secretary'
-      ? getOfficerDetails('secretary', 'Executive Secretary')
-      : getOfficerDetails('asst-secretary', 'Assistant Secretary');
+    const getSignatoryDetails = (sigId: string, officerPos: string, fallbackTitle: string) => {
+      if (sigId && sigId !== 'default') {
+        const customSig = signatories.find(s => s.$id === sigId);
+        if (customSig) {
+          return {
+            name: customSig.name_officer.toUpperCase(),
+            title: (customSig.position || fallbackTitle).toUpperCase()
+          };
+        }
+      }
+      const details = getOfficerDetails(officerPos, fallbackTitle);
+      return {
+        name: details.name.toUpperCase(),
+        title: details.title.toUpperCase()
+      };
+    };
+
+    let signatureHtml = '';
+    const activeRows = layout.rows.filter(r => r.left || r.right);
+    if (activeRows.length > 0) {
+      signatureHtml = `
+        <div style="margin-top: 60px; page-break-inside: avoid; text-align: left;">
+          <table style="width: 100%; table-layout: fixed; border: none; border-collapse: collapse;">
+            <tbody>
+              ${activeRows.map((row, i) => {
+                const leftS = getById(row.left);
+                const rightS = getById(row.right);
+                return `
+                  <tr>
+                    <td style="width: 50%; padding-right: 20px; padding-bottom: 35px; border: none; vertical-align: top;">
+                      ${leftS ? `
+                        <div style="text-align: left;">
+                          <p style="font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase; margin: 0 0 35px 0; ${leftS.notation_line ? '' : 'visibility: hidden;'}">${leftS.notation_line ? leftS.notation_line.toUpperCase() : '&nbsp;'}:</p>
+                          <div style="text-align: center; width: 250px; margin-top: 30px;">
+                            <div style="border-top: 1px solid #000000; width: 100%; margin-bottom: 8px;"></div>
+                            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase; text-align: center;">${leftS.name_officer.toUpperCase()}</p>
+                            ${leftS.position ? `<p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase; text-align: center;">${leftS.position.toUpperCase()}</p>` : ''}
+                          </div>
+                        </div>
+                      ` : '&nbsp;'}
+                    </td>
+                    <td style="width: 50%; padding-left: 20px; padding-bottom: 35px; border: none; vertical-align: top;">
+                      ${rightS ? `
+                        <div style="text-align: left;">
+                          <p style="font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase; margin: 0 0 35px 0; ${rightS.notation_line ? '' : 'visibility: hidden;'}">${rightS.notation_line ? rightS.notation_line.toUpperCase() : '&nbsp;'}:</p>
+                          <div style="text-align: center; width: 250px; margin-top: 30px;">
+                            <div style="border-top: 1px solid #000000; width: 100%; margin-bottom: 8px;"></div>
+                            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase; text-align: center;">${rightS.name_officer.toUpperCase()}</p>
+                            ${rightS.position ? `<p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase; text-align: center;">${rightS.position.toUpperCase()}</p>` : ''}
+                          </div>
+                        </div>
+                      ` : '&nbsp;'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      const preparedByDetails = getSignatoryDetails(printPreparedBy, selectedSignatory, selectedSignatory === 'secretary' ? 'Executive Secretary' : 'Assistant Secretary');
+      const presidentDetails = getSignatoryDetails(printAttestedBy, 'president', 'President');
+      const notedDetails = (printNotedBy && printNotedBy !== 'default')
+        ? (() => {
+            const customSig = signatories.find(s => s.$id === printNotedBy);
+            return customSig ? { name: customSig.name_officer.toUpperCase(), title: (customSig.position || 'ADVISER, SPECS').toUpperCase() } : { name: 'NICOLAS A. PURA', title: 'ADVISER, SPECS' };
+          })()
+        : { name: 'NICOLAS A. PURA', title: 'ADVISER, SPECS' };
+
+      signatureHtml = `
+        <div class="signature-section" style="margin-top: 60px; page-break-inside: avoid; text-align: left;">
+          <div style="display: flex; flex-direction: column; gap: 40px; text-align: left; align-items: flex-start;">
+            <div style="text-align: left;">
+              <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${preparedByDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${preparedByDetails.title}</p>
+            </div>
+            <div style="text-align: left;">
+              <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title}</p>
+            </div>
+            <div style="text-align: left;">
+              <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${notedDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${notedDetails.title}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -1332,25 +1631,7 @@ const AdminAttendance: React.FC = () => {
                     </tbody>
                   </table>
 
-                  <div class="signature-section" style="margin-top: 60px; page-break-inside: avoid; text-align: left;">
-                    <div style="display: flex; flex-direction: column; gap: 40px; text-align: left; align-items: flex-start;">
-                      <div style="text-align: left;">
-                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
-                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${preparedByDetails.name}</p>
-                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${preparedByDetails.title}</p>
-                      </div>
-                      <div style="text-align: left;">
-                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
-                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name}</p>
-                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title}</p>
-                      </div>
-                      <div style="text-align: left;">
-                        <p style="margin: 0 0 35px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
-                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">NICOLAS A. PURA</p>
-                        <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">ADVISER, SPECS</p>
-                      </div>
-                    </div>
-                  </div>
+                  ${signatureHtml}
 
                 </td>
               </tr>
@@ -1927,6 +2208,110 @@ const AdminAttendance: React.FC = () => {
         />
       )}
 
+      {/* Signatory Row-Based Drag-and-Drop Organizer */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs mt-6">
+        <button
+          onClick={() => setShowSignatorySection(!showSignatorySection)}
+          className="w-full flex items-center justify-between"
+        >
+          <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+            Signatory Layout — Attendance Sheet
+          </h3>
+          {showSignatorySection ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+        </button>
+
+        {showSignatorySection && (
+          <div className="mt-4 space-y-4">
+            <p className="text-xs text-slate-500">
+              Each row has a <strong>Left</strong> and <strong>Right</strong> slot. A row can be left-only, right-only, or both.
+              Drag signatories from pool into slots. Layouts are saved per report type locally.
+            </p>
+
+            {/* Available pool */}
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Available Signatories</h4>
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                onDrop={(e) => handleDropOnSlot(e, 'available')}
+                className="min-h-[60px] border-2 border-dashed rounded-xl p-3 flex flex-wrap gap-2 transition-colors border-slate-200 dark:border-slate-700"
+              >
+                {availableSignatories.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-2 px-2">
+                    {signatories.length === 0 ? 'No signatories in the database.' : 'All signatories are placed in rows.'}
+                  </p>
+                ) : (
+                  availableSignatories.map(s => <DraggableChip key={s.$id} signatory={s} />)
+                )}
+              </div>
+            </div>
+
+            {/* Rows */}
+            {layout.rows.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Signature Rows</h4>
+                {layout.rows.map((row, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    {/* Row label */}
+                    <span className="text-[10px] font-bold text-slate-400 w-12 text-right pt-4 flex-shrink-0">
+                      Row {idx + 1}
+                    </span>
+
+                    {/* Left slot */}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wide">Left</span>
+                      </div>
+                      <SlotDropZone rowIdx={idx} side="left" signatory={getById(row.left)} />
+                    </div>
+
+                    {/* Right slot */}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-bold text-purple-500 uppercase tracking-wide">Right</span>
+                      </div>
+                      <SlotDropZone rowIdx={idx} side="right" signatory={getById(row.right)} />
+                    </div>
+
+                    {/* Remove row button */}
+                    <button
+                      onClick={() => removeRow(idx)}
+                      className="flex-shrink-0 mt-6 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                      title="Remove this row"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add row + reset */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={addRow}
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] dark:text-emerald-400 hover:underline"
+              >
+                <Plus className="h-3 w-3" /> Add Row
+              </button>
+              {layout.rows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Reset the signatory layout?')) {
+                      saveLayout({ rows: [] });
+                    }
+                  }}
+                  className="text-xs font-medium text-red-500 hover:underline"
+                >
+                  Reset Layout
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Delete Record Confirmation */}
       <ConfirmModal
         isOpen={deleteConfirm.open}
@@ -1942,40 +2327,92 @@ const AdminAttendance: React.FC = () => {
       {/* Signatory Selection Modal */}
       {printModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl mx-4 animate-in zoom-in-95">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl mx-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex flex-col items-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[#0d6b66] border border-teal-100 mb-4">
                 <Printer className="h-6 w-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Print Attendance Sheet</h3>
-              <p className="text-sm text-slate-500 text-center mb-5 font-medium">Select the officer signatory who prepared this report.</p>
+              <p className="text-xs text-slate-500 text-center mb-5 font-medium">Select the officer signatory who prepared this report.</p>
               
               <div className="w-full space-y-4 mb-6">
-                <div className="text-left">
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Prepared By Signatory</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPrintSignatory('secretary')}
-                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
-                        printSignatory === 'secretary'
-                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
+                {/* Signatory Selection Dropdowns */}
+                <div className="text-left space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Prepared By Officer Role</label>
+                    <div className="grid grid-cols-2 gap-3 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrintSignatory('secretary')}
+                        className={`rounded-lg py-1.5 text-xs font-semibold border transition-all ${
+                          printSignatory === 'secretary'
+                            ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Secretary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPrintSignatory('asst-secretary')}
+                        className={`rounded-lg py-1.5 text-xs font-semibold border transition-all ${
+                          printSignatory === 'asst-secretary'
+                            ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Asst. Secretary
+                      </button>
+                    </div>
+                    
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Prepared By Custom Signatory</label>
+                    <select
+                      value={printPreparedBy}
+                      onChange={(e) => {
+                        setPrintPreparedBy(e.target.value);
+                        localStorage.setItem('specs_attendance_print_prepared_by', e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#0d6b66] outline-none"
                     >
-                      Secretary
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPrintSignatory('asst-secretary')}
-                      className={`rounded-lg py-2.5 text-xs font-semibold border transition-all ${
-                        printSignatory === 'asst-secretary'
-                          ? 'border-[#0d6b66] bg-teal-50 text-[#0d6b66] font-bold'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
+                      <option value="default">Default Officer Details</option>
+                      {signatories.map(s => (
+                        <option key={s.$id} value={s.$id}>{s.name_officer} ({s.position || 'No position'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Attested By</label>
+                    <select
+                      value={printAttestedBy}
+                      onChange={(e) => {
+                        setPrintAttestedBy(e.target.value);
+                        localStorage.setItem('specs_attendance_print_attested_by', e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#0d6b66] outline-none"
                     >
-                      Asst. Secretary
-                    </button>
+                      <option value="default">Default Officer Details (President)</option>
+                      {signatories.map(s => (
+                        <option key={s.$id} value={s.$id}>{s.name_officer} ({s.position || 'No position'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Noted By</label>
+                    <select
+                      value={printNotedBy}
+                      onChange={(e) => {
+                        setPrintNotedBy(e.target.value);
+                        localStorage.setItem('specs_attendance_print_noted_by', e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#0d6b66] outline-none"
+                    >
+                      <option value="default">Default Officer Details (Adviser)</option>
+                      {signatories.map(s => (
+                        <option key={s.$id} value={s.$id}>{s.name_officer} ({s.position || 'No position'})</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
