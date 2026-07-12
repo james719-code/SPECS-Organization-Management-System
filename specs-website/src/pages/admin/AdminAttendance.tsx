@@ -181,6 +181,41 @@ const AdminAttendance: React.FC = () => {
     saveLayout({ rows: newRows });
   };
 
+  const assignSignatoryToSlot = (signatoryId: string, rowIdx: number, side: 'left' | 'right') => {
+    const newRows = layout.rows.map(r => ({ left: r.left, right: r.right }));
+
+    // Also remove from any other slot (in case it was placed elsewhere)
+    newRows.forEach(r => {
+      if (r.left === signatoryId) r.left = null;
+      if (r.right === signatoryId) r.right = null;
+    });
+
+    // Ensure target row exists
+    while (newRows.length <= rowIdx) {
+      newRows.push({ left: null, right: null });
+    }
+
+    if (side === 'left') {
+      if (newRows[rowIdx].left && newRows[rowIdx].left !== signatoryId) {
+        const displaced = newRows[rowIdx].left;
+        newRows[rowIdx].left = signatoryId;
+        newRows.splice(rowIdx + 1, 0, { left: displaced, right: null });
+      } else {
+        newRows[rowIdx].left = signatoryId;
+      }
+    } else {
+      if (newRows[rowIdx].right && newRows[rowIdx].right !== signatoryId) {
+        const displaced = newRows[rowIdx].right;
+        newRows[rowIdx].right = signatoryId;
+        newRows.splice(rowIdx + 1, 0, { left: null, right: displaced });
+      } else {
+        newRows[rowIdx].right = signatoryId;
+      }
+    }
+
+    saveLayout({ rows: newRows });
+  };
+
   const addRow = () => {
     const newRows = [...layout.rows, { left: null, right: null }];
     setLayout({ rows: newRows });
@@ -248,7 +283,25 @@ const AdminAttendance: React.FC = () => {
         {signatory ? (
           <DraggableSlotChip signatory={signatory} rowIdx={rowIdx} side={side} />
         ) : (
-          <p className="text-[10px] text-slate-400 italic text-center">Drop here</p>
+          <div className="w-full flex flex-col items-center justify-center gap-1.5">
+            <span className="text-[10px] text-slate-400 italic text-center hidden md:inline">Drop here</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  assignSignatoryToSlot(e.target.value, rowIdx, side);
+                }
+              }}
+              className="w-full max-w-[160px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] px-2 py-1 outline-none text-slate-500 focus:border-[#0d6b66] cursor-pointer"
+            >
+              <option value="">Select Signatory...</option>
+              {availableSignatories.map(s => (
+                <option key={s.$id} value={s.$id}>
+                  {s.name_officer}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
     );

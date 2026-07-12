@@ -21,19 +21,19 @@ const StudentTutorials: React.FC = () => {
       </div>
 
       {/* Section Tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
         {sections.map(section => (
           <button
             key={section.key}
             onClick={() => setActiveSection(section.key)}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
               activeSection === section.key
                 ? 'bg-[#0d6b66] text-white shadow-md shadow-teal-900/20'
                 : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             {section.icon}
-            <span className="hidden sm:inline">{section.label}</span>
+            <span>{section.label}</span>
           </button>
         ))}
       </div>

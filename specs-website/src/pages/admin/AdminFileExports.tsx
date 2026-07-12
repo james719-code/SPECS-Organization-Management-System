@@ -3,8 +3,9 @@ import { api, cachedApi } from '../../shared/api';
 import { useToast } from '../../components/ui/Toast';
 import {
   FileText, Image, Star, FileEdit, GripVertical, Plus, Trash2, X,
-  Users, Printer, Loader2, ChevronDown, ChevronUp, Download, RefreshCw
+  Users, Printer, Loader2, ChevronDown, ChevronUp, Download, RefreshCw, Upload
 } from 'lucide-react';
+import JSZip from 'jszip';
 
 type ReportType = 'narrative' | 'documentation' | 'rating' | 'resolution' | 'proposal';
 
@@ -42,6 +43,52 @@ interface ReportImage {
   label: string;
 }
 
+interface CriteriaDefinition {
+  id: number;
+  area: string;
+  text: string;
+  csvHeaderPattern: string;
+}
+
+const EVALUATION_CRITERIA: CriteriaDefinition[] = [
+  { id: 1, area: '1. Activity Title/Theme', text: 'The title/theme is appropriate to the nature of the activity.', csvHeaderPattern: 'appropriate to the nature' },
+  { id: 2, area: '2. Objectives', text: 'The objectives of the activity are in line with the Vision and mission of the university.', csvHeaderPattern: 'Vision and mission' },
+  { id: 3, area: '2. Objectives', text: 'The objectives are relevant to the activity.', csvHeaderPattern: 'relevant to the activity' },
+  { id: 4, area: '2. Objectives', text: 'The objectives are attainable within the allotted time.', csvHeaderPattern: 'attainable within' },
+  { id: 5, area: '3. Program Implementations / Schedule', text: 'There is flexibility in the time slot', csvHeaderPattern: 'flexibility in the time slot' },
+  { id: 6, area: '3. Program Implementations / Schedule', text: 'The flow of the program is smooth and without ad-lib', csvHeaderPattern: 'flow of the program' },
+  { id: 7, area: '3. Program Implementations / Schedule', text: 'The content of the program is well-organized and informative.', csvHeaderPattern: 'well-organized and informative' },
+  { id: 8, area: '3. Program Implementations / Schedule', text: 'The topics are discussed thoroughly and executed effectively.', csvHeaderPattern: 'discussed thoroughly' },
+  { id: 9, area: '3. Program Implementations / Schedule', text: 'The organizers were effective in their functions.', csvHeaderPattern: 'organizers were effective' },
+  { id: 10, area: '3. Program Implementations / Schedule', text: 'The chosen modality and instruction are accessible, student-friendly, and hassle-free.', csvHeaderPattern: 'modality and instruction' },
+  { id: 11, area: '4. Speakers', text: 'The speakers are competent and have mastery on the topics assigned to them.', csvHeaderPattern: 'speakers are competent' },
+  { id: 12, area: '4. Speakers', text: 'The speakers talk articulately.', csvHeaderPattern: 'speakers talk articulately' },
+  { id: 13, area: '5. Venue', text: 'The venue is accessible, clean and adequate in size.', csvHeaderPattern: 'venue is accessible' },
+  { id: 14, area: '5. Venue', text: 'It is well-ventilated.', csvHeaderPattern: 'well-ventilated' },
+  { id: 15, area: '5. Venue', text: 'It is equipped with functional amenities.', csvHeaderPattern: 'equipped with functional' },
+  { id: 16, area: '6. Meals', text: 'The food is served on time.', csvHeaderPattern: 'food is served' },
+  { id: 17, area: '6. Meals', text: 'The food is balanced and nutritious.', csvHeaderPattern: 'food is balanced' },
+];
+
+const parseCsvLine = (text: string): string[] => {
+  const result: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (c === ',' && !inQuotes) {
+      result.push(cell.trim());
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  result.push(cell.trim());
+  return result;
+};
+
 const AdminFileExports: React.FC = () => {
   const { addToast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
@@ -67,9 +114,79 @@ const AdminFileExports: React.FC = () => {
   const [docDate, setDocDate] = useState<string>('');
   const [docImages, setDocImages] = useState<ReportImage[]>([]);
 
+  // --- Rating Report States ---
+  const [ratingEventId, setRatingEventId] = useState(() => localStorage.getItem('specs_rating_event_id') || '');
+  const [ratingDate, setRatingDate] = useState(() => localStorage.getItem('specs_rating_date') || '');
+  const [ratingResponsesCount, setRatingResponsesCount] = useState(() => 
+    parseInt(localStorage.getItem('specs_rating_responses_count') || '0', 10)
+  );
+  
+  const [ratingScores, setRatingScores] = useState<Record<number, number | null>>(() => {
+    try {
+      const saved = localStorage.getItem('specs_rating_scores');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    const initial: Record<number, number | null> = {};
+    EVALUATION_CRITERIA.forEach(c => { initial[c.id] = null; });
+    return initial;
+  });
+
+  const [ratingApplicable, setRatingApplicable] = useState<Record<number, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('specs_rating_applicable');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    const initial: Record<number, boolean> = {};
+    EVALUATION_CRITERIA.forEach(c => { initial[c.id] = true; });
+    return initial;
+  });
+
+  const [ratingInterpretation, setRatingInterpretation] = useState(() => 
+    localStorage.getItem('specs_rating_interpretation') || ''
+  );
+
+  useEffect(() => {
+    localStorage.setItem('specs_rating_event_id', ratingEventId);
+    localStorage.setItem('specs_rating_date', ratingDate);
+    localStorage.setItem('specs_rating_responses_count', String(ratingResponsesCount));
+    localStorage.setItem('specs_rating_scores', JSON.stringify(ratingScores));
+    localStorage.setItem('specs_rating_applicable', JSON.stringify(ratingApplicable));
+    localStorage.setItem('specs_rating_interpretation', ratingInterpretation);
+  }, [ratingEventId, ratingDate, ratingResponsesCount, ratingScores, ratingApplicable, ratingInterpretation]);
+
+  const calculateOverall = (scores: Record<number, number | null>, applicable: Record<number, boolean>): number => {
+    let sum = 0;
+    let count = 0;
+    EVALUATION_CRITERIA.forEach(crit => {
+      const isApplicable = applicable[crit.id] !== false;
+      const score = scores[crit.id];
+      if (isApplicable && score != null) {
+        sum += score;
+        count++;
+      }
+    });
+    return count > 0 ? sum / count : 0;
+  };
+
+  const getRatingVerbalDescription = (score: number): string => {
+    if (score >= 4.75) return 'EXCELLENT';
+    if (score >= 3.75) return 'VERY GOOD';
+    if (score >= 2.75) return 'GOOD';
+    if (score >= 1.75) return 'NEEDS IMPROVEMENT';
+    return 'NOT APPLICABLE';
+  };
+
   // Derived active values
-  const selectedEventId = activeReport === 'narrative' ? narrativeEventId : docEventId;
-  const reportDate = activeReport === 'narrative' ? narrativeDate : docDate;
+  const selectedEventId = 
+    activeReport === 'narrative' ? narrativeEventId : 
+    activeReport === 'documentation' ? docEventId : 
+    activeReport === 'rating' ? ratingEventId : '';
+
+  const reportDate = 
+    activeReport === 'narrative' ? narrativeDate : 
+    activeReport === 'documentation' ? docDate : 
+    activeReport === 'rating' ? ratingDate : '';
+
   const reportImages = activeReport === 'narrative' ? narrativeImages : docImages;
 
   const handleEventChange = (eventId: string) => {
@@ -83,12 +200,15 @@ const AdminFileExports: React.FC = () => {
       // Clean up previous image URLs
       narrativeImages.forEach(img => URL.revokeObjectURL(img.url));
       setNarrativeImages([]);
-    } else {
+    } else if (activeReport === 'documentation') {
       setDocEventId(eventId);
       setDocDate(dateVal);
       // Clean up previous image URLs
       docImages.forEach(img => URL.revokeObjectURL(img.url));
       setDocImages([]);
+    } else if (activeReport === 'rating') {
+      setRatingEventId(eventId);
+      setRatingDate(dateVal);
     }
   };
 
@@ -152,6 +272,190 @@ const AdminFileExports: React.FC = () => {
       allImagesRef.current.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
+
+  const handleScoreChange = (id: number, val: string) => {
+    const parsed = parseFloat(val);
+    const updated = { ...ratingScores };
+    if (val === '' || isNaN(parsed)) {
+      updated[id] = null;
+    } else {
+      updated[id] = Math.min(5, Math.max(1, parsed));
+    }
+    setRatingScores(updated);
+    
+    // Auto-update overall score and interpretation
+    const computedOverall = calculateOverall(updated, ratingApplicable);
+    const verb = getRatingVerbalDescription(computedOverall);
+    setRatingInterpretation(
+      `In general, the implementation of the activity was successful. Based on an overall score resulting in ${computedOverall > 0 ? computedOverall.toFixed(2) : '0.00'}, the transcribed data matches the word description "${verb}".`
+    );
+  };
+
+  const handleToggleApplicable = (id: number, val: boolean) => {
+    const updatedApplicable = { ...ratingApplicable, [id]: val };
+    setRatingApplicable(updatedApplicable);
+    
+    // Auto-update overall score and interpretation
+    const computedOverall = calculateOverall(ratingScores, updatedApplicable);
+    const verb = getRatingVerbalDescription(computedOverall);
+    setRatingInterpretation(
+      `In general, the implementation of the activity was successful. Based on an overall score resulting in ${computedOverall > 0 ? computedOverall.toFixed(2) : '0.00'}, the transcribed data matches the word description "${verb}".`
+    );
+  };
+
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check if it is a ZIP or CSV file
+    const isZip = file.name.toLowerCase().endsWith('.zip');
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+
+    if (!isZip && !isCsv) {
+      addToast({ type: 'error', title: 'Invalid File', message: 'Please upload a .zip or .csv file.' });
+      return;
+    }
+
+    const processCsvContent = (csvText: string) => {
+      const lines = csvText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      if (lines.length === 0) return null;
+
+      const headers = parseCsvLine(lines[0]);
+      const dataRows = lines.slice(1).map(line => parseCsvLine(line));
+      return { headers, dataRows };
+    };
+
+    if (isCsv) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const csvText = event.target?.result as string;
+          const parsed = processCsvContent(csvText);
+          if (!parsed) {
+            addToast({ type: 'warning', title: 'Empty File', message: 'The CSV file was empty.' });
+            return;
+          }
+
+          applyParsedData(parsed.headers, parsed.dataRows);
+        } catch (err: any) {
+          addToast({ type: 'error', title: 'Parse Error', message: err.message || 'Failed to parse CSV file.' });
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const arrayBuffer = event.target?.result as ArrayBuffer;
+          const zip = await JSZip.loadAsync(arrayBuffer);
+          
+          let allRows: string[][] = [];
+          let headers: string[] = [];
+
+          // Find all CSV files in the zip
+          const csvFiles = Object.keys(zip.files).filter(name => name.toLowerCase().endsWith('.csv'));
+          if (csvFiles.length === 0) {
+            addToast({ type: 'error', title: 'Invalid File', message: 'No CSV files found inside the ZIP.' });
+            return;
+          }
+
+          for (const filename of csvFiles) {
+            const csvText = await zip.files[filename].async('text');
+            const parsed = processCsvContent(csvText);
+            if (!parsed) continue;
+
+            if (headers.length === 0) {
+              headers = parsed.headers;
+            }
+            allRows = allRows.concat(parsed.dataRows);
+          }
+
+          if (allRows.length === 0) {
+            addToast({ type: 'warning', title: 'Empty Data', message: 'No evaluation records found in the ZIP CSV files.' });
+            return;
+          }
+
+          applyParsedData(headers, allRows);
+        } catch (err: any) {
+          addToast({ type: 'error', title: 'Import Failed', message: err.message || 'Failed to process zip file.' });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    e.target.value = ''; // clear input
+  };
+
+  const applyParsedData = (headers: string[], dataRows: string[][]) => {
+    // Map evaluation criteria questions to CSV columns
+    const columnIndices: Record<number, number> = {};
+    EVALUATION_CRITERIA.forEach(crit => {
+      const idx = headers.findIndex(h => 
+        h.toLowerCase().includes(crit.csvHeaderPattern.toLowerCase()) ||
+        h.toLowerCase().replace(/\s+/g, '').includes(crit.text.toLowerCase().replace(/\s+/g, ''))
+      );
+      if (idx !== -1) {
+        columnIndices[crit.id] = idx;
+      } else {
+        // Fallback match by question index (e.g. starts with "1.", "2.")
+        const prefixIdx = headers.findIndex(h => h.trim().startsWith(`${crit.id}.`));
+        if (prefixIdx !== -1) {
+          columnIndices[crit.id] = prefixIdx;
+        }
+      }
+    });
+
+    // Compute average ratings for each question
+    const newScores: Record<number, number | null> = {};
+    const newApplicable = { ...ratingApplicable };
+    EVALUATION_CRITERIA.forEach(crit => {
+      const colIdx = columnIndices[crit.id];
+      if (colIdx === undefined) {
+        newScores[crit.id] = null;
+        newApplicable[crit.id] = false;
+        return;
+      }
+
+      let sum = 0;
+      let count = 0;
+
+      dataRows.forEach(row => {
+        const rawVal = row[colIdx];
+        if (rawVal) {
+          const val = parseFloat(rawVal);
+          if (!isNaN(val) && val > 1 && val <= 5) {
+            sum += val;
+            count++;
+          }
+        }
+      });
+
+      const averageScore = count > 0 ? parseFloat((sum / count).toFixed(2)) : null;
+      newScores[crit.id] = averageScore;
+      if (averageScore === null) {
+        newApplicable[crit.id] = false;
+      } else {
+        newApplicable[crit.id] = true;
+      }
+    });
+
+    setRatingScores(newScores);
+    setRatingApplicable(newApplicable);
+    setRatingResponsesCount(dataRows.length);
+    
+    // Auto-compute overall score and update interpretation text
+    const computedOverall = calculateOverall(newScores, newApplicable);
+    const verb = getRatingVerbalDescription(computedOverall);
+    setRatingInterpretation(
+      `In general, the implementation of the activity was successful. Based on an overall score resulting in ${computedOverall.toFixed(2)}, the transcribed data matches the word description "${verb}".`
+    );
+
+    addToast({ 
+      type: 'success', 
+      title: 'Import Successful', 
+      message: `Successfully parsed ${dataRows.length} evaluation responses.` 
+    });
+  };
 
   // Resolution form
   const [resNumber, setResNumber] = useState(() => localStorage.getItem('specs_res_number') || '01');
@@ -225,7 +529,6 @@ const AdminFileExports: React.FC = () => {
     propTitle, propProponents, propDate, propTime, propVenue, propParticipants,
     propRationale, propObjectives, propDescription, propBudgetItems, propSourceOfFunds, propExpectedOutputs
   ]);
-
   // Signatory layout — row-based
   const [layout, setLayout] = useState<SignatoryLayout>({ rows: [] });
   const [showSignatorySection, setShowSignatorySection] = useState(true);
@@ -425,6 +728,41 @@ const AdminFileExports: React.FC = () => {
     const newRows = layout.rows.map((r, i) =>
       i === rowIdx ? { ...r, [side]: null } : { ...r }
     );
+    saveLayout({ rows: newRows });
+  };
+
+  const assignSignatoryToSlot = (signatoryId: string, rowIdx: number, side: 'left' | 'right') => {
+    const newRows = layout.rows.map(r => ({ left: r.left, right: r.right }));
+
+    // Also remove from any other slot (in case it was placed elsewhere)
+    newRows.forEach(r => {
+      if (r.left === signatoryId) r.left = null;
+      if (r.right === signatoryId) r.right = null;
+    });
+
+    // Ensure target row exists
+    while (newRows.length <= rowIdx) {
+      newRows.push({ left: null, right: null });
+    }
+
+    if (side === 'left') {
+      if (newRows[rowIdx].left && newRows[rowIdx].left !== signatoryId) {
+        const displaced = newRows[rowIdx].left;
+        newRows[rowIdx].left = signatoryId;
+        newRows.splice(rowIdx + 1, 0, { left: displaced, right: null });
+      } else {
+        newRows[rowIdx].left = signatoryId;
+      }
+    } else {
+      if (newRows[rowIdx].right && newRows[rowIdx].right !== signatoryId) {
+        const displaced = newRows[rowIdx].right;
+        newRows[rowIdx].right = signatoryId;
+        newRows.splice(rowIdx + 1, 0, { left: null, right: displaced });
+      } else {
+        newRows[rowIdx].right = signatoryId;
+      }
+    }
+
     saveLayout({ rows: newRows });
   };
 
@@ -714,27 +1052,83 @@ const AdminFileExports: React.FC = () => {
         ${signatoriesHtml}
       `;
     } else if (activeReport === 'rating') {
-      const rows = events.map(ev => `
-        <tr>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.event_name || 'N/A'}</td>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.date_to_held ? new Date(ev.date_to_held).toLocaleDateString() : 'N/A'}</td>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.rating_links || 'No link'}</td>
-        </tr>
-      `).join('');
-      
-      reportBodyHtml = `
-        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-          <thead>
-            <tr style="background-color: #f1f5f9;">
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Event Name</th>
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Date</th>
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Rating Link</th>
+      const grouped: Record<string, typeof EVALUATION_CRITERIA> = {};
+      EVALUATION_CRITERIA.forEach(crit => {
+        if (!grouped[crit.area]) {
+          grouped[crit.area] = [];
+        }
+        grouped[crit.area].push(crit);
+      });
+
+      let tableRowsHtml = '';
+      Object.keys(grouped).forEach(area => {
+        const crits = grouped[area];
+        let groupRowsHtml = '';
+        crits.forEach((crit, idx) => {
+          const isApplicable = ratingApplicable[crit.id] !== false;
+          const scoreVal = ratingScores[crit.id];
+          const ratingText = isApplicable ? (scoreVal != null ? scoreVal.toFixed(2) : 'N/A') : 'N/A';
+
+          groupRowsHtml += `
+            <tr style="page-break-inside: avoid; break-inside: avoid;">
+              ${idx === 0 ? `<td rowspan="${crits.length}" style="border: 1px solid black; padding: 6px; font-weight: bold; vertical-align: top; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${area}</td>` : ''}
+              <td style="border: 1px solid black; padding: 6px; text-align: left; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${crit.text}</td>
+              <td style="border: 1px solid black; padding: 6px; text-align: center; font-weight: bold; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${ratingText}</td>
             </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="3">No events found.</td></tr>'}
+          `;
+        });
+
+        tableRowsHtml += `
+          <tbody style="page-break-inside: avoid; break-inside: avoid;">
+            ${groupRowsHtml}
           </tbody>
-        </table>
+        `;
+      });
+
+      const computedOverall = calculateOverall(ratingScores, ratingApplicable);
+
+      reportBodyHtml = `
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none; margin-top: 10px;">
+          <div style="text-align: center; background-color: #7ee8a2; border: 1.5px solid #042f1a; color: #042f1a; font-weight: bold; padding: 6px; font-size: 11pt; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 0.5px; page-break-inside: avoid;">
+            EVALUATION
+          </div>
+
+          <div style="font-size: 10pt; margin-bottom: 20px; line-height: 1.4; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin: 0 0 5px 0;">Rating for the evaluation form where:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin: 0; padding: 0;">
+              <span><strong>5</strong> &ndash; Excellent</span>
+              <span><strong>4</strong> &ndash; Very Good</span>
+              <span><strong>3</strong> &ndash; Good</span>
+              <span><strong>2</strong> &ndash; Needs Improvement</span>
+              <span><strong>1</strong> &ndash; Not Applicable</span>
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black;">
+            <thead>
+              <tr style="background-color: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: left; font-family: 'Times New Roman', Times, serif; width: 25%;">AREA</th>
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: left; font-family: 'Times New Roman', Times, serif; width: 55%;">CRITERIA</th>
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: center; font-family: 'Times New Roman', Times, serif; width: 20%;">AVERAGE RATING</th>
+              </tr>
+            </thead>
+            ${tableRowsHtml}
+            <tbody>
+              <tr style="font-weight: bold; background-color: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
+                <td colspan="2" style="border: 1px solid black; padding: 8px; text-align: right; font-size: 10.5pt; font-family: 'Times New Roman', Times, serif;">OVERALL RATING</td>
+                <td style="border: 1px solid black; padding: 8px; text-align: center; font-size: 10.5pt; font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                  ${computedOverall > 0 ? computedOverall.toFixed(2) : 'N/A'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          ${ratingInterpretation ? `
+            <div style="margin-bottom: 35px; line-height: 1.6; font-size: 10.5pt; text-align: justify; page-break-inside: avoid;">
+              <p style="margin: 0;"><strong>Interpretations:</strong> ${ratingInterpretation}</p>
+            </div>
+          ` : ''}
+        </div>
         ${signatoriesHtml}
       `;
     } else if (activeReport === 'resolution') {
@@ -1191,27 +1585,84 @@ const AdminFileExports: React.FC = () => {
         </div>
       `;
     } else if (activeReport === 'rating') {
-      const rows = events.map(ev => `
-        <tr>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.event_name || 'N/A'}</td>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.date_to_held ? new Date(ev.date_to_held).toLocaleDateString() : 'N/A'}</td>
-          <td style="border: 1px solid black; padding: 6px; font-size: 10px;">${ev.rating_links || 'No link'}</td>
-        </tr>
-      `).join('');
-      
-      reportBodyHtml = `
-        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-          <thead>
-            <tr style="background-color: #f1f5f9;">
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Event Name</th>
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Date</th>
-              <th style="border: 1px solid black; padding: 6px; font-size: 10px; text-align: left;">Rating Link</th>
+      const grouped: Record<string, typeof EVALUATION_CRITERIA> = {};
+      EVALUATION_CRITERIA.forEach(crit => {
+        if (!grouped[crit.area]) {
+          grouped[crit.area] = [];
+        }
+        grouped[crit.area].push(crit);
+      });
+
+      let tableRowsHtml = '';
+      Object.keys(grouped).forEach(area => {
+        const crits = grouped[area];
+        let groupRowsHtml = '';
+        crits.forEach((crit, idx) => {
+          const isApplicable = ratingApplicable[crit.id] !== false;
+          const scoreVal = ratingScores[crit.id];
+          const ratingText = isApplicable ? (scoreVal != null ? scoreVal.toFixed(2) : 'N/A') : 'N/A';
+
+          groupRowsHtml += `
+            <tr style="page-break-inside: avoid; break-inside: avoid;">
+              ${idx === 0 ? `<td rowspan="${crits.length}" style="border: 1px solid black; padding: 6px; font-weight: bold; vertical-align: top; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${area}</td>` : ''}
+              <td style="border: 1px solid black; padding: 6px; text-align: left; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${crit.text}</td>
+              <td style="border: 1px solid black; padding: 6px; text-align: center; font-weight: bold; font-size: 10pt; font-family: 'Times New Roman', Times, serif;">${ratingText}</td>
             </tr>
-          </thead>
-          <tbody>
-            ${rows || '<tr><td colspan="3">No events found.</td></tr>'}
+          `;
+        });
+
+        tableRowsHtml += `
+          <tbody style="page-break-inside: avoid; break-inside: avoid;">
+            ${groupRowsHtml}
           </tbody>
-        </table>
+        `;
+      });
+
+      const computedOverall = calculateOverall(ratingScores, ratingApplicable);
+
+      reportBodyHtml = `
+        <div style="font-family: 'Times New Roman', Times, serif; color: #000000; text-transform: none; margin-top: 10px;">
+          <div style="text-align: center; background-color: #7ee8a2; border: 1.5px solid #042f1a; color: #042f1a; font-weight: bold; padding: 6px; font-size: 11pt; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 0.5px; page-break-inside: avoid;">
+            EVALUATION
+          </div>
+
+          <div style="font-size: 10pt; margin-bottom: 20px; line-height: 1.4; page-break-inside: avoid;">
+            <p style="font-weight: bold; margin: 0 0 5px 0;">Rating for the evaluation form where:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; margin: 0; padding: 0;">
+              <span><strong>5</strong> &ndash; Excellent</span>
+              <span><strong>4</strong> &ndash; Very Good</span>
+              <span><strong>3</strong> &ndash; Good</span>
+              <span><strong>2</strong> &ndash; Needs Improvement</span>
+              <span><strong>1</strong> &ndash; Not Applicable</span>
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black;">
+            <thead>
+              <tr style="background-color: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: left; font-family: 'Times New Roman', Times, serif; width: 25%;">AREA</th>
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: left; font-family: 'Times New Roman', Times, serif; width: 55%;">CRITERIA</th>
+                <th style="border: 1px solid black; padding: 6px; font-size: 10pt; text-align: center; font-family: 'Times New Roman', Times, serif; width: 20%;">AVERAGE RATING</th>
+              </tr>
+            </thead>
+            ${tableRowsHtml}
+            <tbody>
+              <tr style="font-weight: bold; background-color: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
+                <td colspan="2" style="border: 1px solid black; padding: 8px; text-align: right; font-size: 10.5pt; font-family: 'Times New Roman', Times, serif;">OVERALL RATING</td>
+                <td style="border: 1px solid black; padding: 8px; text-align: center; font-size: 10.5pt; font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                  ${computedOverall > 0 ? computedOverall.toFixed(2) : 'N/A'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+
+          ${ratingInterpretation ? `
+            <div style="margin-bottom: 35px; line-height: 1.6; font-size: 10.5pt; text-align: justify; page-break-inside: avoid;">
+              <p style="margin: 0;"><strong>Interpretations:</strong> ${ratingInterpretation}</p>
+            </div>
+          ` : ''}
+        </div>
         <div id="signatories-wrapper">
           ${signatoriesHtml}
         </div>
@@ -1745,7 +2196,25 @@ const AdminFileExports: React.FC = () => {
         {signatory ? (
           <DraggableSlotChip signatory={signatory} rowIdx={rowIdx} side={side} />
         ) : (
-          <p className="text-[10px] text-slate-400 italic text-center">Drop here</p>
+          <div className="w-full flex flex-col items-center justify-center gap-1.5">
+            <span className="text-[10px] text-slate-400 italic text-center hidden md:inline">Drop here</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  assignSignatoryToSlot(e.target.value, rowIdx, side);
+                }
+              }}
+              className="w-full max-w-[160px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[10px] px-2 py-1 outline-none text-slate-500 focus:border-[#0d6b66] cursor-pointer"
+            >
+              <option value="">Select Signatory...</option>
+              {availableSignatories.map(s => (
+                <option key={s.$id} value={s.$id}>
+                  {s.name_officer}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
     );
@@ -1892,7 +2361,138 @@ const AdminFileExports: React.FC = () => {
         </div>
       )}
 
+      {/* Rating Report Form */}
+      {activeReport === 'rating' && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-4 animate-fade-in">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+            Activity Evaluation Details
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Select Event *</label>
+              <select
+                value={ratingEventId}
+                onChange={e => handleEventChange(e.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+              >
+                <option value="">-- Select Event --</option>
+                {events.map(ev => (
+                  <option key={ev.$id} value={ev.$id}>{ev.event_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Event Date</label>
+              <input
+                type="date"
+                value={ratingDate}
+                onChange={e => setRatingDate(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+              />
+            </div>
 
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">
+                Upload Evaluation Responses File (.zip or .csv)
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept=".zip,.csv"
+                  onChange={handleZipUpload}
+                  className="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-[#0d6b66] dark:file:bg-teal-950/30 dark:file:text-teal-400 hover:file:bg-teal-100 transition-all cursor-pointer"
+                />
+                {ratingResponsesCount > 0 && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold whitespace-nowrap bg-emerald-50 dark:bg-emerald-950/35 px-2.5 py-1.5 rounded-lg border border-emerald-250/20">
+                    {ratingResponsesCount} responses loaded
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                You can upload a ZIP file containing Google Forms feedback CSV(s), or upload a raw CSV file directly. Individual ratings of "1" are treated as "Not Applicable" and excluded.
+              </p>
+            </div>
+
+            {/* Criteria table with applicable checkboxes and manual score overrides */}
+            <div className="sm:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">
+                  Criteria Applicability & Scores
+                </label>
+                <span className="text-[10px] text-slate-400 italic">
+                  Toggle applicability checkboxes or modify scores manually if needed.
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
+                  <thead className="bg-slate-50 dark:bg-slate-800 font-bold text-slate-705 dark:text-slate-300 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2 w-12 text-center">App?</th>
+                      <th className="px-4 py-2 w-48">Area</th>
+                      <th className="px-4 py-2">Criteria Question</th>
+                      <th className="px-4 py-2 w-32 text-center">Average Rating</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                    {EVALUATION_CRITERIA.map(crit => {
+                      const isApplicable = ratingApplicable[crit.id] !== false;
+                      const scoreVal = ratingScores[crit.id];
+                      return (
+                        <tr key={crit.id} className={isApplicable ? '' : 'bg-slate-50/55 opacity-60'}>
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isApplicable}
+                              onChange={e => handleToggleApplicable(crit.id, e.target.checked)}
+                              className="h-3.5 w-3.5 text-[#0d6b66] focus:ring-[#0d6b66] border-slate-350 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-2 font-semibold text-slate-750 dark:text-slate-400">{crit.area}</td>
+                          <td className="px-4 py-2 text-slate-600 dark:text-slate-300">{crit.text}</td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="5"
+                              step="0.01"
+                              disabled={!isApplicable}
+                              value={scoreVal != null ? scoreVal : ''}
+                              onChange={e => handleScoreChange(crit.id, e.target.value)}
+                              placeholder="N/A"
+                              className="w-full rounded border border-slate-200 dark:border-slate-700 px-2 py-1 text-center text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none disabled:bg-slate-100 dark:disabled:bg-slate-800/40"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-white text-sm">
+                      <td colSpan={3} className="px-4 py-3 text-right">OVERALL EVALUATION RATING</td>
+                      <td className="px-4 py-3 text-center text-teal-650 dark:text-teal-400 text-base">
+                        {calculateOverall(ratingScores, ratingApplicable) > 0 
+                          ? calculateOverall(ratingScores, ratingApplicable).toFixed(2) 
+                          : 'N/A'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Interpretations Paragraph</label>
+              <textarea
+                value={ratingInterpretation}
+                onChange={e => setRatingInterpretation(e.target.value)}
+                rows={4}
+                placeholder="Enter interpretation description..."
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none resize-y"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Resolution Form */}
       {activeReport === 'resolution' && (

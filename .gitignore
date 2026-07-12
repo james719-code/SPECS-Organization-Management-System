@@ -47,3 +47,4 @@ reasonix.toml
 **/blob-report/
 **/playwright/.cache/
 **/playwright/.auth/
+*.csv

@@ -55,16 +55,16 @@ const TermsOfServicePage: React.FC<TermsOfServicePageProps> = ({ theme, toggleTh
       <div className="flex-1 max-w-6xl mx-auto w-full px-6 sm:px-12 md:px-20 py-12 lg:py-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           {/* Sidebar Navigation */}
-          <aside className="lg:col-span-3">
-            <nav className="sticky top-28 space-y-1">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 px-3">
+          <aside className="lg:col-span-3 sticky top-[72px] lg:top-28 z-20 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md lg:bg-transparent lg:backdrop-blur-none -mx-6 px-6 lg:mx-0 lg:px-0 py-3 lg:py-0 border-b border-slate-200/40 dark:border-slate-800/40 lg:border-b-0">
+            <nav className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0 gap-2 lg:gap-1 scrollbar-none">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 px-3 hidden lg:block">
                 On This Page
               </h4>
               {SECTIONS.map((section) => (
                 <a
                   key={section.id}
                   href={`#${section.id}`}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-[#0d6b66] dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-all group"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-[#0d6b66] dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-all group whitespace-nowrap bg-white dark:bg-slate-900 border border-slate-200/40 dark:border-slate-800/40 lg:bg-transparent lg:border-none flex-shrink-0"
                 >
                   <span className="text-slate-400 dark:text-slate-500 group-hover:text-[#0d6b66] dark:group-hover:text-teal-400 transition-colors">
                     {section.icon}
