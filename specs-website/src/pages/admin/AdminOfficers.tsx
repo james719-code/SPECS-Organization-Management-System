@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { RotateCw, Shield, Edit2, Check, AlertCircle, Users, X, Grid, List } from 'lucide-react';
+import { RotateCw, Shield, Edit2, Check, AlertCircle, Users, X, Grid, List, CreditCard } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { storage } from '../../shared/appwrite';
 import { BUCKET_ID_PICTURES } from '../../shared/constants';
 import { useToast } from '../../components/ui/Toast';
 import type { OfficerDoc, StudentDoc } from '../../types/database';
+import { IDCardExportModal } from '../../components/id/IDCardExportModal';
 
 const POSITION_METADATA: Record<string, { label: string; limit: number; badgeColor: string }> = {
   'president': { label: 'President', limit: 1, badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-955/30 dark:text-amber-300 border-amber-200 dark:border-amber-900/50' },
@@ -39,6 +40,9 @@ const AdminOfficers: React.FC = () => {
   // Drag & Drop / Click-to-assign states
   const [draggingOfficerId, setDraggingOfficerId] = useState<string | null>(null);
   const [activeSelectOfficerId, setActiveSelectOfficerId] = useState<string | null>(null);
+
+  // Export ID Modal State
+  const [exportIdOfficer, setExportIdOfficer] = useState<OfficerDoc | null>(null);
 
   const { addToast } = useToast();
 
@@ -283,19 +287,32 @@ const AdminOfficers: React.FC = () => {
           )}
           <span className="truncate">{name}</span>
         </div>
-        {officer.position && (
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              handleAssignInline(officer.$id, '');
+              setExportIdOfficer(officer);
             }}
-            className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0 ml-1"
-            title="Remove Position"
+            className="text-slate-400 hover:text-[#0d6b66] transition-colors flex-shrink-0"
+            title="Export Officer ID Card"
           >
-            <X className="h-3.5 w-3.5" />
+            <CreditCard className="h-3.5 w-3.5" />
           </button>
-        )}
+          {officer.position && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAssignInline(officer.$id, '');
+              }}
+              className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+              title="Remove Position"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -639,6 +656,28 @@ const AdminOfficers: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ID Card Export Modal */}
+      <IDCardExportModal
+        isOpen={!!exportIdOfficer}
+        onClose={() => setExportIdOfficer(null)}
+        data={exportIdOfficer ? (() => {
+          const student = exportIdOfficer.students && typeof exportIdOfficer.students === 'object'
+            ? (exportIdOfficer.students as StudentDoc)
+            : null;
+          return {
+            id: student?.$id || exportIdOfficer.$id,
+            name: student?.name || 'Executive Officer',
+            studentId: student?.student_id ? String(student.student_id) : exportIdOfficer.$id,
+            role: 'officer' as const,
+            position: exportIdOfficer.position || 'Officer',
+            section: student?.section,
+            yearLevel: student?.yearLevel,
+            email: student?.email,
+            address: student?.address
+          };
+        })() : null}
+      />
     </div>
   );
 };

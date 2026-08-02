@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, CreditCard } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { formatDate } from '../../shared/formatters';
@@ -13,6 +13,7 @@ import { databases, functions } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, FUNCTION_ID } from '../../shared/constants';
 import { Query } from 'appwrite';
 import type { StudentDoc, AccountDoc } from '../../types/database';
+import { IDCardExportModal } from '../../components/id/IDCardExportModal';
 
 const PAGE_SIZE = 12;
 
@@ -59,6 +60,9 @@ const AdminStudents: React.FC = () => {
   const [editSection, setEditSection] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editEmail, setEditEmail] = useState('');
+
+  // Export ID Modal State
+  const [exportIdStudent, setExportIdStudent] = useState<StudentDoc | null>(null);
 
   const OFFICER_POSITIONS = [
     { value: 'president', label: 'President' },
@@ -746,12 +750,20 @@ const AdminStudents: React.FC = () => {
                       disabled={actionLoading}
                       className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 text-white py-2.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
                     >
-                      Demote to Student
+              Demote to Student
                     </button>
                   )}
                 </>
               )}
-              <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setExportIdStudent(detailStudent)}
+                className="w-full rounded-lg bg-slate-900 hover:bg-slate-800 text-white py-2.5 text-sm font-semibold transition-colors shadow-sm flex items-center justify-center gap-2"
+              >
+                <CreditCard className="h-4 w-4 text-emerald-400" />
+                Export Member ID Card
+              </button>
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={handleOpenEditModal}
@@ -982,6 +994,22 @@ const AdminStudents: React.FC = () => {
           </div>
         </div>
       , document.body)}
+
+      {/* ID Card Export Modal */}
+      <IDCardExportModal
+        isOpen={!!exportIdStudent}
+        onClose={() => setExportIdStudent(null)}
+        data={exportIdStudent ? {
+          id: exportIdStudent.$id,
+          name: exportIdStudent.name || 'Student Member',
+          studentId: exportIdStudent.student_id ? String(exportIdStudent.student_id) : exportIdStudent.$id,
+          role: 'student',
+          section: exportIdStudent.section,
+          yearLevel: exportIdStudent.yearLevel,
+          email: exportIdStudent.email,
+          address: exportIdStudent.address
+        } : null}
+      />
     </div>
   );
 };

@@ -36,7 +36,8 @@ if (DEV_BYPASS) {
         createRecovery: async (email: string, _url: string) => (await getMockApi()).sendPasswordResetEmail(email),
         updateRecovery: async (userId: string, secret: string, password: string) => (await getMockApi()).confirmPasswordRecovery(userId, secret, password),
         create: async (_userId: string, email: string, password: string, name: string) => (await getMockApi()).register(email, password, name),
-        createVerification: async (_url: string) => (await getMockApi()).sendVerificationEmail()
+        createVerification: async (_url: string) => (await getMockApi()).sendVerificationEmail(),
+        updatePassword: async (password: string, oldPassword?: string) => (await getMockApi()).updatePassword(password)
     };
 
     databases = {

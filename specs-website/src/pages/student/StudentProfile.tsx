@@ -5,12 +5,13 @@ import { showToast } from '../../shared/toast';
 import { account, databases, Query } from '../../shared/appwrite';
 import { 
   Loader2, Heart, Award, CheckCircle2, XCircle, Clock, Send, PenTool, ShieldAlert,
-  BookOpen, Globe, LayoutGrid
+  BookOpen, Globe, LayoutGrid, CreditCard, FileText, User as UserIcon, Trash2
 } from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS } from '../../shared/constants';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
+import { IDCardExportModal } from '../../components/id/IDCardExportModal';
 
 const StudentProfile: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -43,12 +44,16 @@ const StudentProfile: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [updatingAccount, setUpdatingAccount] = useState(false);
 
-  // SMTP Credentials states (officer only)
+  // SMTP Credentials & Officer position states (officer only)
   const [officerEmail, setOfficerEmail] = useState('');
   const [officerToken, setOfficerToken] = useState('');
+  const [officerPosition, setOfficerPosition] = useState('');
   const [officerDocId, setOfficerDocId] = useState<string | null>(null);
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [showSmtpTutorial, setShowSmtpTutorial] = useState(false);
+
+  // ID Card modal state
+  const [isIdModalOpen, setIsIdModalOpen] = useState(false);
 
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -86,6 +91,7 @@ const StudentProfile: React.FC = () => {
           setOfficerDocId(offDoc.$id);
           setOfficerEmail(offDoc.email || '');
           setOfficerToken(offDoc.token_email || '');
+          setOfficerPosition(offDoc.position || '');
         } catch (err) {
           console.warn('Could not fetch officer SMTP credentials:', err);
         }
@@ -292,14 +298,20 @@ const StudentProfile: React.FC = () => {
   }
 
   const name = studentData?.name || currentUser?.name || 'User';
-  const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const initials = name
+    .split(' ')
+    .map((n: string) => n[0])
+    .filter(Boolean)
+    .join('')
+    .substring(0, 2)
+    .toUpperCase() || 'U';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-sm text-slate-500 mt-1">View and manage your student information.</p>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">My Profile</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">View and manage your account information and membership badge.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -311,7 +323,7 @@ const StudentProfile: React.FC = () => {
               {initials}
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">{name}</h3>
+              <h3 className="text-lg font-bold text-slate-900">{studentData?.name || currentUser?.name}</h3>
               <p className="text-xs text-slate-500 font-medium">{studentData?.email || currentUser?.email}</p>
             </div>
 
@@ -320,20 +332,34 @@ const StudentProfile: React.FC = () => {
               {accountType === 'officer' ? 'Active Officer' : accountType === 'admin' ? 'Active Admin' : 'Active Student'}
             </span>
 
-            <div className="flex gap-2 justify-center pt-3">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-3">
               <button
+                type="button"
                 onClick={handleEditOpen}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-xl bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-3.5 text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
+                <UserIcon className="h-3.5 w-3.5" />
                 Edit Profile
               </button>
+
               <button
+                type="button"
+                onClick={() => setIsIdModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <CreditCard className="h-3.5 w-3.5 text-teal-400" />
+                Export ID Card
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setDeleteConfirmText('');
                   setIsDeleteOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 px-3.5 text-xs font-bold transition-all cursor-pointer"
               >
+                <Trash2 className="h-3.5 w-3.5 text-red-500" />
                 Delete Account
               </button>
             </div>
@@ -349,7 +375,7 @@ const StudentProfile: React.FC = () => {
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`specs-member:${currentUser.$id}`)}`}
                     alt="Attendance QR Code"
-                    className="w-32 h-32 transition-transform duration-200 group-hover:scale-98"
+                    className="w-32 h-32 aspect-square object-contain shrink-0 transition-transform duration-200 group-hover:scale-98"
                   />
                   <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
                     <svg className="h-6 w-6 text-white drop-shadow-md animate-in zoom-in-50 duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -374,6 +400,21 @@ const StudentProfile: React.FC = () => {
 
         {/* Right Info Details */}
         <div className="lg:col-span-2 space-y-6">
+          {/* SPECS Attendance & Event Pass Guide Card */}
+          <div className="rounded-xl border border-teal-200/90 dark:border-teal-900/50 bg-teal-50/70 dark:bg-teal-950/20 p-5 shadow-xs space-y-2 text-left">
+            <h3 className="text-sm font-black text-[#0d6b66] dark:text-teal-400 uppercase tracking-wider flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-[#0d6b66] dark:text-teal-400 shrink-0" />
+              SPECS Organization Pass & Attendance Guide
+            </h3>
+            <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+              Your SPECS Member Badge is a <strong>Horizontal 50/50 Attendance Pass</strong> designed for fast check-in at organization events:
+            </p>
+            <ul className="text-xs text-slate-700 dark:text-slate-300 space-y-1.5 font-medium leading-relaxed list-disc pl-4 pt-1">
+              <li><strong>Left Half (Member Details)</strong>: Displays your name, photo container, student ID, and course section.</li>
+              <li><strong>Right Half (Attendance QR)</strong>: Displays a large, high-contrast QR code for instant scanning at SPECS workshops, assemblies, and hackathons.</li>
+              <li><strong>Policy & Usage Disclaimer (Card Back)</strong>: Explicitly notes that this pass is an internal organization event badge and <em>not an official University ID Card</em>.</li>
+            </ul>
+          </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
               <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -989,11 +1030,11 @@ const StudentProfile: React.FC = () => {
                 </svg>
               </button>
             </div>
-            <div className="p-4 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white shadow-md">
+            <div className="p-4 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white shadow-md flex items-center justify-center aspect-square">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`specs-member:${currentUser.$id}`)}`}
                 alt="Enlarged Attendance QR Code"
-                className="w-64 h-64"
+                className="w-64 h-64 max-w-full max-h-full aspect-square object-contain shrink-0"
               />
             </div>
             <div className="text-center space-y-1">
@@ -1005,6 +1046,23 @@ const StudentProfile: React.FC = () => {
         </div>,
         document.body
       )}
+
+      {/* ID Card Export Modal */}
+      <IDCardExportModal
+        isOpen={isIdModalOpen}
+        onClose={() => setIsIdModalOpen(false)}
+        data={currentUser ? {
+          id: currentUser.$id,
+          name: name,
+          studentId: studentData?.student_id || currentUser?.$id,
+          role: accountType === 'officer' ? 'officer' : 'student',
+          position: officerPosition || (studentData?.position || ''),
+          section: studentData?.section,
+          yearLevel: studentData?.yearLevel,
+          email: studentData?.email || currentUser?.email,
+          address: studentData?.address
+        } : null}
+      />
     </div>
   );
 };

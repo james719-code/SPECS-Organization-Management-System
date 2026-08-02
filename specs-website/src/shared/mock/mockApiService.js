@@ -170,6 +170,12 @@ class MockApiService {
         return true;
     }
 
+    async updatePassword(newPassword) {
+        await delay(MOCK_DELAY);
+        console.log('[Mock] Password updated successfully for current user');
+        return true;
+    }
+
     async updateAccountType(accountId, newType) {
         await delay(MOCK_DELAY);
         const index = mockAccounts.findIndex(a => a.$id === accountId);

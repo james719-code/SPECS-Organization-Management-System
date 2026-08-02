@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, cachedApi } from '../../shared/api';
 import { useToast } from '../../components/ui/Toast';
 import {
   FileText, Image, Star, FileEdit, GripVertical, Plus, Trash2, X,
-  Users, Printer, Loader2, ChevronDown, ChevronUp, Download, RefreshCw, Upload
+  Users, Printer, Loader2, ChevronDown, ChevronUp, Download, RefreshCw, Upload, CreditCard,
+  UserCheck, ShieldCheck
 } from 'lucide-react';
 import JSZip from 'jszip';
+import { IDCardPreview, IDCardData, formatOfficerPosition } from '../../components/id/IDCardPreview';
+import { IDCardExportModal } from '../../components/id/IDCardExportModal';
 
-type ReportType = 'narrative' | 'documentation' | 'rating' | 'resolution' | 'proposal';
+type ReportType = 'narrative' | 'documentation' | 'rating' | 'resolution' | 'proposal' | 'id_card';
 
 interface Signatory {
   $id: string;
@@ -35,6 +38,7 @@ const REPORT_LABELS: Record<ReportType, string> = {
   rating: 'Rating Report',
   resolution: 'SPECS Resolution',
   proposal: 'Activity Proposal',
+  id_card: 'ID Card Generator',
 };
 
 interface ReportImage {
@@ -582,11 +586,87 @@ const AdminFileExports: React.FC = () => {
     }
   };
 
+  // ID Card Generator States
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [idCardSearch, setIdCardSearch] = useState('');
+  const [selectedStudentForId, setSelectedStudentForId] = useState('');
+  const [selectedIdCardDataForModal, setSelectedIdCardDataForModal] = useState<IDCardData | null>(null);
+  const [idCategoryFilter, setIdCategoryFilter] = useState<'all' | 'officers' | 'students' | 'custom'>('all');
+  const [customBlankData, setCustomBlankData] = useState({
+    name: '',
+    studentId: '',
+    role: 'student' as 'student' | 'officer',
+    position: '',
+    section: '',
+    yearLevel: '',
+    email: '',
+    address: ''
+  });
+
+  const loadStudents = async () => {
+    try {
+      const res = await cachedApi.students.listAllProfiles();
+      setAllStudents(res.documents || []);
+    } catch (err: any) {
+      console.error('Failed to load students for ID generator:', err);
+    }
+  };
+
   useEffect(() => {
     loadSignatories();
     loadEvents();
     loadOfficers();
+    loadStudents();
   }, []);
+
+  const selectedIdCardData = useMemo<IDCardData | null>(() => {
+    if (selectedStudentForId === 'custom_blank') {
+      return {
+        id: 'custom_blank',
+        name: customBlankData.name || 'FULL NAME',
+        studentId: customBlankData.studentId || 'STUDENT ID',
+        role: customBlankData.role,
+        position: customBlankData.position,
+        section: customBlankData.section,
+        yearLevel: customBlankData.yearLevel,
+        email: customBlankData.email,
+        address: customBlankData.address
+      };
+    }
+    if (!selectedStudentForId) return null;
+    if (selectedStudentForId.startsWith('off_')) {
+      const offId = selectedStudentForId.replace('off_', '');
+      const off = officers.find(o => o.$id === offId);
+      if (!off) return null;
+      const std = off.students && typeof off.students === 'object' ? off.students : null;
+      return {
+        id: std?.$id || off.$id,
+        name: std?.name || off.name_officer || 'Executive Officer',
+        studentId: std?.student_id ? String(std.student_id) : off.$id,
+        role: 'officer',
+        position: off.position || 'Officer',
+        section: std?.section,
+        yearLevel: std?.yearLevel,
+        email: std?.email,
+        address: std?.address
+      };
+    } else if (selectedStudentForId.startsWith('std_')) {
+      const stdId = selectedStudentForId.replace('std_', '');
+      const std = allStudents.find(s => s.$id === stdId);
+      if (!std) return null;
+      return {
+        id: std.$id,
+        name: std.name || 'Student Member',
+        studentId: std.student_id ? String(std.student_id) : std.$id,
+        role: 'student',
+        section: std.section,
+        yearLevel: std.yearLevel,
+        email: std.email,
+        address: std.address
+      };
+    }
+    return null;
+  }, [selectedStudentForId, officers, allStudents, customBlankData]);
 
   // --- Layout persistence ---
   const getStorageKey = () => `${STORAGE_KEY_PREFIX}${activeReport}`;
@@ -2265,11 +2345,353 @@ const AdminFileExports: React.FC = () => {
               {type === 'rating' && <Star className="h-3.5 w-3.5" />}
               {type === 'resolution' && <FileEdit className="h-3.5 w-3.5" />}
               {type === 'proposal' && <FileText className="h-3.5 w-3.5" />}
+              {type === 'id_card' && <CreditCard className="h-3.5 w-3.5" />}
               {REPORT_LABELS[type]}
             </button>
           ))}
         </div>
       </div>
+
+      {/* ID Card Generator Section */}
+      {activeReport === 'id_card' && (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-6 shadow-xs space-y-6 animate-fade-in">
+          {/* Header Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-[#0d6b66]" />
+                ID Card Generator
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Generate official horizontal CR80 SPECS attendance passes (3.375" × 2.125") with 50/50 QR layout and organization policy disclaimers.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedStudentForId('custom_blank');
+                  setIdCategoryFilter('custom');
+                  setCustomBlankData(prev => ({ ...prev, role: 'visitor', position: 'Visitor Pass' }));
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-purple-900 hover:bg-purple-950 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                + Visitor Pass
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedStudentForId('custom_blank');
+                  setIdCategoryFilter('custom');
+                  setCustomBlankData(prev => ({ ...prev, role: 'student', position: '' }));
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#0d6b66] hover:bg-[#0b5c58] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                + Create Blank Card
+              </button>
+            </div>
+          </div>
+
+          {/* Category Filter Pills & Search Input */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Category Pills */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl max-w-full overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setIdCategoryFilter('all')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    idCategoryFilter === 'all'
+                      ? 'bg-white dark:bg-slate-700 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  All ({officers.length + allStudents.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIdCategoryFilter('officers')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    idCategoryFilter === 'officers'
+                      ? 'bg-white dark:bg-slate-700 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+                  Officers ({officers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIdCategoryFilter('students')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    idCategoryFilter === 'students'
+                      ? 'bg-white dark:bg-slate-700 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Students ({allStudents.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStudentForId('custom_blank');
+                    setIdCategoryFilter('custom');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    idCategoryFilter === 'custom'
+                      ? 'bg-white dark:bg-slate-700 text-[#0d6b66] dark:text-teal-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Custom / Visitor Card
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative flex-1 min-w-[220px]">
+                <input
+                  type="text"
+                  placeholder="Search member, ID, course..."
+                  value={idCardSearch}
+                  onChange={e => setIdCardSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 pl-3 pr-8 py-2 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none"
+                />
+                {idCardSearch && (
+                  <button
+                    onClick={() => setIdCardSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Blank / Visitor Pass Generator Form */}
+          {idCategoryFilter === 'custom' && (
+            <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                  <UserCheck className="h-4 w-4 text-[#0d6b66]" />
+                  Custom Card & Visitor Pass Builder
+                </span>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                  Fill in details below to dynamically populate the card preview
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={customBlankData.name}
+                    onChange={e => setCustomBlankData({ ...customBlankData, name: e.target.value })}
+                    placeholder="e.g. JUAN DELA CRUZ"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">ID Number / Reference *</label>
+                  <input
+                    type="text"
+                    value={customBlankData.studentId}
+                    onChange={e => setCustomBlankData({ ...customBlankData, studentId: e.target.value })}
+                    placeholder="e.g. 202410192 or VIST-001"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pass Type / Role</label>
+                  <select
+                    value={customBlankData.role}
+                    onChange={e => setCustomBlankData({ ...customBlankData, role: e.target.value as any })}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  >
+                    <option value="student">Student Member</option>
+                    <option value="officer">Executive Officer</option>
+                    <option value="visitor">Visitor Pass</option>
+                    <option value="guest">Guest Speaker / VIP</option>
+                  </select>
+                </div>
+                {customBlankData.role === 'officer' && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Officer Position</label>
+                    <input
+                      type="text"
+                      value={customBlankData.position}
+                      onChange={e => setCustomBlankData({ ...customBlankData, position: e.target.value })}
+                      placeholder="e.g. President, Vice-President"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Section / Year</label>
+                  <input
+                    type="text"
+                    value={customBlankData.section}
+                    onChange={e => setCustomBlankData({ ...customBlankData, section: e.target.value })}
+                    placeholder="e.g. BSCS 4A"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={customBlankData.email}
+                    onChange={e => setCustomBlankData({ ...customBlankData, email: e.target.value })}
+                    placeholder="e.g. jdelacruz@parsu.edu.ph"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Residential Address</label>
+                  <input
+                    type="text"
+                    value={customBlankData.address}
+                    onChange={e => setCustomBlankData({ ...customBlankData, address: e.target.value })}
+                    placeholder="e.g. Goa, Camarines Sur"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-[#0d6b66]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile-Friendly Grid Selector */}
+          {idCategoryFilter !== 'custom' && (
+            <div className="space-y-2">
+              <div className="max-h-[320px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {/* Officers */}
+                {(idCategoryFilter === 'all' || idCategoryFilter === 'officers') &&
+                  officers
+                    .filter(off => {
+                      const std = off.students && typeof off.students === 'object' ? off.students : null;
+                      const name = std?.name || off.name_officer || '';
+                      const q = idCardSearch.toLowerCase();
+                      return name.toLowerCase().includes(q) || (off.position || '').toLowerCase().includes(q);
+                    })
+                    .map(off => {
+                      const std = off.students && typeof off.students === 'object' ? off.students : null;
+                      const name = std?.name || off.name_officer || 'Executive Officer';
+                      const pos = formatOfficerPosition(off.position) || off.position || 'Officer';
+                      const isSelected = selectedStudentForId === `off_${off.$id}`;
+                      return (
+                        <div
+                          key={`off_${off.$id}`}
+                          onClick={() => setSelectedStudentForId(`off_${off.$id}`)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? 'bg-[#0d6b66]/10 border-[#0d6b66] shadow-xs'
+                              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-[#063834] text-amber-300 flex items-center justify-center shrink-0">
+                              <ShieldCheck className="h-4 w-4 text-amber-300" />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                {name}
+                              </h4>
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase truncate">
+                                {pos}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md shrink-0 uppercase ${
+                            isSelected ? 'bg-[#0d6b66] text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}>
+                            {isSelected ? 'Selected' : 'Select'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                {/* Students */}
+                {(idCategoryFilter === 'all' || idCategoryFilter === 'students') &&
+                  allStudents
+                    .filter(s => {
+                      const q = idCardSearch.toLowerCase();
+                      return (s.name || '').toLowerCase().includes(q) || (s.student_id || '').toString().includes(q) || (s.section || '').toLowerCase().includes(q);
+                    })
+                    .slice(0, 60)
+                    .map(s => {
+                      const isSelected = selectedStudentForId === `std_${s.$id}`;
+                      return (
+                        <div
+                          key={`std_${s.$id}`}
+                          onClick={() => setSelectedStudentForId(`std_${s.$id}`)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? 'bg-[#0d6b66]/10 border-[#0d6b66] shadow-xs'
+                              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-[#0d6b66] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                              {(s.name || 'S').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                {s.name}
+                              </h4>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                ID: {s.student_id || 'N/A'} • {s.section || 'Student'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded-md shrink-0 uppercase ${
+                            isSelected ? 'bg-[#0d6b66] text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}>
+                            {isSelected ? 'Selected' : 'Select'}
+                          </span>
+                        </div>
+                      );
+                    })}
+              </div>
+            </div>
+          )}
+
+          {/* Render ID Card Interactive Preview */}
+          {selectedIdCardData ? (
+            <div className="flex flex-col items-center justify-center p-3 sm:p-6 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 w-full max-w-full overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full max-w-xl gap-2">
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  Live Preview ({selectedIdCardData.role === 'officer' ? 'OFFICER' : selectedIdCardData.role === 'visitor' ? 'VISITOR' : 'MEMBER'})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIdCardDataForModal(selectedIdCardData)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0d6b66] hover:bg-[#0b5c58] text-white rounded-xl text-xs font-extrabold transition-all shadow-md cursor-pointer shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export & Attach Photo
+                </button>
+              </div>
+
+              <div className="w-full flex items-center justify-center overflow-x-auto py-2">
+                <div className="shrink-0 origin-center scale-[0.45] min-[360px]:scale-[0.55] min-[440px]:scale-[0.70] sm:scale-85 md:scale-100 my-[-130px] min-[360px]:my-[-90px] min-[440px]:my-[-45px] sm:my-[-20px] md:my-0 transition-all">
+                  <IDCardPreview data={selectedIdCardData} orientation="landscape" side="both" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+              <CreditCard className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No Card Selected</p>
+              <p className="text-xs text-slate-400 mt-1">Select a member/officer above or click "+ Create Blank ID Card" to generate.</p>
+            </div>
+          )}
+        </div>
+      )}
       {/* Event Selection and Narrative/Documentation Inputs */}
       {(activeReport === 'narrative' || activeReport === 'documentation') && (
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-4 animate-fade-in">
@@ -3077,6 +3499,13 @@ const AdminFileExports: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ID Card Export Modal */}
+      <IDCardExportModal
+        isOpen={!!selectedIdCardDataForModal}
+        onClose={() => setSelectedIdCardDataForModal(null)}
+        data={selectedIdCardDataForModal}
+      />
     </div>
   );
 };

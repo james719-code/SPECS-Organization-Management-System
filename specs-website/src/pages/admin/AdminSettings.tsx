@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 import { account } from '../../shared/appwrite';
 import { api, cachedApi } from '../../shared/api';
-import { User, Server, Loader2, Calendar, Edit, CheckCircle, Trash2 } from 'lucide-react';
+import { User, Server, Loader2, Calendar, Edit, CheckCircle, Trash2, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface AdminProfile {
   $id: string;
@@ -24,6 +25,7 @@ const getStartingBalanceDocId = (sy: string): string => {
 
 const AdminSettings: React.FC = () => {
 
+  const navigate = useNavigate();
   const { addToast } = useToast();
 
   // Admin Profile State
@@ -35,6 +37,12 @@ const AdminSettings: React.FC = () => {
   });
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Password Change State
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // System Configurations State
   const [metadata, setMetadata] = useState<SystemMetadata>({
@@ -178,6 +186,21 @@ const AdminSettings: React.FC = () => {
       return;
     }
 
+    if (newPassword || confirmPassword || oldPassword) {
+      if (!oldPassword) {
+        addToast({ type: 'error', title: 'Validation Error', message: 'Current password is required to update password.' });
+        return;
+      }
+      if (newPassword.length < 8) {
+        addToast({ type: 'error', title: 'Validation Error', message: 'New password must be at least 8 characters long.' });
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        addToast({ type: 'error', title: 'Validation Error', message: 'New passwords do not match.' });
+        return;
+      }
+    }
+
     try {
       setSavingProfile(true);
       await api.admins.update(
@@ -187,7 +210,40 @@ const AdminSettings: React.FC = () => {
           contactNumber: profile.contactNumber.trim()
         }
       );
-      addToast({ type: 'success', title: 'Profile Saved', message: 'Your administrative profile has been updated.' });
+
+      let passwordUpdated = false;
+      if (newPassword) {
+        await account.updatePassword(newPassword, oldPassword);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        passwordUpdated = true;
+      }
+
+      if (passwordUpdated) {
+        addToast({
+          type: 'success',
+          title: 'Password Updated',
+          message: 'Password changed successfully. Logging out...'
+        });
+
+        setTimeout(async () => {
+          try {
+            await account.deleteSession('current');
+            localStorage.removeItem('appwrite_session');
+          } catch (e) {
+            console.error('Failed to clear session during auto logout:', e);
+          }
+          navigate('/login');
+        }, 1200);
+        return;
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Profile Saved',
+        message: 'Your administrative profile has been updated.'
+      });
     } catch (err: any) {
       console.error('Failed to update admin profile:', err);
       addToast({ type: 'error', title: 'Update Failed', message: err.message || 'Failed to sync modifications.' });
@@ -453,6 +509,90 @@ const AdminSettings: React.FC = () => {
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none transition-colors"
                   placeholder="Enter contact number"
                 />
+              </div>
+
+              {/* Password Section */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5 text-slate-400" />
+                    Change Password
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    Leave blank to keep current
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={oldPassword}
+                      onChange={e => setOldPassword(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 pr-10 text-sm text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none transition-colors"
+                      placeholder="Enter current password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 pr-10 text-sm text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none transition-colors"
+                        placeholder="Min. 8 characters"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 pr-10 text-sm text-slate-900 dark:text-white focus:border-[#0d6b66] outline-none transition-colors"
+                        placeholder="Re-enter password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
