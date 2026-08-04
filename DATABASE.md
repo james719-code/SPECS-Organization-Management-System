@@ -168,12 +168,15 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
 | **`$id`** | string | - | - | ✅ | - | - |
-| **`students`** | **relationship** | - | - | - | `NULL` | **Many to one** → `students` [onDelete: setNull] 🆕 |
-| **`events`** | relationship | - | - | - | `NULL` | One to one → `events` [onDelete: setNull] |
+| **`students`** | **relationship** | - | - | - | `NULL` | **Many to one** → `students` [onDelete: setNull] |
+| **`events`** | relationship | - | - | - | `NULL` | **Many to one** → `events` [onDelete: setNull] |
 | **`name_attendance`** | string | Size: 150 | ✅ | - | - | - |
 | **`officers`** | relationship | - | - | - | `NULL` | One to many → `officers` [onDelete: setNull] |
-| **`custom_session_id`** | string | Size: 50 | - | - | `NULL` | Groups all records belonging to a custom non-official session 🆕 |
-| **`custom_session_name`** | string | Size: 200 | - | - | `NULL` | Human-readable name for a custom non-official session 🆕 |
+| **`attendance_type`** | enum | student, officer, non-member | - | - | `student` | Attendee type |
+| **`non-member-name`** | string | - | - | - | `NULL` | Non-member attendee name |
+| **`non-member-email`** | string | - | - | - | `NULL` | Non-member attendee email |
+| **`custom_session_id`** | string | - | - | - | `NULL` | Groups records belonging to a custom session |
+| **`custom_session_name`** | string | - | - | - | `NULL` | Human-readable name for a custom session |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 

@@ -66,9 +66,9 @@ export interface AttendanceDoc extends ModelsDocument {
   events?: EventDoc | string | null;
   name_attendance: string;
   officers?: OfficerDoc | string | null;
-  attendee_type?: 'student' | 'officer' | 'non-member' | null;
-  non_member_name?: string | null;
-  non_member_email?: string | null;
+  attendance_type?: 'student' | 'officer' | 'non-member' | null;
+  'non-member-name'?: string | null;
+  'non-member-email'?: string | null;
   custom_session_id?: string | null;
   custom_session_name?: string | null;
 }

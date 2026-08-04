@@ -398,14 +398,14 @@ export const api = {
             try {
                 const data: any = {
                     events: eventId,
-                    attendee_type: attendeeType,
+                    attendance_type: attendeeType,
                     name_attendance: attendanceName
                 };
                 if (attendeeType === 'student' || attendeeType === 'officer') {
                     data.students = attendeeId;
                 } else if (attendeeType === 'non-member') {
-                    data.non_member_name = nonMemberData?.name || null;
-                    data.non_member_email = nonMemberData?.email || null;
+                    data['non-member-name'] = nonMemberData?.name || null;
+                    data['non-member-email'] = nonMemberData?.email || null;
                 }
                 if (officerId && officerId !== 'admin') {
                     data.officers = [officerId];
@@ -431,14 +431,14 @@ export const api = {
                     events: null,
                     custom_session_id: sessionId,
                     custom_session_name: sessionName,
-                    attendee_type: attendeeType,
+                    attendance_type: attendeeType,
                     name_attendance: attendanceName
                 };
                 if (attendeeType === 'student' || attendeeType === 'officer') {
                     data.students = attendeeId;
                 } else if (attendeeType === 'non-member') {
-                    data.non_member_name = nonMemberData?.name || null;
-                    data.non_member_email = nonMemberData?.email || null;
+                    data['non-member-name'] = nonMemberData?.name || null;
+                    data['non-member-email'] = nonMemberData?.email || null;
                 }
                 if (officerId && officerId !== 'admin') {
                     data.officers = [officerId];

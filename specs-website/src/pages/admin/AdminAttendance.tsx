@@ -534,7 +534,7 @@ const AdminAttendance: React.FC = () => {
     const totalCount = students.length;
     const uniquePresent = new Set(
       attendanceRecords
-        .filter(record => (record.attendee_type || 'student') !== 'non-member')
+        .filter(record => (record.attendance_type || 'student') !== 'non-member')
         .map(record => {
           const profile = record.students as any;
           return profile?.$id || record.students;
@@ -1252,6 +1252,50 @@ const AdminAttendance: React.FC = () => {
       setTimeout(() => setScanFlash(null), 1000);
     }
   };
+
+  // Group attendance records by attendee to prevent duplicate rows in the log sheet
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, {
+      id: string;
+      name: string;
+      type: 'student' | 'officer' | 'non-member';
+      records: { id: string; sessionLabel: string; createdAt: string }[];
+    }> = {};
+
+    attendanceRecords.forEach(record => {
+      const attendeeType = record.attendance_type || 'student';
+      let attendeeId = '';
+      let attendeeName = '';
+
+      if (attendeeType === 'student' || attendeeType === 'officer') {
+        const profile = record.students as any;
+        attendeeId = profile?.$id || record.students || '';
+        attendeeName = profile?.name || 'Unknown Student';
+      } else if (attendeeType === 'non-member') {
+        attendeeId = `nonmember:${record['non-member-name']}:${record['non-member-email'] || ''}`;
+        attendeeName = record['non-member-name'] || 'Non-Member';
+      }
+
+      if (!attendeeId) return;
+
+      if (!groups[attendeeId]) {
+        groups[attendeeId] = {
+          id: attendeeId,
+          name: attendeeName,
+          type: attendeeType,
+          records: []
+        };
+      }
+      
+      groups[attendeeId].records.push({
+        id: record.$id,
+        sessionLabel: record.attendance_label || 'Default Session',
+        createdAt: record.$createdAt
+      });
+    });
+
+    return Object.values(groups);
+  }, [attendanceRecords]);
 
   const scanHandlerRef = useRef(handleQrScanned);
   useEffect(() => {

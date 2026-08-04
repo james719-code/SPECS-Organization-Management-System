@@ -308,7 +308,7 @@ describe('API Layer', () => {
             appwriteMocks.databases.createDocument.mockResolvedValue({
                 $id: 'att-nonmember',
                 name_attendance: 'Test Event',
-                attendee_type: 'non-member'
+                attendance_type: 'non-member'
             });
 
             const result = await api.attendance.create(
