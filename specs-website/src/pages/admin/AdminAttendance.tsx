@@ -1253,50 +1253,6 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
-  // Group attendance records by attendee to prevent duplicate rows in the log sheet
-  const groupedRecords = useMemo(() => {
-    const groups: Record<string, {
-      id: string;
-      name: string;
-      type: 'student' | 'officer' | 'non-member';
-      records: { id: string; sessionLabel: string; createdAt: string }[];
-    }> = {};
-
-    attendanceRecords.forEach(record => {
-      const attendeeType = record.attendance_type || 'student';
-      let attendeeId = '';
-      let attendeeName = '';
-
-      if (attendeeType === 'student' || attendeeType === 'officer') {
-        const profile = record.students as any;
-        attendeeId = profile?.$id || record.students || '';
-        attendeeName = profile?.name || 'Unknown Student';
-      } else if (attendeeType === 'non-member') {
-        attendeeId = `nonmember:${record['non-member-name']}:${record['non-member-email'] || ''}`;
-        attendeeName = record['non-member-name'] || 'Non-Member';
-      }
-
-      if (!attendeeId) return;
-
-      if (!groups[attendeeId]) {
-        groups[attendeeId] = {
-          id: attendeeId,
-          name: attendeeName,
-          type: attendeeType,
-          records: []
-        };
-      }
-      
-      groups[attendeeId].records.push({
-        id: record.$id,
-        sessionLabel: record.attendance_label || 'Default Session',
-        createdAt: record.$createdAt
-      });
-    });
-
-    return Object.values(groups);
-  }, [attendanceRecords]);
-
   const scanHandlerRef = useRef(handleQrScanned);
   useEffect(() => {
     scanHandlerRef.current = handleQrScanned;
@@ -1917,7 +1873,7 @@ const AdminAttendance: React.FC = () => {
     }> = {};
 
     attendanceRecords.forEach(record => {
-      const attendeeType = record.attendee_type || 'student';
+      const attendeeType = record.attendance_type || 'student';
       let attendeeId = '';
       let attendeeName = '';
 
@@ -1926,8 +1882,8 @@ const AdminAttendance: React.FC = () => {
         attendeeId = profile?.$id || record.students || '';
         attendeeName = profile?.name || 'Unknown Student';
       } else if (attendeeType === 'non-member') {
-        attendeeId = `nonmember:${record.non_member_name}:${record.non_member_email || ''}`;
-        attendeeName = record.non_member_name || 'Non-Member';
+        attendeeId = `nonmember:${record['non-member-name']}:${record['non-member-email'] || ''}`;
+        attendeeName = record['non-member-name'] || 'Non-Member';
       }
 
       if (!attendeeId) return;
