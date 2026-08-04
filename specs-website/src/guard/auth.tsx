@@ -46,8 +46,13 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
           }
           setLoading(false);
         }
-      } catch (error) {
-        console.error('[AuthGuard] Auth check failed:', error);
+      } catch (error: any) {
+        // 401 Unauthorized is expected when checking guest/anonymous visitors
+        if (error?.code !== 401 && error?.status !== 401 && error?.type !== 'user_unauthorized') {
+          if (!import.meta.env.PROD) {
+            console.warn('[AuthGuard] Auth check error:', error);
+          }
+        }
         if (active) {
           setAuthenticated(false);
           setLoading(false);

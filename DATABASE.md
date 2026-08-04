@@ -172,6 +172,8 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`events`** | relationship | - | - | - | `NULL` | One to one → `events` [onDelete: setNull] |
 | **`name_attendance`** | string | Size: 150 | ✅ | - | - | - |
 | **`officers`** | relationship | - | - | - | `NULL` | One to many → `officers` [onDelete: setNull] |
+| **`custom_session_id`** | string | Size: 50 | - | - | `NULL` | Groups all records belonging to a custom non-official session 🆕 |
+| **`custom_session_name`** | string | Size: 200 | - | - | `NULL` | Human-readable name for a custom non-official session 🆕 |
 | **`$createdAt`** | datetime | - | - | - | - | - |
 | **`$updatedAt`** | datetime | - | - | - | - | - |
 

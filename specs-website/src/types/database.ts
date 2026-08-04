@@ -69,6 +69,15 @@ export interface AttendanceDoc extends ModelsDocument {
   attendee_type?: 'student' | 'officer' | 'non-member' | null;
   non_member_name?: string | null;
   non_member_email?: string | null;
+  custom_session_id?: string | null;
+  custom_session_name?: string | null;
+}
+
+export interface CustomSessionStub {
+  id: string;
+  name: string;
+  createdAt: string;
+  ended?: boolean;
 }
 
 export interface PaymentDoc extends ModelsDocument {

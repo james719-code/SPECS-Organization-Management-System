@@ -362,6 +362,20 @@ export const api = {
                 throw createApiError(error, `Failed to list attendance for event ${eventId}`);
             }
         },
+        async listForCustomSession(sessionId: string, { limit = DEFAULT_PAGE_SIZE, offset = 0 } = {}): Promise<PaginatedResponse<AttendanceDoc>> {
+            try {
+                const pageSize = Math.min(limit, MAX_PAGE_SIZE);
+                const queries = [
+                    Query.equal('custom_session_id', sessionId),
+                    Query.limit(pageSize),
+                    Query.offset(offset)
+                ];
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, queries);
+                return createPaginatedResponse<AttendanceDoc>(result, pageSize, offset);
+            } catch (error) {
+                throw createApiError(error, `Failed to list attendance for custom session ${sessionId}`);
+            }
+        },
         async listAll(options: ListOptions = {}): Promise<PaginatedResponse<AttendanceDoc>> {
             try {
                 const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = normalizeListOptions(options);
@@ -403,6 +417,39 @@ export const api = {
                 throw createApiError(error, 'Failed to create attendance record');
             }
         },
+        async createForCustomSession(
+            sessionId: string,
+            sessionName: string,
+            attendeeType: 'student' | 'officer' | 'non-member',
+            attendeeId: string | null,
+            nonMemberData: { name?: string; email?: string } | null,
+            officerId: string | null | undefined,
+            attendanceName: string
+        ): Promise<AttendanceDoc> {
+            try {
+                const data: any = {
+                    events: null,
+                    custom_session_id: sessionId,
+                    custom_session_name: sessionName,
+                    attendee_type: attendeeType,
+                    name_attendance: attendanceName
+                };
+                if (attendeeType === 'student' || attendeeType === 'officer') {
+                    data.students = attendeeId;
+                } else if (attendeeType === 'non-member') {
+                    data.non_member_name = nonMemberData?.name || null;
+                    data.non_member_email = nonMemberData?.email || null;
+                }
+                if (officerId && officerId !== 'admin') {
+                    data.officers = [officerId];
+                }
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), data);
+                dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
+                return result;
+            } catch (error) {
+                throw createApiError(error, 'Failed to create custom session attendance record');
+            }
+        },
         async delete(attendanceId: string): Promise<any> {
             try {
                 const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, attendanceId);
@@ -419,7 +466,11 @@ export const api = {
         async getCurrent(): Promise<any> {
             try {
                 return await account.get();
-            } catch (error) {
+            } catch (error: any) {
+                // 401 Unauthorized is expected when guest/anonymous users visit the site
+                if (error?.code === 401 || error?.status === 401 || error?.type === 'user_unauthorized') {
+                    return null;
+                }
                 throw createApiError(error, 'Failed to get current user');
             }
         },
@@ -1158,6 +1209,14 @@ export const cachedApi = {
         async listAll(options: ListOptions = {}, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
             const cacheKey = generateCacheKey('attendance_all', options);
             return dataCache.getOrFetch(cacheKey, () => api.attendance.listAll(options), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.ATTENDANCE]
+            });
+        },
+        async listForCustomSession(sessionId: string, options: ListOptions = {}, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
+            const cacheKey = generateCacheKey('attendance_custom_session', { sessionId, ...options });
+            return dataCache.getOrFetch(cacheKey, () => api.attendance.listForCustomSession(sessionId, options), {
                 ttl,
                 staleTtl: 2 * 60 * 1000,
                 tags: [CacheTags.ATTENDANCE]

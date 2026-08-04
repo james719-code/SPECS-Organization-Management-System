@@ -128,7 +128,8 @@ const StudentAttendance: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {attendance.map(record => {
                     const eventId = record.events ? (typeof record.events === 'object' ? record.events.$id : record.events) : '';
-                    const eventName = eventLookup[eventId] || 'General Activity';
+                    const isCustomSession = Boolean(record.custom_session_name || record.custom_session_id);
+                    const eventName = record.custom_session_name || (eventId ? eventLookup[eventId] : '') || 'General Activity';
                     return (
                       <tr 
                         key={record.$id} 
@@ -139,7 +140,16 @@ const StudentAttendance: React.FC = () => {
                         <td className="px-6 py-3.5 text-xs text-slate-400 font-mono">
                           {formatDateTime(record.$createdAt)}
                         </td>
-                        <td className="px-6 py-3.5 font-bold text-slate-900 group-hover:text-[#0d6b66] transition-colors">{eventName}</td>
+                        <td className="px-6 py-3.5 font-bold text-slate-900 group-hover:text-[#0d6b66] transition-colors">
+                          <div className="flex items-center gap-2">
+                            <span>{eventName}</span>
+                            {isCustomSession && (
+                              <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                Custom Session
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-3.5 text-slate-500">{record.name_attendance || 'General Check-in'}</td>
                         <td className="px-6 py-3.5 text-center">
                           <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
@@ -158,7 +168,8 @@ const StudentAttendance: React.FC = () => {
           <div className="block sm:hidden space-y-3">
             {attendance.map(record => {
               const eventId = record.events ? (typeof record.events === 'object' ? record.events.$id : record.events) : '';
-              const eventName = eventLookup[eventId] || 'General Activity';
+              const isCustomSession = Boolean(record.custom_session_name || record.custom_session_id);
+              const eventName = record.custom_session_name || (eventId ? eventLookup[eventId] : '') || 'General Activity';
               return (
                 <div 
                   key={record.$id} 
@@ -167,8 +178,15 @@ const StudentAttendance: React.FC = () => {
                   title="Click to view scanner details"
                 >
                   <div className="flex justify-between items-start gap-3 border-b pb-2">
-                    <h3 className="font-bold text-slate-800 text-sm hover:text-[#0d6b66] transition-colors">{eventName}</h3>
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm hover:text-[#0d6b66] transition-colors">{eventName}</h3>
+                      {isCustomSession && (
+                        <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 mt-1">
+                          Custom Session
+                        </span>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 flex-shrink-0">
                       Present
                     </span>
                   </div>

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RotateCw, Loader2, Check, Camera, Search, Printer, GripVertical, X, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { RotateCw, Loader2, Check, Camera, Search, Printer, GripVertical, X, ChevronUp, ChevronDown, Plus, Trash2, Lock, Unlock, Calendar } from 'lucide-react';
 import { cachedApi, api } from '../../shared/api';
 import { formatDateTime, formatDate } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import type { EventDoc, AttendanceDoc, AccountDoc, OfficerDoc, StudentDoc } from '../../types/database';
+import type { EventDoc, AttendanceDoc, AccountDoc, OfficerDoc, StudentDoc, CustomSessionStub } from '../../types/database';
 import { createPortal } from 'react-dom';
 import { functions } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID } from '../../shared/constants';
@@ -32,6 +32,95 @@ const AdminAttendance: React.FC = () => {
   const [events, setEvents] = useState<EventDoc[]>([]);
   const [students, setStudents] = useState<AccountDoc[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+
+  // Custom Session states
+  const [attendanceContext, setAttendanceContext] = useState<'event' | 'custom'>('event');
+  const [customSessions, setCustomSessions] = useState<CustomSessionStub[]>([]);
+  const [selectedCustomSessionId, setSelectedCustomSessionId] = useState<string>('');
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+  const [newSessionName, setNewSessionName] = useState('');
+
+  const CUSTOM_SESSIONS_STORAGE_KEY = 'specs_custom_sessions_v1';
+
+  const loadCustomSessions = () => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_SESSIONS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setCustomSessions(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setCustomSessions([]);
+  };
+
+  const saveCustomSessions = (sessions: CustomSessionStub[]) => {
+    setCustomSessions(sessions);
+    try {
+      localStorage.setItem(CUSTOM_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+    } catch {}
+  };
+
+  const handleCreateCustomSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSessionName.trim()) return;
+    const newSession: CustomSessionStub = {
+      id: `cs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: newSessionName.trim(),
+      createdAt: new Date().toISOString(),
+      ended: false
+    };
+    const updated = [newSession, ...customSessions].slice(0, 50);
+    saveCustomSessions(updated);
+    setSelectedCustomSessionId(newSession.id);
+    setNewSessionName('');
+    setShowNewSessionModal(false);
+    addToast({ type: 'success', title: 'Custom Session Created', message: `Session "${newSession.name}" is now active.` });
+  };
+
+  const handleToggleSessionEnded = (sessionId: string) => {
+    const updated = customSessions.map(s => {
+      if (s.id === sessionId) {
+        const nextEnded = !s.ended;
+        addToast({
+          type: nextEnded ? 'info' : 'success',
+          title: nextEnded ? 'Session Ended' : 'Session Reopened',
+          message: nextEnded ? `"${s.name}" is now marked as ended (read-only).` : `"${s.name}" check-in has been reopened.`
+        });
+        return { ...s, ended: nextEnded };
+      }
+      return s;
+    });
+    saveCustomSessions(updated);
+  };
+
+  const handleDeleteCustomSession = (sessionId: string, sessionName: string) => {
+    if (!window.confirm(`Remove session "${sessionName}" from your device? Attendance records in the database will remain intact.`)) return;
+    const updated = customSessions.filter(s => s.id !== sessionId);
+    saveCustomSessions(updated);
+    if (selectedCustomSessionId === sessionId) {
+      setSelectedCustomSessionId('');
+    }
+    addToast({ type: 'info', title: 'Session Removed', message: `Session "${sessionName}" removed from local list.` });
+  };
+
+  const activeCustomSession = useMemo(() => {
+    return customSessions.find(s => s.id === selectedCustomSessionId) || null;
+  }, [customSessions, selectedCustomSessionId]);
+
+  const activeSessionName = useMemo(() => {
+    if (attendanceContext === 'event') {
+      const ev = events.find(e => e.$id === selectedEventId);
+      return ev?.event_name || 'Organization Event';
+    }
+    return activeCustomSession?.name || 'Custom Session';
+  }, [attendanceContext, events, selectedEventId, activeCustomSession]);
+
+  const activeSessionId = attendanceContext === 'event' ? selectedEventId : selectedCustomSessionId;
+  const isSessionEnded = attendanceContext === 'custom' && Boolean(activeCustomSession?.ended);
+
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceDoc[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -373,20 +462,26 @@ const AdminAttendance: React.FC = () => {
 
   useEffect(() => {
     loadInitialData();
+    loadCustomSessions();
     setPrintPreparedBy(localStorage.getItem('specs_attendance_print_prepared_by') || 'default');
     setPrintAttestedBy(localStorage.getItem('specs_attendance_print_attested_by') || 'default');
     setPrintNotedBy(localStorage.getItem('specs_attendance_print_noted_by') || 'default');
   }, []);
 
-  const loadAttendanceRecords = async (eventId: string) => {
-    if (!eventId) {
+  const loadAttendanceRecords = async (context: 'event' | 'custom', id: string) => {
+    if (!id) {
       setAttendanceRecords([]);
       return;
     }
     setLoadingRecords(true);
     try {
-      const res = await api.attendance.listForEvent(eventId, { limit: 500 });
-      setAttendanceRecords(res.documents);
+      if (context === 'custom') {
+        const res = await api.attendance.listForCustomSession(id, { limit: 500 });
+        setAttendanceRecords(res.documents);
+      } else {
+        const res = await api.attendance.listForEvent(id, { limit: 500 });
+        setAttendanceRecords(res.documents);
+      }
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to load attendance records.' });
     } finally {
@@ -395,8 +490,8 @@ const AdminAttendance: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAttendanceRecords(selectedEventId);
-  }, [selectedEventId]);
+    loadAttendanceRecords(attendanceContext, activeSessionId);
+  }, [attendanceContext, selectedEventId, selectedCustomSessionId]);
 
   // Autocomplete change
   const handleStudentSearchChange = (val: string) => {
@@ -455,8 +550,13 @@ const AdminAttendance: React.FC = () => {
   // Submit attendance record
   const handleAddAttendance = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEventId) {
-      addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
+    if (isSessionEnded) {
+      addToast({ type: 'warning', title: 'Session Ended', message: 'This session has been ended and is read-only.' });
+      return;
+    }
+
+    if (!activeSessionId) {
+      addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
       return;
     }
 
@@ -479,7 +579,11 @@ const AdminAttendance: React.FC = () => {
 
       if (activeTab === 'member' && selectedStudent) {
         const attendeeType = selectedStudent.type || 'student';
-        await api.attendance.create(selectedEventId, attendeeType, selectedStudent.id, null, recorderId, attendanceLabel);
+        if (attendanceContext === 'custom' && activeCustomSession) {
+          await api.attendance.createForCustomSession(activeCustomSession.id, activeCustomSession.name, attendeeType, selectedStudent.id, null, recorderId, attendanceLabel);
+        } else {
+          await api.attendance.create(selectedEventId, attendeeType, selectedStudent.id, null, recorderId, attendanceLabel);
+        }
         addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
         
         // Dispatch email notification if toggled and email is present (Background)
@@ -508,7 +612,7 @@ const AdminAttendance: React.FC = () => {
 
               const htmlBody = getAttendanceHtml(
                 studentName,
-                selectedEvent?.event_name || 'Organization Event',
+                activeSessionName,
                 dateStr,
                 'Present',
                 timeStr,
@@ -521,7 +625,7 @@ const AdminAttendance: React.FC = () => {
                   action: 'send_email',
                   payload: {
                     to: studentEmail,
-                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    subject: `Attendance Recorded: ${activeSessionName}`,
                     body: htmlBody,
                     html: true
                   }
@@ -541,7 +645,11 @@ const AdminAttendance: React.FC = () => {
         const name = nonMemberName.trim();
         const email = nonMemberEmail.trim();
 
-        await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        if (attendanceContext === 'custom' && activeCustomSession) {
+          await api.attendance.createForCustomSession(activeCustomSession.id, activeCustomSession.name, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        } else {
+          await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        }
         addToast({ type: 'success', title: 'Recorded', message: `Non-Member: ${name} is marked present.` });
 
         // Dispatch email notification if toggled and email is present (Background)
@@ -568,7 +676,7 @@ const AdminAttendance: React.FC = () => {
 
               const htmlBody = getAttendanceHtml(
                 name,
-                selectedEvent?.event_name || 'Organization Event',
+                activeSessionName,
                 dateStr,
                 'Present',
                 timeStr,
@@ -581,7 +689,7 @@ const AdminAttendance: React.FC = () => {
                   action: 'send_email',
                   payload: {
                     to: email,
-                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    subject: `Attendance Recorded: ${activeSessionName}`,
                     body: htmlBody,
                     html: true
                   }
@@ -600,7 +708,7 @@ const AdminAttendance: React.FC = () => {
       }
 
       // Refresh listing
-      loadAttendanceRecords(selectedEventId);
+      loadAttendanceRecords(attendanceContext, activeSessionId);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
     } finally {
@@ -769,9 +877,16 @@ const AdminAttendance: React.FC = () => {
       console.warn('AudioContext beep failed:', e);
     }
   };
-
   const handleQrScanned = async (decodedText: string) => {
     if (scanCooldown) return;
+    if (isSessionEnded) {
+      addToast({ type: 'warning', title: 'Session Ended', message: 'This session has been ended and is read-only.' });
+      return;
+    }
+    if (!activeSessionId) {
+      addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
+      return;
+    }
     
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -790,7 +905,7 @@ const AdminAttendance: React.FC = () => {
 
         if (!name) throw new Error('Missing name');
 
-        const scanKey = `${selectedEventId}:non-member:${name}:${email || ''}:${attendanceLabel.trim()}`;
+        const scanKey = `${activeSessionId}:non-member:${name}:${email || ''}:${attendanceLabel.trim()}`;
         
         // Check duplicate
         const cacheKey = 'specs_scanned_qrs';
@@ -832,7 +947,11 @@ const AdminAttendance: React.FC = () => {
           ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
           : null;
 
-        await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        if (attendanceContext === 'custom' && activeCustomSession) {
+          await api.attendance.createForCustomSession(activeCustomSession.id, activeCustomSession.name, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        } else {
+          await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
+        }
         
         // Cache scan
         try {
@@ -866,7 +985,7 @@ const AdminAttendance: React.FC = () => {
 
               const htmlBody = getAttendanceHtml(
                 name,
-                selectedEvent?.event_name || 'Organization Event',
+                activeSessionName,
                 dateStr,
                 'Present',
                 formattedTimeStr,
@@ -879,7 +998,7 @@ const AdminAttendance: React.FC = () => {
                   action: 'send_email',
                   payload: {
                     to: email,
-                    subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                    subject: `Attendance Recorded: ${activeSessionName}`,
                     body: htmlBody,
                     html: true
                   }
@@ -892,7 +1011,7 @@ const AdminAttendance: React.FC = () => {
           })();
         }
 
-        loadAttendanceRecords(selectedEventId);
+        loadAttendanceRecords(attendanceContext, activeSessionId);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Scan Error', message: 'Failed to parse non-member data.' });
         const errorLog = {
@@ -994,7 +1113,7 @@ const AdminAttendance: React.FC = () => {
       } catch (e) {}
     }
 
-    const scanKey = `${selectedEventId}:${studentProfileId}:${attendanceLabel.trim()}`;
+    const scanKey = `${activeSessionId}:${studentProfileId}:${attendanceLabel.trim()}`;
     if (cache[scanKey]) {
       setScanCooldown(true);
       setTimeout(() => setScanCooldown(false), 1500);
@@ -1050,7 +1169,11 @@ const AdminAttendance: React.FC = () => {
         : null;
 
       const attendeeType = attendeeAccount?.type || 'student';
-      await api.attendance.create(selectedEventId, attendeeType, studentProfileId, null, recorderId, attendanceLabel);
+      if (attendanceContext === 'custom' && activeCustomSession) {
+        await api.attendance.createForCustomSession(activeCustomSession.id, activeCustomSession.name, attendeeType, studentProfileId, null, recorderId, attendanceLabel);
+      } else {
+        await api.attendance.create(selectedEventId, attendeeType, studentProfileId, null, recorderId, attendanceLabel);
+      }
       
       // Cache successful scan
       try {
@@ -1086,7 +1209,7 @@ const AdminAttendance: React.FC = () => {
 
             const htmlBody = getAttendanceHtml(
               attendeeName,
-              selectedEvent?.event_name || 'Organization Event',
+              activeSessionName,
               dateStr,
               'Present',
               formattedTimeStr,
@@ -1099,7 +1222,7 @@ const AdminAttendance: React.FC = () => {
                 action: 'send_email',
                 payload: {
                   to: attendeeEmail,
-                  subject: `Attendance Recorded: ${selectedEvent?.event_name || 'Event'}`,
+                  subject: `Attendance Recorded: ${activeSessionName}`,
                   body: htmlBody,
                   html: true
                 }
@@ -1113,7 +1236,7 @@ const AdminAttendance: React.FC = () => {
         })();
       }
 
-      loadAttendanceRecords(selectedEventId);
+      loadAttendanceRecords(attendanceContext, activeSessionId);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
       
@@ -1219,7 +1342,7 @@ const AdminAttendance: React.FC = () => {
   useEffect(() => {
     let html5QrCode: Html5Qrcode | null = null;
     
-    if (attendanceMode === 'qr' && selectedEventId) {
+    if (attendanceMode === 'qr' && activeSessionId) {
       const elementId = "qr-reader-el";
       
       const startScanner = async () => {
@@ -1357,7 +1480,7 @@ const AdminAttendance: React.FC = () => {
         }
       };
     }
-  }, [attendanceMode, selectedEventId, isFullScreenScan]);
+  }, [attendanceMode, activeSessionId, isFullScreenScan]);
 
   const handleDeleteRecord = async () => {
     if (!deleteConfirm.id) return;
@@ -1366,7 +1489,7 @@ const AdminAttendance: React.FC = () => {
       await api.attendance.delete(deleteConfirm.id);
       addToast({ type: 'success', title: 'Removed', message: 'Attendance record deleted.' });
       setDeleteConfirm({ open: false, id: null });
-      loadAttendanceRecords(selectedEventId);
+      loadAttendanceRecords(attendanceContext, activeSessionId);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete record.' });
     } finally {
@@ -1375,12 +1498,16 @@ const AdminAttendance: React.FC = () => {
   };
 
   const handlePrintReport = async (selectedSignatory: 'secretary' | 'asst-secretary') => {
-    if (!selectedEventId) {
-      addToast({ type: 'warning', title: 'Event Required', message: 'Please select an event first.' });
+    if (!activeSessionId) {
+      addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
       return;
     }
-    const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-    if (!selectedEvent) return;
+    const selectedEvent = attendanceContext === 'event' ? events.find(ev => ev.$id === selectedEventId) : null;
+    const eventNameDisplay = activeSessionName;
+    const locationDisplay = selectedEvent?.location || 'N/A';
+    const dateDisplay = selectedEvent?.date_to_held 
+      ? formatDate(selectedEvent.date_to_held) 
+      : (activeCustomSession?.createdAt ? formatDate(activeCustomSession.createdAt) : formatDate(new Date().toISOString()));
 
     const rowsHtml = filteredGroupedRecords.map((group, index) => {
       const sessionsStr = group.records.map(r => {
@@ -1514,7 +1641,7 @@ const AdminAttendance: React.FC = () => {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Attendance Report - ${selectedEvent.event_name}</title>
+          <title>Attendance Report - ${eventNameDisplay}</title>
           <style>
             @page {
               size: 8.5in 13in;
@@ -1669,9 +1796,9 @@ const AdminAttendance: React.FC = () => {
                   <h2 class="report-title">Official Attendance Sheet Report</h2>
 
                   <div class="meta-section">
-                    <p class="meta-item"><strong>Event Name:</strong> ${selectedEvent.event_name}</p>
-                    <p class="meta-item"><strong>Location:</strong> ${selectedEvent.location || 'N/A'}</p>
-                    <p class="meta-item"><strong>Event Date:</strong> ${formatDate(selectedEvent.date_to_held || '')}</p>
+                    <p class="meta-item"><strong>Session / Event Name:</strong> ${eventNameDisplay}</p>
+                    <p class="meta-item"><strong>Location:</strong> ${locationDisplay}</p>
+                    <p class="meta-item"><strong>Date:</strong> ${dateDisplay}</p>
                   </div>
 
                   <table class="report-table">
@@ -1722,7 +1849,7 @@ const AdminAttendance: React.FC = () => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
       const { downloadPdfFromHtml } = await import('../../shared/utils');
-      await downloadPdfFromHtml(htmlContent, `Attendance_Report_${selectedEvent.event_name.replace(/\s+/g, '_')}.pdf`, addToast);
+      await downloadPdfFromHtml(htmlContent, `Attendance_Report_${eventNameDisplay.replace(/\s+/g, '_')}.pdf`, addToast);
       return;
     }
 
@@ -1822,83 +1949,221 @@ const AdminAttendance: React.FC = () => {
         </button>
       </div>
 
-      {/* Select Event */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
-            <span>Select Event</span>
-            {attendanceMode === 'qr' && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 font-semibold normal-case bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full animate-pulse">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Locked in QR Scan Mode
-              </span>
-            )}
-          </label>
-          <span className="text-xs text-slate-400 font-medium">{events.length} events available</span>
+      {/* Select Context & Event/Session */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+        {/* Context Switcher Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <button
+            type="button"
+            disabled={attendanceMode === 'qr'}
+            onClick={() => setAttendanceContext('event')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              attendanceContext === 'event'
+                ? 'bg-[#0d6b66] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Official Events
+          </button>
+          <button
+            type="button"
+            disabled={attendanceMode === 'qr'}
+            onClick={() => setAttendanceContext('custom')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              attendanceContext === 'custom'
+                ? 'bg-[#0d6b66] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Custom Sessions (Non-Event)
+          </button>
         </div>
-        {events.length === 0 ? (
-          <p className="text-sm text-slate-400 italic">No events found. Please add events first.</p>
+
+        {attendanceContext === 'event' ? (
+          <>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                <span>Select Event</span>
+                {attendanceMode === 'qr' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 font-semibold normal-case bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full animate-pulse">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Locked in QR Scan Mode
+                  </span>
+                )}
+              </label>
+              <span className="text-xs text-slate-400 font-medium">{events.length} events available</span>
+            </div>
+            {events.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">No events found. Please add events first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {events.map(event => {
+                  const isSelected = selectedEventId === event.$id;
+                  const isDisabled = attendanceMode === 'qr';
+                  return (
+                    <button
+                      key={event.$id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => setSelectedEventId(event.$id)}
+                      className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-left transition-all duration-200 ${
+                        isDisabled
+                          ? (isSelected
+                              ? 'border-[#0d6b66]/60 bg-[#0d6b66]/60 text-white/80 cursor-not-allowed opacity-90'
+                              : 'border-slate-200/40 bg-slate-50/20 text-slate-400 cursor-not-allowed opacity-50')
+                          : (isSelected
+                              ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm shadow-[#0d6b66]/10 active:scale-[0.98]'
+                              : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]')
+                      }`}
+                    >
+                      <div
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-white text-[#0d6b66]'
+                            : `bg-white border border-slate-300 text-transparent ${isDisabled ? '' : 'group-hover:border-slate-400'}`
+                        }`}
+                      >
+                        {isSelected ? (
+                          <Check className="h-3 w-3 stroke-[3]" />
+                        ) : (
+                          <div className={`h-1.5 w-1.5 rounded-full bg-slate-300 ${isDisabled ? '' : 'group-hover:bg-slate-400'}`} />
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-xs font-semibold truncate max-w-[180px] sm:max-w-[240px] leading-tight transition-colors ${
+                          isSelected 
+                            ? (isDisabled ? 'text-white/80' : 'text-white') 
+                            : (isDisabled ? 'text-slate-400' : 'text-slate-700 group-hover:text-slate-900')
+                        }`}>
+                          {event.event_name}
+                        </span>
+                        <span className={`text-[9px] mt-0.5 transition-colors ${
+                          isSelected 
+                            ? (isDisabled ? 'text-white/70' : 'text-white/80') 
+                            : 'text-slate-400'
+                        }`}>
+                          {formatDate(event.date_to_held || '')}
+                          {event.location && ` • ${event.location}`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="flex flex-wrap gap-2.5 max-h-60 overflow-y-auto pr-1">
-            {events.map(event => {
-              const isSelected = selectedEventId === event.$id;
-              const isDisabled = attendanceMode === 'qr';
-              return (
+          <>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                <span>Select Custom Session</span>
+                {attendanceMode === 'qr' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 font-semibold normal-case bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full animate-pulse">
+                    Locked in QR Scan Mode
+                  </span>
+                )}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewSessionModal(true)}
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#0d6b66] hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New Session
+              </button>
+            </div>
+
+            {customSessions.length === 0 ? (
+              <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl space-y-2">
+                <p className="text-xs text-slate-500">No custom attendance sessions created yet.</p>
                 <button
-                  key={event.$id}
                   type="button"
-                  disabled={isDisabled}
-                  onClick={() => setSelectedEventId(event.$id)}
-                  className={`group flex items-center gap-2.5 px-4 py-2.5 rounded-full border text-left transition-all duration-200 ${
-                    isDisabled
-                      ? (isSelected
-                          ? 'border-[#0d6b66]/60 bg-[#0d6b66]/60 text-white/80 cursor-not-allowed opacity-90'
-                          : 'border-slate-200/40 bg-slate-50/20 text-slate-400 cursor-not-allowed opacity-50')
-                      : (isSelected
-                          ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm shadow-[#0d6b66]/10 active:scale-[0.98]'
-                          : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]')
-                  }`}
+                  onClick={() => setShowNewSessionModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0d6b66] text-white text-xs font-semibold rounded-lg hover:bg-[#0b5955] transition-colors"
                 >
-                  <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-white text-[#0d6b66]'
-                        : `bg-white border border-slate-300 text-transparent ${isDisabled ? '' : 'group-hover:border-slate-400'}`
-                    }`}
-                  >
-                    {isSelected ? (
-                      <Check className="h-3 w-3 stroke-[3]" />
-                    ) : (
-                      <div className={`h-1.5 w-1.5 rounded-full bg-slate-300 ${isDisabled ? '' : 'group-hover:bg-slate-400'}`} />
-                    )}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className={`text-xs font-semibold truncate max-w-[180px] sm:max-w-[240px] leading-tight transition-colors ${
-                      isSelected 
-                        ? (isDisabled ? 'text-white/80' : 'text-white') 
-                        : (isDisabled ? 'text-slate-400' : 'text-slate-700 group-hover:text-slate-900')
-                    }`}>
-                      {event.event_name}
-                    </span>
-                    <span className={`text-[9px] mt-0.5 transition-colors ${
-                      isSelected 
-                        ? (isDisabled ? 'text-white/70' : 'text-white/80') 
-                        : 'text-slate-400'
-                    }`}>
-                      {formatDate(event.date_to_held || '')}
-                      {event.location && ` • ${event.location}`}
-                    </span>
-                  </div>
+                  <Plus className="h-3.5 w-3.5" />
+                  Create First Session
                 </button>
-              );
-            })}
-          </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {customSessions.map(session => {
+                  const isSelected = selectedCustomSessionId === session.id;
+                  const isDisabled = attendanceMode === 'qr';
+                  return (
+                    <div key={session.id} className="relative group/session flex items-center">
+                      <button
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => setSelectedCustomSessionId(session.id)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-left transition-all duration-200 ${
+                          isSelected
+                            ? 'border-[#0d6b66] bg-[#0d6b66] text-white shadow-sm'
+                            : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                            isSelected
+                              ? 'bg-white text-[#0d6b66]'
+                              : 'bg-white border border-slate-300 text-transparent'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          ) : (
+                            <div className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0 pr-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs font-semibold truncate max-w-[180px] sm:max-w-[220px] leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`}>
+                              {session.name}
+                            </span>
+                            {session.ended && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-amber-100 text-amber-800'}`}>
+                                Ended
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[9px] mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                            Created {formatDate(session.createdAt)}
+                          </span>
+                        </div>
+                      </button>
+                      {/* Session Action Buttons */}
+                      {isSelected && !isDisabled && (
+                        <div className="flex items-center gap-1 ml-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSessionEnded(session.id)}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 rounded-full hover:bg-amber-50 transition-colors"
+                            title={session.ended ? "Reopen check-in for this session" : "End session (mark read-only)"}
+                          >
+                            {session.ended ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomSession(session.id, session.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                            title="Remove session from device"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {selectedEventId ? (
+      {activeSessionId ? (
         <>
           {/* Metrics Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1956,6 +2221,22 @@ const AdminAttendance: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {isSessionEnded && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center justify-between shadow-xs">
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                    Session Ended — Read Only
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSessionEnded(activeCustomSession!.id)}
+                    className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline"
+                  >
+                    Reopen Check-in
+                  </button>
+                </div>
+              )}
 
               {attendanceMode === 'manual' ? (
                 <form onSubmit={handleAddAttendance} className="space-y-4">
@@ -2742,6 +3023,58 @@ const AdminAttendance: React.FC = () => {
             </div>
           );
         })(),
+        document.body
+      )}
+
+      {/* New Custom Session Modal */}
+      {showNewSessionModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-800">New Custom Attendance Session</h3>
+              <button
+                type="button"
+                onClick={() => setShowNewSessionModal(false)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateCustomSession} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Session Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Study Hall, Officer Meeting, General Assembly"
+                  value={newSessionName}
+                  onChange={e => setNewSessionName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] outline-none"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Custom sessions allow taking attendance for non-official events directly.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewSessionModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#0d6b66] hover:bg-[#0b5955] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                >
+                  Create Session
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
         document.body
       )}
     </div>
