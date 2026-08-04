@@ -132,7 +132,7 @@ const AdminStudents: React.FC = () => {
         );
         addToast({ type: 'success', title: 'Promoted', message: `"${studentName}" has been promoted to Officer.` });
         setSelectedPosition('');
-        api.cache.clearTags(['accounts', 'students', 'dashboard']);
+        api.cache.clearTags(['accounts', 'students', 'officers', 'dashboard']);
         fetchStudents(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || `Failed to promote "${studentName}" to Officer.` });

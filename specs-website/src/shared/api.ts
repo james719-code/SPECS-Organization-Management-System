@@ -376,6 +376,43 @@ export const api = {
                 throw createApiError(error, `Failed to list attendance for custom session ${sessionId}`);
             }
         },
+        async listCustomSessions(): Promise<CustomSessionStub[]> {
+            try {
+                let docs: any[] = [];
+                try {
+                    const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                        Query.isNotNull('custom_session_id'),
+                        Query.orderDesc('$createdAt'),
+                        Query.limit(500)
+                    ]);
+                    docs = result.documents;
+                } catch (e) {
+                    const fallbackRes = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                        Query.orderDesc('$createdAt'),
+                        Query.limit(500)
+                    ]);
+                    docs = fallbackRes.documents.filter((d: any) => d.custom_session_id);
+                }
+
+                const map = new Map<string, CustomSessionStub>();
+                docs.forEach((doc: any) => {
+                    const sid = doc.custom_session_id;
+                    const sname = doc.custom_session_name || 'Custom Session';
+                    if (sid && !map.has(sid)) {
+                        map.set(sid, {
+                            id: sid,
+                            name: sname,
+                            createdAt: doc.$createdAt,
+                            ended: false
+                        });
+                    }
+                });
+                return Array.from(map.values());
+            } catch (error) {
+                console.warn('Failed to list custom sessions from database:', error);
+                return [];
+            }
+        },
         async listAll(options: ListOptions = {}): Promise<PaginatedResponse<AttendanceDoc>> {
             try {
                 const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = normalizeListOptions(options);
@@ -456,9 +493,23 @@ export const api = {
                 dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 return result;
             } catch (error) {
-                throw createApiError(error, `Failed to delete attendance ${attendanceId}`);
+                throw createApiError(error, `Failed to delete attendance record ${attendanceId}`);
             }
-        }
+        },
+        async deleteForCustomSession(sessionId: string): Promise<void> {
+            try {
+                const records = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                    Query.equal('custom_session_id', sessionId),
+                    Query.limit(500)
+                ]);
+                for (const doc of records.documents) {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, doc.$id);
+                }
+                dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
+            } catch (error) {
+                throw createApiError(error, `Failed to delete attendance records for custom session ${sessionId}`);
+            }
+        },
     },
 
     // --- USERS (Accounts) ---
@@ -1217,6 +1268,14 @@ export const cachedApi = {
         async listForCustomSession(sessionId: string, options: ListOptions = {}, ttl = 60 * 1000): Promise<PaginatedResponse<AttendanceDoc>> {
             const cacheKey = generateCacheKey('attendance_custom_session', { sessionId, ...options });
             return dataCache.getOrFetch(cacheKey, () => api.attendance.listForCustomSession(sessionId, options), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.ATTENDANCE]
+            });
+        },
+        async listCustomSessions(ttl = 60 * 1000): Promise<CustomSessionStub[]> {
+            const cacheKey = generateCacheKey('attendance_custom_sessions_list', {});
+            return dataCache.getOrFetch(cacheKey, () => api.attendance.listCustomSessions(), {
                 ttl,
                 staleTtl: 2 * 60 * 1000,
                 tags: [CacheTags.ATTENDANCE]

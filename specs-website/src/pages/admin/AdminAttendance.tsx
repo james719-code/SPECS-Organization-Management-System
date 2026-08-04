@@ -42,18 +42,51 @@ const AdminAttendance: React.FC = () => {
 
   const CUSTOM_SESSIONS_STORAGE_KEY = 'specs_custom_sessions_v1';
 
-  const loadCustomSessions = () => {
+  const loadCustomSessions = async () => {
+    let localStubs: CustomSessionStub[] = [];
     try {
       const saved = localStorage.getItem(CUSTOM_SESSIONS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setCustomSessions(parsed);
-          return;
-        }
+        if (Array.isArray(parsed)) localStubs = parsed;
       }
     } catch {}
-    setCustomSessions([]);
+
+    const localEndedMap = new Map<string, boolean>();
+    localStubs.forEach(s => {
+      if (s.ended) localEndedMap.set(s.id, true);
+    });
+
+    try {
+      const dbSessions = await cachedApi.attendance.listCustomSessions();
+      const mergedMap = new Map<string, CustomSessionStub>();
+
+      // DB sessions first
+      dbSessions.forEach(s => {
+        mergedMap.set(s.id, {
+          ...s,
+          ended: localEndedMap.get(s.id) || false
+        });
+      });
+
+      // Add local stubs if not in DB yet (e.g. newly created before first check-in)
+      localStubs.forEach(s => {
+        if (!mergedMap.has(s.id)) {
+          mergedMap.set(s.id, s);
+        }
+      });
+
+      const mergedList = Array.from(mergedMap.values());
+      setCustomSessions(mergedList);
+      if (mergedList.length > 0 && !selectedCustomSessionId) {
+        setSelectedCustomSessionId(mergedList[0].id);
+      }
+    } catch {
+      setCustomSessions(localStubs);
+      if (localStubs.length > 0 && !selectedCustomSessionId) {
+        setSelectedCustomSessionId(localStubs[0].id);
+      }
+    }
   };
 
   const saveCustomSessions = (sessions: CustomSessionStub[]) => {
@@ -96,14 +129,20 @@ const AdminAttendance: React.FC = () => {
     saveCustomSessions(updated);
   };
 
-  const handleDeleteCustomSession = (sessionId: string, sessionName: string) => {
-    if (!window.confirm(`Remove session "${sessionName}" from your device? Attendance records in the database will remain intact.`)) return;
+  const handleDeleteCustomSession = async (sessionId: string, sessionName: string) => {
+    if (!window.confirm(`Delete custom session "${sessionName}" and all of its attendance records from the database?`)) return;
+    try {
+      await api.attendance.deleteForCustomSession(sessionId);
+    } catch (err: any) {
+      console.warn('Failed to delete custom session records from DB:', err);
+    }
     const updated = customSessions.filter(s => s.id !== sessionId);
     saveCustomSessions(updated);
     if (selectedCustomSessionId === sessionId) {
-      setSelectedCustomSessionId('');
+      setSelectedCustomSessionId(updated[0]?.id || '');
     }
-    addToast({ type: 'info', title: 'Session Removed', message: `Session "${sessionName}" removed from local list.` });
+    addToast({ type: 'info', title: 'Session Deleted', message: `Custom session "${sessionName}" and its attendance records were deleted.` });
+    await loadCustomSessions();
   };
 
   const activeCustomSession = useMemo(() => {
@@ -157,6 +196,47 @@ const AdminAttendance: React.FC = () => {
   const [printPreparedBy, setPrintPreparedBy] = useState<string>('default');
   const [printAttestedBy, setPrintAttestedBy] = useState<string>('default');
   const [printNotedBy, setPrintNotedBy] = useState<string>('default');
+  const [printSectionFilter, setPrintSectionFilter] = useState<string>('all');
+  const [printCustomSection, setPrintCustomSection] = useState<string>('');
+
+  const formatStudentSection = (section?: string | null, yearLevel?: number | null): string => {
+    const sec = (section || '').trim();
+    if (!sec && !yearLevel) return '';
+    
+    if (sec) {
+      const uppercaseSec = sec.toUpperCase().replace('-', ' ');
+      if (uppercaseSec.startsWith('BSCS') || uppercaseSec.startsWith('BSIT') || uppercaseSec.startsWith('ACT')) {
+        return uppercaseSec;
+      }
+      if (/^[A-Z]$/.test(uppercaseSec) && yearLevel) {
+        return `BSCS ${yearLevel}${uppercaseSec}`;
+      }
+      if (/^\d[A-Z]$/.test(uppercaseSec)) {
+        return `BSCS ${uppercaseSec}`;
+      }
+      return uppercaseSec;
+    }
+    
+    if (yearLevel) {
+      return `BSCS ${yearLevel}`;
+    }
+    
+    return '';
+  };
+
+  const availableSections = useMemo(() => {
+    const secSet = new Set<string>();
+    students.forEach(acc => {
+      const p = acc.students as any;
+      if (p && typeof p === 'object') {
+        const formatted = formatStudentSection(p.section, p.yearLevel);
+        if (formatted) {
+          secSet.add(formatted);
+        }
+      }
+    });
+    return Array.from(secSet).sort();
+  }, [students]);
 
   // Drag-and-drop Signatory Layout states
   const [layout, setLayout] = useState<SignatoryLayout>({ rows: [] });
@@ -709,6 +789,9 @@ const AdminAttendance: React.FC = () => {
 
       // Refresh listing
       loadAttendanceRecords(attendanceContext, activeSessionId);
+      if (attendanceContext === 'custom') {
+        loadCustomSessions();
+      }
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to record attendance.' });
     } finally {
@@ -1509,7 +1592,20 @@ const AdminAttendance: React.FC = () => {
       ? formatDate(selectedEvent.date_to_held) 
       : (activeCustomSession?.createdAt ? formatDate(activeCustomSession.createdAt) : formatDate(new Date().toISOString()));
 
-    const rowsHtml = filteredGroupedRecords.map((group, index) => {
+    const effectiveSectionDisplay = printSectionFilter === 'custom' 
+      ? (printCustomSection.trim() || 'Custom Section') 
+      : printSectionFilter !== 'all' 
+        ? printSectionFilter 
+        : '';
+
+    let recordsToPrint = filteredGroupedRecords;
+    if (printSectionFilter !== 'all' && printSectionFilter !== 'custom') {
+      recordsToPrint = filteredGroupedRecords.filter(g => 
+        (g.section || '').trim().toLowerCase() === printSectionFilter.trim().toLowerCase()
+      );
+    }
+
+    const rowsHtml = recordsToPrint.map((group, index) => {
       const sessionsStr = group.records.map(r => {
         const timeStr = new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return `${r.sessionLabel} (${timeStr})`;
@@ -1527,24 +1623,106 @@ const AdminAttendance: React.FC = () => {
 
     const origin = window.location.origin;
 
-    const getOfficerDetails = (positionCode: string, defaultTitle: string) => {
-      const officer = officersList.find(o => o.position === positionCode);
+    const getOfficerDetails = async (positionCode: string, defaultTitle: string) => {
+      if (!positionCode) {
+        return { name: '_______________________', title: `${defaultTitle.toUpperCase()}, SPECS` };
+      }
+      const cleanTarget = positionCode.toLowerCase().replace(/[\s_-]+/g, '');
+
+      let officer = officersList.find(o => {
+        if (!o.position) return false;
+        const pos = o.position.toLowerCase().replace(/[\s_-]+/g, '');
+        if (pos === cleanTarget) return true;
+        if ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary')) return true;
+        if ((cleanTarget === 'asstsecretary' || cleanTarget === 'assistantsecretary') && (pos === 'asstsecretary' || pos === 'assistantsecretary')) return true;
+        if (cleanTarget === 'president' && pos === 'president') return true;
+        if (cleanTarget === 'adviser' && pos === 'adviser') return true;
+        return false;
+      });
+
+      if (!officer) {
+        for (const acc of students) {
+          const off = acc.officers as any;
+          if (off && typeof off === 'object' && off.position) {
+            const pos = off.position.toLowerCase().replace(/[\s_-]+/g, '');
+            if (pos === cleanTarget || ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary'))) {
+              const stud = acc.students as any;
+              const name = (stud && typeof stud === 'object' ? stud.name : '') || acc.username || '';
+              if (name && name.trim()) {
+                return {
+                  name: name.trim().toUpperCase(),
+                  title: `${defaultTitle.toUpperCase()}, SPECS`
+                };
+              }
+            }
+          }
+        }
+
+        try {
+          const freshRes = await api.officers.listAll();
+          setOfficersList(freshRes.documents);
+          officer = freshRes.documents.find(o => {
+            if (!o.position) return false;
+            const pos = o.position.toLowerCase().replace(/[\s_-]+/g, '');
+            if (pos === cleanTarget) return true;
+            if ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary')) return true;
+            if ((cleanTarget === 'asstsecretary' || cleanTarget === 'assistantsecretary') && (pos === 'asstsecretary' || pos === 'assistantsecretary')) return true;
+            if (cleanTarget === 'president' && pos === 'president') return true;
+            if (cleanTarget === 'adviser' && pos === 'adviser') return true;
+            return false;
+          });
+        } catch (err) {
+          console.warn('Failed to fetch fresh officers list:', err);
+        }
+      }
+
       if (officer && officer.students) {
-        const student = typeof officer.students === 'object' ? (officer.students as StudentDoc) : null;
-        if (student?.name) {
+        let name = '';
+        if (typeof officer.students === 'object' && (officer.students as any)?.name) {
+          name = (officer.students as any).name;
+        }
+        if (!name) {
+          const studentId = typeof officer.students === 'object' ? (officer.students as any).$id : officer.students;
+          const foundAcc = students.find(s => {
+            const p = s.students as any;
+            return p?.$id === studentId || s.$id === studentId || s.students === studentId;
+          });
+          if (foundAcc) {
+            const p = foundAcc.students as any;
+            name = (p && typeof p === 'object' ? p.name : '') || foundAcc.username || '';
+          }
+        }
+        if (!name) {
+          const studentId = typeof officer.students === 'object' ? (officer.students as any).$id : officer.students;
+          if (studentId) {
+            try {
+              const sDoc = await api.students.get(studentId);
+              if (sDoc?.name) name = sDoc.name;
+            } catch {
+              try {
+                const aDoc = await api.users.getAccount(studentId);
+                const p = aDoc?.students as any;
+                name = (p && typeof p === 'object' ? p.name : '') || aDoc?.username || '';
+              } catch {}
+            }
+          }
+        }
+
+        if (name && name.trim()) {
           return {
-            name: student.name.toUpperCase(),
-            title: `${defaultTitle}, SPECS`
+            name: name.trim().toUpperCase(),
+            title: `${defaultTitle.toUpperCase()}, SPECS`
           };
         }
       }
+
       return {
         name: '_______________________',
         title: `${defaultTitle.toUpperCase()}, SPECS`
       };
     };
 
-    const getSignatoryDetails = (sigId: string, officerPos: string, fallbackTitle: string) => {
+    const getSignatoryDetails = async (sigId: string, officerPos: string, fallbackTitle: string) => {
       if (sigId && sigId !== 'default') {
         const customSig = signatories.find(s => s.$id === sigId);
         if (customSig) {
@@ -1554,7 +1732,7 @@ const AdminAttendance: React.FC = () => {
           };
         }
       }
-      const details = getOfficerDetails(officerPos, fallbackTitle);
+      const details = await getOfficerDetails(officerPos, fallbackTitle);
       return {
         name: details.name.toUpperCase(),
         title: details.title.toUpperCase()
@@ -1605,8 +1783,8 @@ const AdminAttendance: React.FC = () => {
         </div>
       `;
     } else {
-      const preparedByDetails = getSignatoryDetails(printPreparedBy, selectedSignatory, selectedSignatory === 'secretary' ? 'Executive Secretary' : 'Assistant Secretary');
-      const presidentDetails = getSignatoryDetails(printAttestedBy, 'president', 'President');
+      const preparedByDetails = await getSignatoryDetails(printPreparedBy, selectedSignatory, selectedSignatory === 'secretary' ? 'Executive Secretary' : 'Assistant Secretary');
+      const presidentDetails = await getSignatoryDetails(printAttestedBy, 'president', 'President');
       const notedDetails = (printNotedBy && printNotedBy !== 'default')
         ? (() => {
             const customSig = signatories.find(s => s.$id === printNotedBy);
@@ -1731,11 +1909,11 @@ const AdminAttendance: React.FC = () => {
               background-color: #f8fafc;
               border: 1px solid #e2e8f0;
               border-radius: 8px;
-              padding: 15px;
+              padding: 12px 18px;
               margin-bottom: 24px;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px 30px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px 30px;
               font-size: 13px;
             }
             .meta-item {
@@ -1797,8 +1975,9 @@ const AdminAttendance: React.FC = () => {
 
                   <div class="meta-section">
                     <p class="meta-item"><strong>Session / Event Name:</strong> ${eventNameDisplay}</p>
-                    <p class="meta-item"><strong>Location:</strong> ${locationDisplay}</p>
                     <p class="meta-item"><strong>Date:</strong> ${dateDisplay}</p>
+                    <p class="meta-item"><strong>Location:</strong> ${locationDisplay}</p>
+                    <p class="meta-item"><strong>Section:</strong> ${effectiveSectionDisplay || 'All Sections'}</p>
                   </div>
 
                   <table class="report-table">
@@ -1811,7 +1990,7 @@ const AdminAttendance: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      ${rowsHtml || '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">No attendance records found for this event.</td></tr>'}
+                      ${rowsHtml || '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">No attendance records found for this section.</td></tr>'}
                     </tbody>
                   </table>
 
@@ -1863,12 +2042,448 @@ const AdminAttendance: React.FC = () => {
     printWindow.document.close();
   };
 
+  const handlePrintBlankSheet = async () => {
+    if (!activeSessionId) {
+      addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
+      return;
+    }
+    const selectedEvent = attendanceContext === 'event' ? events.find(ev => ev.$id === selectedEventId) : null;
+    const eventNameDisplay = activeSessionName;
+    const locationDisplay = selectedEvent?.location || 'N/A';
+    const dateDisplay = selectedEvent?.date_to_held 
+      ? formatDate(selectedEvent.date_to_held) 
+      : (activeCustomSession?.createdAt ? formatDate(activeCustomSession.createdAt) : formatDate(new Date().toISOString()));
+
+    const effectiveSectionDisplay = printSectionFilter === 'custom' 
+      ? (printCustomSection.trim() || 'Custom Section') 
+      : printSectionFilter !== 'all' 
+        ? printSectionFilter 
+        : 'All Sections';
+
+    const origin = window.location.origin;
+
+    const getOfficerDetails = async (positionCode: string, defaultTitle: string) => {
+      if (!positionCode) {
+        return { name: '_______________________', title: `${defaultTitle.toUpperCase()}, SPECS` };
+      }
+      const cleanTarget = positionCode.toLowerCase().replace(/[\s_-]+/g, '');
+
+      let officer = officersList.find(o => {
+        if (!o.position) return false;
+        const pos = o.position.toLowerCase().replace(/[\s_-]+/g, '');
+        if (pos === cleanTarget) return true;
+        if ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary')) return true;
+        if ((cleanTarget === 'asstsecretary' || cleanTarget === 'assistantsecretary') && (pos === 'asstsecretary' || pos === 'assistantsecretary')) return true;
+        if (cleanTarget === 'president' && pos === 'president') return true;
+        if (cleanTarget === 'adviser' && pos === 'adviser') return true;
+        return false;
+      });
+
+      if (!officer) {
+        for (const acc of students) {
+          const off = acc.officers as any;
+          if (off && typeof off === 'object' && off.position) {
+            const pos = off.position.toLowerCase().replace(/[\s_-]+/g, '');
+            if (pos === cleanTarget || ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary'))) {
+              const stud = acc.students as any;
+              const name = (stud && typeof stud === 'object' ? stud.name : '') || acc.username || '';
+              if (name && name.trim()) {
+                return {
+                  name: name.trim().toUpperCase(),
+                  title: `${defaultTitle.toUpperCase()}, SPECS`
+                };
+              }
+            }
+          }
+        }
+
+        try {
+          const freshRes = await api.officers.listAll();
+          setOfficersList(freshRes.documents);
+          officer = freshRes.documents.find(o => {
+            if (!o.position) return false;
+            const pos = o.position.toLowerCase().replace(/[\s_-]+/g, '');
+            if (pos === cleanTarget) return true;
+            if ((cleanTarget === 'secretary' || cleanTarget === 'executivesecretary') && (pos === 'secretary' || pos === 'executivesecretary')) return true;
+            if ((cleanTarget === 'asstsecretary' || cleanTarget === 'assistantsecretary') && (pos === 'asstsecretary' || pos === 'assistantsecretary')) return true;
+            if (cleanTarget === 'president' && pos === 'president') return true;
+            if (cleanTarget === 'adviser' && pos === 'adviser') return true;
+            return false;
+          });
+        } catch (err) {
+          console.warn('Failed to fetch fresh officers list:', err);
+        }
+      }
+
+      if (officer && officer.students) {
+        let name = '';
+        if (typeof officer.students === 'object' && (officer.students as any)?.name) {
+          name = (officer.students as any).name;
+        }
+        if (!name) {
+          const studentId = typeof officer.students === 'object' ? (officer.students as any).$id : officer.students;
+          const foundAcc = students.find(s => {
+            const p = s.students as any;
+            return p?.$id === studentId || s.$id === studentId || s.students === studentId;
+          });
+          if (foundAcc) {
+            const p = foundAcc.students as any;
+            name = (p && typeof p === 'object' ? p.name : '') || foundAcc.username || '';
+          }
+        }
+        if (!name) {
+          const studentId = typeof officer.students === 'object' ? (officer.students as any).$id : officer.students;
+          if (studentId) {
+            try {
+              const sDoc = await api.students.get(studentId);
+              if (sDoc?.name) name = sDoc.name;
+            } catch {
+              try {
+                const aDoc = await api.users.getAccount(studentId);
+                const p = aDoc?.students as any;
+                name = (p && typeof p === 'object' ? p.name : '') || aDoc?.username || '';
+              } catch {}
+            }
+          }
+        }
+
+        if (name && name.trim()) {
+          return {
+            name: name.trim().toUpperCase(),
+            title: `${defaultTitle.toUpperCase()}, SPECS`
+          };
+        }
+      }
+
+      return {
+        name: '_______________________',
+        title: `${defaultTitle.toUpperCase()}, SPECS`
+      };
+    };
+
+    const getSignatoryDetails = async (sigId: string, officerPos: string, fallbackTitle: string) => {
+      if (sigId && sigId !== 'default') {
+        const customSig = signatories.find(s => s.$id === sigId);
+        if (customSig) {
+          return {
+            name: customSig.name_officer.toUpperCase(),
+            title: (customSig.position || fallbackTitle).toUpperCase()
+          };
+        }
+      }
+      const details = await getOfficerDetails(officerPos, fallbackTitle);
+      return {
+        name: details.name.toUpperCase(),
+        title: details.title.toUpperCase()
+      };
+    };
+
+    let signatureHtml = '';
+    const activeRows = layout.rows.filter(r => r.left || r.right);
+    if (activeRows.length > 0) {
+      signatureHtml = `
+        <div style="margin-top: 50px; page-break-inside: avoid; text-align: left;">
+          <table style="width: 100%; table-layout: fixed; border: none; border-collapse: collapse;">
+            <tbody>
+              ${activeRows.map((row, i) => {
+                const leftS = getById(row.left);
+                const rightS = getById(row.right);
+                return `
+                  <tr>
+                    <td style="width: 50%; padding-right: 20px; padding-bottom: 35px; border: none; vertical-align: top;">
+                      ${leftS ? `
+                        <div style="text-align: left;">
+                          <p style="font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase; margin: 0 0 35px 0; ${leftS.notation_line ? '' : 'visibility: hidden;'}">${leftS.notation_line ? leftS.notation_line.toUpperCase() : '&nbsp;'}:</p>
+                          <div style="text-align: center; width: 250px; margin-top: 30px;">
+                            <div style="border-top: 1px solid #000000; width: 100%; margin-bottom: 8px;"></div>
+                            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase; text-align: center;">${leftS.name_officer.toUpperCase()}</p>
+                            ${leftS.position ? `<p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase; text-align: center;">${leftS.position.toUpperCase()}</p>` : ''}
+                          </div>
+                        </div>
+                      ` : '&nbsp;'}
+                    </td>
+                    <td style="width: 50%; padding-left: 20px; padding-bottom: 35px; border: none; vertical-align: top;">
+                      ${rightS ? `
+                        <div style="text-align: left;">
+                          <p style="font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase; margin: 0 0 35px 0; ${rightS.notation_line ? '' : 'visibility: hidden;'}">${rightS.notation_line ? rightS.notation_line.toUpperCase() : '&nbsp;'}:</p>
+                          <div style="text-align: center; width: 250px; margin-top: 30px;">
+                            <div style="border-top: 1px solid #000000; width: 100%; margin-bottom: 8px;"></div>
+                            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase; text-align: center;">${rightS.name_officer.toUpperCase()}</p>
+                            ${rightS.position ? `<p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase; text-align: center;">${rightS.position.toUpperCase()}</p>` : ''}
+                          </div>
+                        </div>
+                      ` : '&nbsp;'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      const preparedByDetails = await getSignatoryDetails(printPreparedBy, printSignatory === 'asst-secretary' ? 'asst-secretary' : 'secretary', printSignatory === 'asst-secretary' ? 'Assistant Secretary' : 'Executive Secretary');
+      const presidentDetails = await getSignatoryDetails(printAttestedBy, 'president', 'President');
+      const notedDetails = (printNotedBy && printNotedBy !== 'default')
+        ? (() => {
+            const customSig = signatories.find(s => s.$id === printNotedBy);
+            return customSig ? { name: customSig.name_officer.toUpperCase(), title: (customSig.position || 'ADVISER, SPECS').toUpperCase() } : { name: 'NICOLAS A. PURA', title: 'ADVISER, SPECS' };
+          })()
+        : { name: 'NICOLAS A. PURA', title: 'ADVISER, SPECS' };
+
+      signatureHtml = `
+        <div class="signature-section" style="margin-top: 50px; page-break-inside: avoid; text-align: left;">
+          <div style="display: flex; flex-direction: column; gap: 35px; text-align: left; align-items: flex-start;">
+            <div style="text-align: left;">
+              <p style="margin: 0 0 30px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">PREPARED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${preparedByDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${preparedByDetails.title}</p>
+            </div>
+            <div style="text-align: left;">
+              <p style="margin: 0 0 30px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">ATTESTED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${presidentDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${presidentDetails.title}</p>
+            </div>
+            <div style="text-align: left;">
+              <p style="margin: 0 0 30px 0; font-size: 13px; color: #1e293b; font-weight: bold; text-transform: uppercase;">NOTED BY:</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; text-transform: uppercase;">${notedDetails.name}</p>
+              <p style="margin: 3px 0 0 0; font-size: 12px; font-style: italic; color: #475569; text-transform: uppercase;">${notedDetails.title}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    const blankRowsHtml = Array.from({ length: 60 }).map((_, i) => `
+      <tr style="height: 28px;">
+        <td style="text-align: center; font-weight: bold; color: #64748b; font-size: 11px;">${i + 1}</td>
+        <td></td>
+        <td></td>
+        <td style="text-align: center; font-size: 11px; color: #475569;">${effectiveSectionDisplay !== 'All Sections' ? effectiveSectionDisplay : ''}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Blank Attendance Sheet - ${eventNameDisplay}</title>
+          <style>
+            @page {
+              size: 8.5in 13in;
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              line-height: 1.4;
+            }
+            .print-header {
+              position: fixed;
+              top: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              height: 5cm;
+              z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .print-header img {
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
+            }
+            .print-footer {
+              position: fixed;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              height: 3cm;
+              z-index: 1000;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .print-footer img {
+              position: absolute !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
+            }
+            .print-layout-table {
+              width: 100%;
+              border-collapse: collapse;
+              border: none !important;
+            }
+            .print-layout-table > thead > tr > td,
+            .print-layout-table > tbody > tr > td,
+            .print-layout-table > tfoot > tr > td {
+              padding-left: 2.54cm;
+              padding-right: 2.54cm;
+              border: none !important;
+              background: transparent !important;
+            }
+            .header-spacer { height: 5cm; }
+            .footer-spacer { height: 3cm; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            .report-title {
+              text-align: center;
+              font-size: 18px;
+              font-weight: 800;
+              text-transform: uppercase;
+              margin: 15px 0 10px 0;
+              color: #0f172a;
+            }
+            .meta-section {
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 12px 18px;
+              margin-bottom: 16px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px 30px;
+              font-size: 12px;
+            }
+            .meta-item { margin: 0; }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #cbd5e1;
+              padding: 5px 6px;
+              text-align: left;
+              font-size: 11px;
+            }
+            .report-table th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+              text-transform: uppercase;
+              font-size: 10px;
+              letter-spacing: 0.5px;
+              text-align: center;
+              vertical-align: middle;
+            }
+
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <img src="${origin}/header.png" alt="Header" />
+          </div>
+          <div class="print-footer">
+            <img src="${origin}/footer.png" alt="Footer" />
+          </div>
+
+          <table class="print-layout-table">
+            <thead>
+              <tr>
+                <td><div class="header-spacer"></div></td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <h2 class="report-title">Blank Attendance Log Sheet (Manual Check-In)</h2>
+
+                  <div class="meta-section">
+                    <p class="meta-item"><strong>Session / Event:</strong> ${eventNameDisplay}</p>
+                    <p class="meta-item"><strong>Date:</strong> ${dateDisplay}</p>
+                    <p class="meta-item"><strong>Location:</strong> ${locationDisplay}</p>
+                    <p class="meta-item"><strong>Target Section:</strong> ${effectiveSectionDisplay || 'All Sections'}</p>
+                  </div>
+
+                  <table class="report-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 4%; text-align: center;">No.</th>
+                        <th style="width: 16%; text-align: center;">Student ID</th>
+                        <th style="width: 38%; text-align: center;">Student Name (Last Name, First Name)</th>
+                        <th style="width: 10%; text-align: center;">Section</th>
+                        <th style="width: 10%; text-align: center;">Time In</th>
+                        <th style="width: 10%; text-align: center;">Time Out</th>
+                        <th style="width: 12%; text-align: center;">Signature</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${blankRowsHtml}
+                    </tbody>
+                  </table>
+
+                  ${signatureHtml}
+
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td><div class="footer-spacer"></div></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <script>
+            let printed = false;
+            function doPrint() {
+              if (printed) return;
+              printed = true;
+              window.print();
+            }
+            window.onload = doPrint;
+            window.onafterprint = function() {
+              window.close();
+            };
+            setTimeout(doPrint, 500);
+          </script>
+        </body>
+      </html>
+    `;
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      const { downloadPdfFromHtml } = await import('../../shared/utils');
+      await downloadPdfFromHtml(htmlContent, `Blank_Attendance_${eventNameDisplay.replace(/\s+/g, '_')}_60_Rows.pdf`, addToast);
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast({ type: 'error', title: 'Pop-up Blocked', message: 'Please allow pop-ups for this website to print reports.' });
+      return;
+    }
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Group attendance records by attendee to prevent duplicate rows in the log sheet
   const groupedRecords = useMemo(() => {
     const groups: Record<string, {
       id: string;
       name: string;
       type: 'student' | 'officer' | 'non-member';
+      section: string;
       records: { id: string; sessionLabel: string; createdAt: string }[];
     }> = {};
 
@@ -1876,11 +2491,26 @@ const AdminAttendance: React.FC = () => {
       const attendeeType = record.attendance_type || 'student';
       let attendeeId = '';
       let attendeeName = '';
+      let attendeeSection = '';
 
       if (attendeeType === 'student' || attendeeType === 'officer') {
         const profile = record.students as any;
         attendeeId = profile?.$id || record.students || '';
         attendeeName = profile?.name || 'Unknown Student';
+        let rawSec = profile?.section || '';
+        let yLevel = profile?.yearLevel || null;
+        if ((!rawSec || !yLevel) && attendeeId) {
+          const acc = students.find(s => {
+            const p = s.students as any;
+            return p?.$id === attendeeId || s.$id === attendeeId;
+          });
+          if (acc && typeof acc.students === 'object') {
+            const p = acc.students as StudentDoc;
+            if (!rawSec) rawSec = p.section || '';
+            if (!yLevel) yLevel = p.yearLevel || null;
+          }
+        }
+        attendeeSection = formatStudentSection(rawSec, yLevel);
       } else if (attendeeType === 'non-member') {
         attendeeId = `nonmember:${record['non-member-name']}:${record['non-member-email'] || ''}`;
         attendeeName = record['non-member-name'] || 'Non-Member';
@@ -1893,6 +2523,7 @@ const AdminAttendance: React.FC = () => {
           id: attendeeId,
           name: attendeeName,
           type: attendeeType,
+          section: attendeeSection,
           records: []
         };
       }
@@ -2759,17 +3390,58 @@ const AdminAttendance: React.FC = () => {
                       ))}
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Target Section Filter</label>
+                    <select
+                      value={printSectionFilter}
+                      onChange={(e) => setPrintSectionFilter(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#0d6b66] outline-none"
+                    >
+                      <option value="all">All Sections (Entire Attendance)</option>
+                      {availableSections.map(sec => (
+                        <option key={sec} value={sec}>{sec}</option>
+                      ))}
+                      <option value="custom">Custom Section Name...</option>
+                    </select>
+                    {printSectionFilter === 'custom' && (
+                      <input
+                        type="text"
+                        placeholder="e.g. BSIT 1-A..."
+                        value={printCustomSection}
+                        onChange={(e) => setPrintCustomSection(e.target.value)}
+                        className="w-full mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#0d6b66] outline-none"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex w-full gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPrintModalOpen(false)}
-                  className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="flex flex-col w-full gap-2">
+                <div className="flex w-full gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPrintModalOpen(false)}
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      setPrintModalOpen(false);
+                      setTimeout(() => {
+                        handlePrintBlankSheet();
+                      }, 50);
+                    }}
+                    className="flex-1 rounded-lg border border-[#0d6b66] text-[#0d6b66] hover:bg-teal-50 px-3 py-2 text-xs font-bold transition-colors"
+                  >
+                    Blank Sheet (60 Rows)
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -2781,9 +3453,9 @@ const AdminAttendance: React.FC = () => {
                       handlePrintReport(printSignatory);
                     }, 50);
                   }}
-                  className="flex-1 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors"
+                  className="w-full rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-4 py-2.5 text-xs font-bold shadow-sm transition-colors"
                 >
-                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF Report' : 'Print Filled Attendance Report'}
                 </button>
               </div>
             </div>
