@@ -1,11 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { account } from '../shared/appwrite';
 import { AlertTriangle } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
+import { useAuth } from '../shared/AuthContext';
 
 const PendingVerificationPage: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   usePageMeta({
     title: 'Verification Pending',
@@ -14,7 +15,7 @@ const PendingVerificationPage: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await account.deleteSession('current');
+      await logout();
     } catch (e) {
       console.error(e);
     }

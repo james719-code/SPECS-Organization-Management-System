@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { account, databases, ID } from '../shared/appwrite';
 import { Mail, Lock, User, Sun, Moon, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
+import { useAuth } from '../shared/AuthContext';
 
 interface SignupPageProps {
   theme: 'light' | 'dark';
@@ -11,6 +12,8 @@ interface SignupPageProps {
 }
 
 const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
+  const { status, profile } = useAuth();
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -31,6 +34,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
     title: 'Student Registration',
     description: 'Register as a SPECS member — the official Computer Science student organization at Partido State University. Create your account to access events, track attendance, and manage dues.',
   });
+
+  useEffect(() => {
+    if (status === 'authenticated' && profile) {
+      if (!profile.verified && profile.type !== 'admin') {
+        navigate('/pending');
+      } else {
+        navigate(`/dashboard/${profile.type}`);
+      }
+    }
+  }, [status, profile, navigate]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();

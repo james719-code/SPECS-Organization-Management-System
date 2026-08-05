@@ -13,7 +13,10 @@ import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { IDCardExportModal } from '../../components/id/IDCardExportModal';
 
+import { useAuth } from '../../shared/AuthContext';
+
 const StudentProfile: React.FC = () => {
+  const { logout } = useAuth();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [studentData, setStudentData] = useState<any>(null);
   const [accountType, setAccountType] = useState<string>('student');
@@ -148,8 +151,7 @@ const StudentProfile: React.FC = () => {
       if (studentData) {
         await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id);
       }
-      await account.deleteSession('current');
-      localStorage.removeItem('appwrite_session');
+      await logout();
       addToast({ type: 'info', title: 'Account deleted', message: 'Your account has been permanently deleted.' });
       navigate('/login');
     } catch (err: any) {

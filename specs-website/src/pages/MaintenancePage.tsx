@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldAlert, Sun, Moon, LogOut, Loader2 } from 'lucide-react';
-import { account } from '../shared/appwrite';
+import { useAuth } from '../shared/AuthContext';
 
 interface MaintenancePageProps {
   theme: 'light' | 'dark';
@@ -11,12 +11,12 @@ interface MaintenancePageProps {
 
 const MaintenancePage: React.FC<MaintenancePageProps> = ({ theme, toggleTheme, isLoggedIn }) => {
   const [loggingOut, setLoggingOut] = useState(false);
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     try {
       setLoggingOut(true);
-      await account.deleteSession('current');
-      localStorage.removeItem('appwrite_session');
+      await logout();
       // Reload the application to reset state and re-trigger check
       window.location.reload();
     } catch (e) {

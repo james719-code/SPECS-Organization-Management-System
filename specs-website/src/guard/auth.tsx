@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { cachedApi } from '../shared/api.js';
-import { account } from '../shared/appwrite.js';
+import { useAuth } from '../shared/AuthContext';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -9,81 +8,26 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const { profile, status } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    let active = true;
-
-    async function checkAuth() {
-      try {
-        // 1. Get current authenticated user
-        const user = await cachedApi.users.getCurrent();
-        if (!user) {
-          if (active) {
-            setAuthenticated(false);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // 2. Fetch user profile role and status
-        const profile = await cachedApi.users.getAccount(user.$id);
-        
-        if (active) {
-          if (profile && !profile.deactivated) {
-            setAuthenticated(true);
-            setUserProfile(profile);
-          } else {
-            try {
-              await account.deleteSession('current');
-            } catch (err) {
-              console.warn('[AuthGuard] Failed to delete session on deactivation:', err);
-            }
-            setAuthenticated(false);
-          }
-          setLoading(false);
-        }
-      } catch (error: any) {
-        // 401 Unauthorized is expected when checking guest/anonymous visitors
-        if (error?.code !== 401 && error?.status !== 401 && error?.type !== 'user_unauthorized') {
-          if (!import.meta.env.PROD) {
-            console.warn('[AuthGuard] Auth check error:', error);
-          }
-        }
-        if (active) {
-          setAuthenticated(false);
-          setLoading(false);
-        }
-      }
-    }
-
-    checkAuth();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (loading) {
+  if (status === 'loading') {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-2">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-800 border-t-transparent" />
-          <p className="text-sm font-medium text-slate-600">Checking credentials...</p>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Checking credentials...</p>
         </div>
       </div>
     );
   }
 
-  if (!authenticated) {
+  if (status === 'unauthenticated' || !profile) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const isVerified = userProfile?.verified;
-  const userType = userProfile?.type;
+  const isVerified = profile?.verified;
+  const userType = profile?.type;
 
   // Unverified check (admins are pre-verified)
   if (!isVerified && userType !== 'admin') {
@@ -91,7 +35,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
   }
 
   // Role validation
-  if (allowedRoles && !allowedRoles.includes(userType)) {
+  if (allowedRoles && !allowedRoles.includes(userType as any)) {
     // If unauthorized, redirect to their designated dashboard
     if (userType === 'admin') {
       return <Navigate to="/dashboard/admin" replace />;
@@ -105,3 +49,4 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
 
   return <>{children}</>;
 };
+

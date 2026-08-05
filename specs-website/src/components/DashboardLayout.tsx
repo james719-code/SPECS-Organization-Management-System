@@ -4,6 +4,7 @@ import { account, databases, storage } from '../shared/appwrite';
 import { Sun, Moon, Menu, LogOut, Upload, Loader2, Camera } from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS, BUCKET_ID_PICTURES } from '../shared/constants';
 import { ID } from 'appwrite';
+import { useAuth } from '../shared/AuthContext';
 
 interface LinkItem {
   to: string;
@@ -27,6 +28,7 @@ interface DashboardLayoutProps {
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, theme, toggleTheme }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -51,8 +53,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
 
   const handleLogout = async () => {
     try {
-      await account.deleteSession('current');
-      localStorage.removeItem('appwrite_session');
+      await logout();
     } catch (e) {
       console.error(e);
     }

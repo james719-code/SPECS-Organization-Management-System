@@ -57,41 +57,24 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminOfficers = lazy(() => import('./pages/admin/AdminOfficers'));
 const AdminTasks = lazy(() => import('./pages/admin/AdminTasks'));
 const AdminFileExports = lazy(() => import('./pages/admin/AdminFileExports'));
+import { useAuth } from './shared/AuthContext';
+
 const AdminNonOrgEvents = lazy(() => import('./pages/admin/AdminNonOrgEvents'));
 const StudentTutorials = lazy(() => import('./pages/student/StudentTutorials'));
 const OfficerTutorials = lazy(() => import('./pages/shared/OfficerTutorials'));
 
-const signRole = (userId: string, role: string) => {
-  const data = `${userId}:${role}`;
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = (hash << 5) - hash + data.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash.toString(36);
-};
-
 export default function App() {
   const navigate = useNavigate();
   const isPending = useGlobalLoading();
+  const { profile, status } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
 
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(() => {
-    try {
-      const stored = localStorage.getItem('appwrite_session');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.sig === signRole(parsed.userId, parsed.role)) {
-          return parsed.role || null;
-        }
-      }
-    } catch (e) {}
-    return null;
-  });
+
+  const userRole = profile?.type || null;
 
   useEffect(() => {
     setGlobalNavigate(navigate);
@@ -107,74 +90,19 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const checkMaintenanceAndRole = async () => {
+    const checkMaintenance = async () => {
       try {
-        let loggedInUser: any = null;
-        try {
-          loggedInUser = await cachedApi.users.getCurrent();
-        } catch (e) {
-          // not logged in
-        }
-
-        if (loggedInUser) {
-          const stored = localStorage.getItem('appwrite_session');
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored);
-              if (parsed.userId === loggedInUser.$id && parsed.role && parsed.sig === signRole(parsed.userId, parsed.role)) {
-                setUserRole(parsed.role);
-              }
-            } catch (e) {}
-          }
-
-          try {
-            const accDoc = await cachedApi.users.getAccount(loggedInUser.$id);
-            const role = accDoc.type || null;
-            setUserRole(role);
-            localStorage.setItem('appwrite_session', JSON.stringify({
-              userId: loggedInUser.$id,
-              role: role,
-              username: accDoc.username || '',
-              sig: signRole(loggedInUser.$id, role)
-            }));
-          } catch (err) {
-            console.warn('Fallback: Failed to fetch account profile for role lookup, using local session:', err);
-            const storedFallback = localStorage.getItem('appwrite_session');
-            if (storedFallback) {
-              try {
-                const parsed = JSON.parse(storedFallback);
-                if (parsed.sig === signRole(parsed.userId, parsed.role)) {
-                  setUserRole(parsed.role || null);
-                } else {
-                  setUserRole(null);
-                }
-              } catch (e) {
-                setUserRole(null);
-              }
-            } else {
-              setUserRole(null);
-            }
-          }
-        } else {
-          setUserRole(null);
-          localStorage.removeItem('appwrite_session');
-        }
-
-        try {
-          const meta = await cachedApi.metadata.get();
-          setIsMaintenance(!!meta?.ismaintenance);
-        } catch (err) {
-          console.warn('Failed to load system metadata collection:', err);
-          setIsMaintenance(false);
-        }
+        const meta = await cachedApi.metadata.get();
+        setIsMaintenance(!!meta?.ismaintenance);
       } catch (err) {
-        console.error('State load error:', err);
+        console.warn('Failed to load system metadata collection:', err);
+        setIsMaintenance(false);
       } finally {
         setLoadingMaintenance(false);
       }
     };
 
-    checkMaintenanceAndRole();
+    checkMaintenance();
   }, []);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -185,7 +113,7 @@ export default function App() {
     </div>
   );
 
-  if (loadingMaintenance) {
+  if (loadingMaintenance || status === 'loading') {
     return fallbackSpinner;
   }
 

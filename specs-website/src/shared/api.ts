@@ -1094,6 +1094,10 @@ export const cachedApi = {
     },
 
     users: {
+        invalidateAuth(): void {
+            dataCache.invalidateTags([CacheTags.ACCOUNTS]);
+            dataCache.remove('current_user');
+        },
         async getCurrent(ttl = 5 * 60 * 1000): Promise<any> {
             const cacheKey = 'current_user';
             return dataCache.getOrFetch(cacheKey, () => api.users.getCurrent(), {

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { account, databases } from '../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../shared/constants';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
+import { useAuth } from '../shared/AuthContext';
 
 interface LoginPageProps {
   theme: 'light' | 'dark';
@@ -11,8 +10,10 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
+  const { login, status, profile } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,27 +25,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
   });
 
   useEffect(() => {
-    const checkActiveSession = async () => {
-      try {
-        const user = await account.get();
-        if (user) {
-          const profile = await apiGetAccountProfile(user.$id);
-          if (profile.deactivated) {
-            await account.deleteSession('current');
-            return;
-          }
-          if (!profile.verified && profile.type !== 'admin') {
-            navigate('/pending');
-          } else {
-            navigate(`/dashboard/${profile.type}`);
-          }
-        }
-      } catch (err) {
-        // No active session, ignore
+    if (status === 'authenticated' && profile) {
+      if (!profile.verified && profile.type !== 'admin') {
+        navigate('/pending');
+      } else {
+        navigate(`/dashboard/${profile.type}`);
       }
-    };
-    checkActiveSession();
-  }, [navigate]);
+    }
+  }, [status, profile, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,31 +40,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
     setError('');
 
     try {
-      await account.createEmailPasswordSession(email, password);
-      // Fetch user profile to route appropriately
-      const user = await account.get();
-      const profile = await apiGetAccountProfile(user.$id);
-      
-      if (profile.deactivated) {
-        await account.deleteSession('current');
-        throw new Error('This account has been deactivated.');
-      }
-
-      if (!profile.verified && profile.type !== 'admin') {
+      const { profile: userProfile } = await login(email, password, rememberMe);
+      if (!userProfile.verified && userProfile.type !== 'admin') {
         navigate('/pending');
       } else {
-        navigate(`/dashboard/${profile.type}`);
+        navigate(`/dashboard/${userProfile.type}`);
       }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Invalid email or password.');
       setLoading(false);
     }
-  };
-
-  // Quick helper to fetch account profile manually
-  const apiGetAccountProfile = async (userId: string) => {
-    return await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, userId);
   };
 
   return (
@@ -155,6 +129,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
             </div>
           </div>
 
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 dark:text-slate-400 select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[#0d6b66] focus:ring-[#0d6b66] dark:bg-slate-900"
+              />
+              <span>Remember me</span>
+            </label>
+          </div>
+
           <button 
             type="submit" 
             disabled={loading}
@@ -182,3 +168,4 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
 };
 
 export default LoginPage;
+

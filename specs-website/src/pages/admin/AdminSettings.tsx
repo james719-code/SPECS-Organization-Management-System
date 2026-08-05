@@ -4,6 +4,7 @@ import { useToast } from '../../components/ui/Toast';
 import { account } from '../../shared/appwrite';
 import { api, cachedApi } from '../../shared/api';
 import { User, Server, Loader2, Calendar, Edit, CheckCircle, Trash2, Lock, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../shared/AuthContext';
 
 interface AdminProfile {
   $id: string;
@@ -27,6 +28,7 @@ const AdminSettings: React.FC = () => {
 
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { logout } = useAuth();
 
   // Admin Profile State
   const [profile, setProfile] = useState<AdminProfile>({
@@ -229,8 +231,7 @@ const AdminSettings: React.FC = () => {
 
         setTimeout(async () => {
           try {
-            await account.deleteSession('current');
-            localStorage.removeItem('appwrite_session');
+            await logout();
           } catch (e) {
             console.error('Failed to clear session during auto logout:', e);
           }
