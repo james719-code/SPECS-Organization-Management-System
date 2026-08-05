@@ -611,7 +611,8 @@ const AdminAttendance: React.FC = () => {
 
   // Metrics calculation
   const metrics = useMemo(() => {
-    const totalCount = students.length;
+    const studentOnly = students.filter(acc => acc.type === 'student');
+    const totalCount = studentOnly.length;
     const uniquePresent = new Set(
       attendanceRecords
         .filter(record => (record.attendance_type || 'student') !== 'non-member')

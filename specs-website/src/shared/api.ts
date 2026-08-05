@@ -140,6 +140,9 @@ export const api = {
                 const { limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, includeArchived = false } = normalizeListOptions(options);
                 const pageSize = clampPageSize(limit);
                 const queries = [Query.limit(pageSize), Query.offset(offset)];
+                if (!includeArchived) {
+                    queries.push(Query.notEqual('archived', true));
+                }
                 if (orderDesc) queries.push(Query.orderDesc('date_to_held'));
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, queries);
                 const paginated = createPaginatedResponse<EventDoc>(result, pageSize, offset);
@@ -161,6 +164,9 @@ export const api = {
         async listAll({ orderDesc = 'date_to_held', maxPages = 10, includeArchived = false } = {}): Promise<PaginatedResponse<EventDoc>> {
             try {
                 const queries: any[] = [];
+                if (!includeArchived) {
+                    queries.push(Query.notEqual('archived', true));
+                }
                 if (orderDesc) queries.push(Query.orderDesc(orderDesc));
                 const result = await listAllDocuments<EventDoc>(COLLECTION_ID_EVENTS, queries, { maxPages });
                 if (!includeArchived) {
@@ -287,17 +293,20 @@ export const api = {
                         }
                     }
 
-                    // Query the revenue collection to locate the connected finance record
-                    const targetName = `${payment.item_name} (Paid by ${studentName})`;
+                    // Query the revenue collection to locate connected finance records
+                    const targetName = `${payment.item_name} (Paid by ${studentName.trim()})`;
                     const revenues = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, [
                         Query.equal('name', targetName),
                         Query.equal('price', payment.price),
                         Query.equal('quantity', payment.quantity)
                     ]);
 
-                    if (revenues.documents.length > 0) {
-                        // Delete the connected revenue document
-                        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_REVENUE, revenues.documents[0].$id);
+                    for (const doc of revenues.documents) {
+                        try {
+                            await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_REVENUE, doc.$id);
+                        } catch (err) {
+                            console.warn(`Failed to delete connected revenue document ${doc.$id}:`, err);
+                        }
                     }
                 }
 
@@ -310,16 +319,19 @@ export const api = {
         },
         async markPaid(payment: PaymentDoc, recorderId: string, studentName: string, modalPaid?: 'cash' | 'gcash' | null, officerId?: string | null, verifierName?: string | null): Promise<PaymentDoc> {
             try {
-                await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
-                    name: `${payment.item_name} (Paid by ${studentName})`,
-                    isEvent: payment.is_event,
-                    event: (payment.is_event && payment.events) ? (typeof payment.events === 'object' ? payment.events.$id : payment.events) : null,
-                    activity: payment.is_event ? null : payment.activity,
-                    quantity: payment.quantity,
-                    price: payment.price,
-                    date_earned: new Date().toISOString(),
-                    recorder: recorderId
-                });
+                if (!payment.is_paid) {
+                    const targetName = `${payment.item_name} (Paid by ${studentName.trim()})`;
+                    await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
+                        name: targetName,
+                        isEvent: payment.is_event,
+                        event: (payment.is_event && payment.events) ? (typeof payment.events === 'object' ? payment.events.$id : payment.events) : null,
+                        activity: payment.is_event ? null : payment.activity,
+                        quantity: payment.quantity,
+                        price: payment.price,
+                        date_earned: new Date().toISOString(),
+                        recorder: recorderId
+                    });
+                }
                 const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { 
                     is_paid: true, 
                     date_paid: new Date().toISOString(),
@@ -498,12 +510,20 @@ export const api = {
         },
         async deleteForCustomSession(sessionId: string): Promise<void> {
             try {
-                const records = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
-                    Query.equal('custom_session_id', sessionId),
-                    Query.limit(500)
-                ]);
-                for (const doc of records.documents) {
-                    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, doc.$id);
+                let hasMore = true;
+                while (hasMore) {
+                    const records = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
+                        Query.equal('custom_session_id', sessionId),
+                        Query.limit(500)
+                    ]);
+                    if (records.documents.length === 0) break;
+                    
+                    const batchSize = 25;
+                    for (let i = 0; i < records.documents.length; i += batchSize) {
+                        const batch = records.documents.slice(i, i + batchSize);
+                        await Promise.all(batch.map(doc => databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, doc.$id)));
+                    }
+                    hasMore = records.documents.length >= 500;
                 }
                 dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
             } catch (error) {
@@ -874,7 +894,7 @@ export const api = {
                     await databases.getDocument(DATABASE_ID, COLLECTION_ID_STARTING_BALANCES, schoolYear);
                     exists = true;
                 } catch (e: any) {
-                    if (e.code !== 404) throw e;
+                    if (e.code !== 404 && e.status !== 404 && e.type !== 'document_not_found') throw e;
                 }
 
                 let result;

@@ -244,6 +244,16 @@ export const imageCache = {
   }
 };
 
+let memoryDataCache: Record<string, CacheItem> | null = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === CACHE_CONFIG.DATA_CACHE_KEY || e.key === null) {
+      memoryDataCache = null;
+    }
+  });
+}
+
 export const dataCache = {
   get(key: string, options: CacheOptions = {}): any {
     try {
@@ -334,6 +344,7 @@ export const dataCache = {
         });
         this._setCache(cacheStore);
       } else {
+        memoryDataCache = {};
         localStorage.removeItem(CACHE_CONFIG.DATA_CACHE_KEY);
       }
     } catch (error) {
@@ -456,10 +467,14 @@ export const dataCache = {
   },
 
   _getCache(): Record<string, CacheItem> {
-    return safeParseStore(localStorage.getItem(CACHE_CONFIG.DATA_CACHE_KEY)) as Record<string, CacheItem>;
+    if (!memoryDataCache) {
+      memoryDataCache = safeParseStore(localStorage.getItem(CACHE_CONFIG.DATA_CACHE_KEY)) as Record<string, CacheItem>;
+    }
+    return memoryDataCache;
   },
 
   _setCache(cacheStore: Record<string, CacheItem>): void {
+    memoryDataCache = cacheStore;
     try {
       localStorage.setItem(CACHE_CONFIG.DATA_CACHE_KEY, JSON.stringify(cacheStore));
     } catch (error) {
@@ -576,6 +591,7 @@ export const cache = {
   },
 
   init(): void {
+    memoryDataCache = null;
     imageCache._checkCacheSize();
     dataCache._checkCacheSize();
   }

@@ -78,6 +78,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchAuth();
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'specs_auth_event' || e.key === 'specs_remember') {
+        cachedApi.users.invalidateAuth();
+        fetchAuth();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    };
   }, [fetchAuth]);
 
   const login = async (email: string, password: string, rememberMe: boolean = false) => {
@@ -86,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Update remember me storage flags
     localStorage.setItem('specs_remember', rememberMe ? '1' : '0');
+    localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'login', t: Date.now() }));
     sessionStorage.setItem('specs_session', '1');
 
     // Invalidate stale user cache so fresh user data is fetched
@@ -103,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       cachedApi.users.invalidateAuth();
       localStorage.removeItem('specs_remember');
+      localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
       sessionStorage.removeItem('specs_session');
       setUser(null);
       setProfile(null);
@@ -125,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     cachedApi.users.invalidateAuth();
     localStorage.removeItem('specs_remember');
+    localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
     sessionStorage.removeItem('specs_session');
     setUser(null);
     setProfile(null);
