@@ -298,7 +298,8 @@ const AdminStudents: React.FC = () => {
       result = result.filter(s =>
         s.name?.toLowerCase().includes(q) ||
         s.email?.toLowerCase().includes(q) ||
-        s.section?.toLowerCase().includes(q)
+        s.section?.toLowerCase().includes(q) ||
+        (s.student_id ? String(s.student_id).includes(q) : false)
       );
     }
 

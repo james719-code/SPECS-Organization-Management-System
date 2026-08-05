@@ -587,13 +587,16 @@ const AdminAttendance: React.FC = () => {
       .filter(acc => {
         const profile = acc.students as any;
         const name = profile?.name || acc.username || '';
-        return name.toLowerCase().includes(val.toLowerCase());
+        const stdId = profile?.student_id ? String(profile.student_id) : '';
+        const q = val.toLowerCase();
+        return name.toLowerCase().includes(q) || stdId.includes(q);
       })
       .map(acc => {
         const profile = acc.students as any;
+        const stdIdLabel = profile?.student_id ? ` (ID: ${profile.student_id})` : '';
         return {
           id: profile?.$id || acc.$id,
-          name: profile?.name || acc.username || 'Unknown Student',
+          name: `${profile?.name || acc.username || 'Unknown Student'}${stdIdLabel}`,
           email: profile?.email || '',
           type: acc.type as 'student' | 'officer'
         };
@@ -1142,12 +1145,17 @@ const AdminAttendance: React.FC = () => {
       const profile = attendeeAccount.students as any;
       studentProfileId = profile?.$id || attendeeAccount.students;
     } else {
-      // Look up by student profile ID for backwards compatibility
+      // Look up by student profile ID or numeric student_id for backwards compatibility
       attendeeAccount = students.find(acc => {
         const profile = acc.students as any;
         const profileId = profile?.$id || acc.students;
-        return profileId === scannedStudentId;
+        const stdId = profile?.student_id ? String(profile.student_id) : '';
+        return profileId === scannedStudentId || stdId === scannedStudentId;
       });
+      if (attendeeAccount) {
+        const profile = attendeeAccount.students as any;
+        studentProfileId = profile?.$id || attendeeAccount.students;
+      }
     }
 
     const attendeeName = attendeeAccount ? (attendeeAccount.students as any)?.name || attendeeAccount.username : 'Unknown Member';

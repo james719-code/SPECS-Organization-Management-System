@@ -25,6 +25,7 @@ const StudentProfile: React.FC = () => {
   // Edit profile states
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editStudentIdNum, setEditStudentIdNum] = useState('');
   const [editSection, setEditSection] = useState('');
   const [editYear, setEditYear] = useState('');
   const [editAddress, setEditAddress] = useState('');
@@ -114,6 +115,7 @@ const StudentProfile: React.FC = () => {
   const handleEditOpen = () => {
     if (!studentData) return;
     setEditName(studentData.name || '');
+    setEditStudentIdNum(String(studentData.student_id || ''));
     setEditSection(studentData.section || '');
     setEditYear(String(studentData.yearLevel || ''));
     setEditAddress(studentData.address || '');
@@ -126,12 +128,16 @@ const StudentProfile: React.FC = () => {
 
     setSavingProfile(true);
     try {
-      const updated = {
+      const parsedId = parseInt(editStudentIdNum.trim(), 10);
+      const updated: any = {
         name: editName.trim(),
         section: editSection.trim(),
         yearLevel: editYear ? parseInt(editYear, 10) : null,
         address: editAddress.trim()
       };
+      if (!isNaN(parsedId) && parsedId > 0) {
+        updated.student_id = parsedId;
+      }
 
       await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, updated);
       setStudentData((prev: any) => ({ ...prev, ...updated }));
@@ -881,6 +887,18 @@ const StudentProfile: React.FC = () => {
                   required
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Student ID Number</label>
+                <input
+                  type="number"
+                  required
+                  value={editStudentIdNum}
+                  onChange={e => setEditStudentIdNum(e.target.value)}
+                  placeholder="e.g. 20240001"
                   className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:border-[#0d6b66] outline-none"
                 />
               </div>
