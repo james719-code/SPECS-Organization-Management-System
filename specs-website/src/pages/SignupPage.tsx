@@ -5,6 +5,7 @@ import { Mail, Lock, User, Sun, Moon, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
 import { useAuth } from '../shared/AuthContext';
+import { api } from '../shared/api';
 
 interface SignupPageProps {
   theme: 'light' | 'dark';
@@ -133,6 +134,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
       // 7. Delete the temporary session
       await account.deleteSession('current');
 
+      api.cache.clearTags(['students', 'accounts', 'dashboard']);
       setSuccess(true);
       setLoading(false);
     } catch (err: any) {

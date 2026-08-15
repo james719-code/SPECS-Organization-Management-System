@@ -95,13 +95,15 @@ const AdminFiles: React.FC = () => {
       const currentUser = await cachedApi.users.getCurrent();
 
       // 3. Create document record
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID_FILES, ID.unique(), {
+      const createdDoc = await databases.createDocument(DATABASE_ID, COLLECTION_ID_FILES, ID.unique(), {
         fileName: uploadTitle.trim(),
         description: uploadDesc.trim(),
         uploader: currentUser?.$id || 'system',
         fileID: uploaded.$id,
       });
 
+      // Optimistic update
+      setFiles(prev => [createdDoc as unknown as FileDoc, ...prev]);
       api.cache.clearTags(['files', 'dashboard']);
       addToast({ type: 'success', title: 'Upload complete', message: `"${uploadTitle}" has been shared.` });
       
@@ -124,6 +126,9 @@ const AdminFiles: React.FC = () => {
     const fileDoc = deleteConfirm.fileDoc;
     setActionLoading(true);
     try {
+      // Optimistic delete
+      setFiles(prev => prev.filter(f => f.$id !== fileDoc.$id));
+
       // 1. Remove file storage binary
       if (fileDoc.fileID) {
         try {
@@ -144,6 +149,7 @@ const AdminFiles: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete file.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }

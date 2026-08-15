@@ -7,7 +7,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import { cachedApi } from '../../shared/api';
+import { cachedApi, api } from '../../shared/api';
 import type { StudentDoc } from '../../types/database';
 
 const VolunteersManagement: React.FC = () => {
@@ -72,6 +72,17 @@ const VolunteersManagement: React.FC = () => {
         reject_leave:  `Denied leave request — ${student.name} remains a volunteer.`,
       };
 
+      const fallbackPayloads: Record<typeof action, Partial<StudentDoc>> = {
+        approve:       { is_volunteer: true,  volunteer_request_status: 'approved' },
+        reject:        { is_volunteer: false, volunteer_request_status: 'rejected' },
+        approve_leave: { is_volunteer: false, volunteer_request_status: 'none' },
+        reject_leave:  { is_volunteer: true,  volunteer_request_status: 'approved' },
+      };
+
+      // Optimistic local state update
+      const updatedStudent = { ...student, ...fallbackPayloads[action] };
+      setStudents(prev => prev.map(s => s.$id === student.$id ? updatedStudent : s));
+
       if (FUNCTION_ID) {
         const currentUser = await cachedApi.users.getCurrent();
         const execution = await functions.createExecution(
@@ -90,20 +101,16 @@ const VolunteersManagement: React.FC = () => {
         }
       } else {
         // Fallback: direct DB write when function not configured
-        const fallbackPayloads: Record<typeof action, Partial<StudentDoc>> = {
-          approve:       { is_volunteer: true,  volunteer_request_status: 'approved' },
-          reject:        { is_volunteer: false, volunteer_request_status: 'rejected' },
-          approve_leave: { is_volunteer: false, volunteer_request_status: 'none' },
-          reject_leave:  { is_volunteer: true,  volunteer_request_status: 'approved' },
-        };
         await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id, fallbackPayloads[action]);
       }
 
+      api.cache.clearTags(['students', 'accounts', 'dashboard']);
       addToast({ type: 'success', title: 'Success', message: successMsgMap[action] });
       setActionConfirm({ open: false, student: null, action: 'approve' });
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Action execution failed.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }

@@ -136,14 +136,18 @@ const AdminOfficers: React.FC = () => {
 
     setActionLoading(true);
     try {
-      await api.officers.update(editOfficer.$id, { position: editPosition || null });
+      const newPos = editPosition || null;
+      // Optimistic update
+      setOfficers(prev => prev.map(o => o.$id === editOfficer.$id ? { ...o, position: newPos } : o));
+      await api.officers.update(editOfficer.$id, { position: newPos });
       addToast({ type: 'success', title: 'Success', message: 'Officer position updated successfully.' });
       setEditOfficer(null);
       setEditPosition('');
-      api.cache.clearTags(['dashboard']);
+      api.cache.clearTags(['officers', 'accounts', 'students', 'dashboard']);
       loadOfficers(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update position.' });
+      loadOfficers(true);
     } finally {
       setActionLoading(false);
     }
@@ -161,12 +165,15 @@ const AdminOfficers: React.FC = () => {
     if (!targetPosition) {
       setActionLoading(true);
       try {
+        // Optimistic update
+        setOfficers(prev => prev.map(o => o.$id === officerId ? { ...o, position: null } : o));
         await api.officers.update(officerId, { position: null });
         addToast({ type: 'success', title: 'Unassigned', message: 'Officer position unassigned.' });
-        api.cache.clearTags(['dashboard']);
+        api.cache.clearTags(['officers', 'accounts', 'students', 'dashboard']);
         loadOfficers(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to unassign position.' });
+        loadOfficers(true);
       } finally {
         setActionLoading(false);
       }
@@ -185,6 +192,13 @@ const AdminOfficers: React.FC = () => {
       
       setActionLoading(true);
       try {
+        // Optimistic swap
+        setOfficers(prev => prev.map(o => {
+          if (o.$id === officerA.$id) return { ...o, position: targetPosition };
+          if (o.$id === officerB.$id) return { ...o, position: currentPosA || null };
+          return o;
+        }));
+
         // Swap: A gets targetPosition, B gets currentPosA (could be null)
         await Promise.all([
           api.officers.update(officerA.$id, { position: targetPosition }),
@@ -200,10 +214,11 @@ const AdminOfficers: React.FC = () => {
           message: `Swapped: "${nameA}" is now ${meta.label}, "${nameB}" is now ${currentPosA ? POSITION_METADATA[currentPosA]?.label : 'Unassigned'}.` 
         });
         
-        api.cache.clearTags(['dashboard']);
+        api.cache.clearTags(['officers', 'accounts', 'students', 'dashboard']);
         loadOfficers(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to swap positions.' });
+        loadOfficers(true);
       } finally {
         setActionLoading(false);
       }
@@ -220,12 +235,15 @@ const AdminOfficers: React.FC = () => {
 
       setActionLoading(true);
       try {
+        // Optimistic update
+        setOfficers(prev => prev.map(o => o.$id === officerA.$id ? { ...o, position: targetPosition } : o));
         await api.officers.update(officerA.$id, { position: targetPosition });
         addToast({ type: 'success', title: 'Assigned', message: `Officer assigned as ${meta.label}.` });
-        api.cache.clearTags(['dashboard']);
+        api.cache.clearTags(['officers', 'accounts', 'students', 'dashboard']);
         loadOfficers(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to assign position.' });
+        loadOfficers(true);
       } finally {
         setActionLoading(false);
       }

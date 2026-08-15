@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { cachedApi, api } from '../../shared/api';
+import { cachedApi, api, CacheTags } from '../../shared/api';
+import { dataCache } from '../../shared/cache';
 import { formatCurrency } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
@@ -325,6 +326,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
           date_earned: new Date(datePaid).toISOString(),
           recorder: recorderId
         });
+        dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
 
         // 3. Optional Email Receipt (Background)
         if (payerEmail.trim()) {

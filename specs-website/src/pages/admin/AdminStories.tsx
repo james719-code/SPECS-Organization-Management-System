@@ -175,20 +175,27 @@ const AdminStories: React.FC = () => {
       const urls = filteredLinks.map(l => l.url.trim());
       const meanings = filteredLinks.map(l => l.label.trim() || l.url.trim());
 
-      await api.stories.update(editingStory.$id, {
+      const updatedPayload = {
         title: editTitle.trim(),
         post_description: editDesc.trim(),
         post_details: editContent.trim(),
         image_bucket: imageId,
         related_links: urls,
         meaning: meanings
-      });
+      };
+
+      // Optimistic update
+      setStories(prev => prev.map(s => s.$id === editingStory.$id ? { ...s, ...updatedPayload } : s));
+
+      await api.stories.update(editingStory.$id, updatedPayload);
+      api.cache.clearTags(['stories', 'landing']);
 
       addToast({ type: 'success', title: 'Story Updated', message: 'Modifications saved successfully.' });
       setEditingStory(null);
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to modify story.' });
+      loadData(true);
     } finally {
       setSubmittingEdit(false);
     }
@@ -201,6 +208,13 @@ const AdminStories: React.FC = () => {
       const currentUser = await cachedApi.users.getCurrent();
       const story = stories.find(s => s.$id === publishConfirm.id);
       if (!story) return;
+
+      // Optimistic approval update
+      if (userRole === 'admin') {
+        setStories(prev => prev.map(s => s.$id === publishConfirm.id ? { ...s, adminApproval: true, officerApproval: true, isAccepted: true } : s));
+      } else {
+        setStories(prev => prev.map(s => s.$id === publishConfirm.id ? { ...s, officerApproval: true } : s));
+      }
 
       if (FUNCTION_ID) {
         await functions.createExecution(
@@ -224,6 +238,7 @@ const AdminStories: React.FC = () => {
         await api.stories.update(publishConfirm.id, updates);
       }
 
+      api.cache.clearTags(['stories', 'landing']);
       addToast({ 
         type: 'success', 
         title: userRole === 'admin' ? 'Published' : 'Officer Approved', 
@@ -233,6 +248,7 @@ const AdminStories: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update story status.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }
@@ -243,6 +259,9 @@ const AdminStories: React.FC = () => {
     setActionLoading(true);
     try {
       const story = stories.find(s => s.$id === deleteConfirm.id);
+
+      // Optimistic delete
+      setStories(prev => prev.filter(s => s.$id !== deleteConfirm.id));
 
       // Clean up image from storage bucket before deleting the story record
       if (story?.image_bucket) {
@@ -275,11 +294,13 @@ const AdminStories: React.FC = () => {
         await api.stories.delete(deleteConfirm.id);
       }
 
+      api.cache.clearTags(['stories', 'landing']);
       addToast({ type: 'success', title: 'Deleted', message: 'Story has been removed.' });
       setDeleteConfirm({ open: false, id: null });
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete story.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }

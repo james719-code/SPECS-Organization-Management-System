@@ -66,7 +66,7 @@ function normalizeTtlOptions(optionsOrTtl: any = null): CacheOptions {
       ttl: optionsOrTtl,
       staleTtl: CACHE_CONFIG.DEFAULT_STALE_TTL,
       tags: [],
-      forceRefresh: false
+      forceRefresh: optionsOrTtl <= 0
     };
   }
 
@@ -75,7 +75,7 @@ function normalizeTtlOptions(optionsOrTtl: any = null): CacheOptions {
     ttl: options.ttl ?? CACHE_CONFIG.DEFAULT_DATA_TTL,
     staleTtl: options.staleTtl ?? CACHE_CONFIG.DEFAULT_STALE_TTL,
     tags: Array.isArray(options.tags) ? options.tags : [],
-    forceRefresh: options.forceRefresh === true
+    forceRefresh: options.forceRefresh === true || (typeof options.ttl === 'number' && options.ttl <= 0)
   };
 }
 

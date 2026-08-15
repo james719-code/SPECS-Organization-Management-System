@@ -141,6 +141,7 @@ const StudentProfile: React.FC = () => {
 
       await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, updated);
       setStudentData((prev: any) => ({ ...prev, ...updated }));
+      api.cache.clearTags(['students', 'accounts', 'dashboard']);
       setIsEditOpen(false);
       addToast({ type: 'success', title: 'Success', message: 'Profile updated successfully!' });
     } catch (err: any) {
@@ -157,6 +158,7 @@ const StudentProfile: React.FC = () => {
       if (studentData) {
         await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id);
       }
+      api.cache.clearTags(['students', 'accounts', 'dashboard']);
       await logout();
       addToast({ type: 'info', title: 'Account deleted', message: 'Your account has been permanently deleted.' });
       navigate('/login');
@@ -188,6 +190,7 @@ const StudentProfile: React.FC = () => {
         );
 
         setAccountData((prev: any) => ({ ...prev, username: usernameTrimmed }));
+        api.cache.clearTags(['accounts', 'students', 'dashboard']);
         addToast({ type: 'success', title: 'Success', message: 'Username updated successfully!' });
       }
 
@@ -216,6 +219,7 @@ const StudentProfile: React.FC = () => {
         email: officerEmail.trim() || null,
         token_email: officerToken.trim() || null
       });
+      api.cache.clearTags(['officers', 'dashboard']);
       addToast({ type: 'success', title: 'Saved', message: 'SMTP credentials updated successfully!' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to save SMTP credentials.' });
@@ -232,6 +236,7 @@ const StudentProfile: React.FC = () => {
         volunteer_request_status: 'pending'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'pending' }));
+      api.cache.clearTags(['students', 'dashboard']);
       addToast({ type: 'success', title: 'Submitted', message: 'Volunteer request submitted! An officer will review it.' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to submit request.' });
@@ -251,6 +256,7 @@ const StudentProfile: React.FC = () => {
         volunteer_request_status: 'backout_pending'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'backout_pending' }));
+      api.cache.clearTags(['students', 'dashboard']);
       addToast({ type: 'success', title: 'Submitted', message: 'Leave request submitted for review.' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to submit leave request.' });
@@ -270,6 +276,7 @@ const StudentProfile: React.FC = () => {
         volunteer_request_status: 'none'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'none' }));
+      api.cache.clearTags(['students', 'dashboard']);
       addToast({ type: 'success', title: 'Cancelled', message: 'Volunteer request cancelled.' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to cancel request.' });
@@ -289,6 +296,7 @@ const StudentProfile: React.FC = () => {
         volunteer_request_status: 'approved'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'approved' }));
+      api.cache.clearTags(['students', 'dashboard']);
       addToast({ type: 'success', title: 'Cancelled', message: 'Leave request cancelled. You remain an active volunteer.' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to cancel leave request.' });

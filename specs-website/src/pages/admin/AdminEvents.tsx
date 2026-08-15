@@ -146,6 +146,9 @@ const AdminEvents: React.FC = () => {
         rating_links: eventRatingLinks.trim() || null
       });
 
+      // Optimistic update
+      setEvents(prev => [newEvent, ...prev]);
+
       const overlapEventName = checkDateOverlap(eventDate);
       if (overlapEventName) {
         addToast({ type: 'warning', title: 'Schedule Conflict', message: `Event "${eventName}" created, but conflicts with "${overlapEventName}".` });
@@ -244,7 +247,7 @@ const AdminEvents: React.FC = () => {
       const relatedLinksUrls = validLinks.map(l => l.url.trim());
       const relatedLinksNames = validLinks.map(l => l.name.trim() || 'Link');
 
-      await api.events.update(editingEvent.$id, {
+      const updatedPayload: Partial<EventDoc> = {
         event_name: editEventName,
         description: editEventDesc,
         date_to_held: new Date(editEventDate).toISOString(),
@@ -254,7 +257,12 @@ const AdminEvents: React.FC = () => {
         meaning: relatedLinksNames,
         location: editEventLocation.trim() || null,
         rating_links: editEventRatingLinks.trim() || null
-      });
+      };
+
+      // Optimistic update
+      setEvents(prev => prev.map(ev => ev.$id === editingEvent.$id ? { ...ev, ...updatedPayload } : ev));
+
+      await api.events.update(editingEvent.$id, updatedPayload);
 
       const overlapEventName = checkDateOverlap(editEventDate, editingEvent.$id);
       if (overlapEventName) {
@@ -267,6 +275,7 @@ const AdminEvents: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to update event.' });
+      loadData(true);
     } finally {
       setSubmitting(false);
     }
@@ -277,12 +286,16 @@ const AdminEvents: React.FC = () => {
     const event = endConfirm.event;
     setActionLoading(true);
     try {
+      // Optimistic update
+      setEvents(prev => prev.map(ev => ev.$id === event.$id ? { ...ev, event_ended: true } : ev));
+
       await api.events.markEnded(event.$id);
       addToast({ type: 'success', title: 'Success', message: `Event "${event.event_name}" is now marked as ended.` });
       setEndConfirm({ open: false, event: null });
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to end event.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }
@@ -293,6 +306,9 @@ const AdminEvents: React.FC = () => {
     const event = deleteConfirm.event;
     setActionLoading(true);
     try {
+      // Optimistic delete
+      setEvents(prev => prev.filter(ev => ev.$id !== event.$id));
+
       // Delete image asset if exists
       if (event.image_file) {
         try {
@@ -308,6 +324,7 @@ const AdminEvents: React.FC = () => {
       loadData(true);
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to delete event.' });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }
@@ -316,6 +333,9 @@ const AdminEvents: React.FC = () => {
   const handleToggleArchive = async (event: EventDoc, archive: boolean) => {
     setActionLoading(true);
     try {
+      // Optimistic update
+      setEvents(prev => prev.map(ev => ev.$id === event.$id ? { ...ev, archived: archive } : ev));
+
       await api.events.archive(event.$id, archive);
       addToast({
         type: 'success',
@@ -329,6 +349,7 @@ const AdminEvents: React.FC = () => {
         title: 'Error',
         message: err.message || `Failed to ${archive ? 'archive' : 'restore'} event.`
       });
+      loadData(true);
     } finally {
       setActionLoading(false);
     }

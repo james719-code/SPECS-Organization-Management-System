@@ -481,16 +481,24 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
       const revenueCacheKey = generateCacheKey('finance_revenue', { startSchoolYearDate, endSchoolYearDate });
       const expensesCacheKey = generateCacheKey('finance_expenses', { startSchoolYearDate, endSchoolYearDate });
-      const ttl = isRefresh ? 0 : 2 * 60 * 1000;
+      const cacheOptions = {
+        ttl: 2 * 60 * 1000,
+        forceRefresh: isRefresh,
+        tags: [CacheTags.FINANCE, CacheTags.DASHBOARD]
+      };
+
+      if (isRefresh) {
+        dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
+      }
 
       const [revenueRes, expensesRes, paymentsRes, eventsRes, officersRes, signatoriesRes] = await Promise.all([
-        dataCache.getOrFetch(revenueCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, revenueQueries), { ttl, tags: [CacheTags.FINANCE, CacheTags.DASHBOARD] }),
-        dataCache.getOrFetch(expensesCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseQueries), { ttl, tags: [CacheTags.FINANCE, CacheTags.DASHBOARD] }),
+        dataCache.getOrFetch(revenueCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_REVENUE, revenueQueries), cacheOptions),
+        dataCache.getOrFetch(expensesCacheKey, () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_EXPENSES, expenseQueries), cacheOptions),
         cachedApi.payments.listAll({}, isRefresh ? 0 : 2 * 60 * 1000),
         dataCache.getOrFetch('events_list_all', () => databases.listDocuments(DATABASE_ID, COLLECTION_ID_EVENTS, [
           Query.orderAsc('event_name'),
           Query.limit(100)
-        ]), { ttl: isRefresh ? 0 : 5 * 60 * 1000, tags: [CacheTags.EVENTS] }),
+        ]), { ttl: 5 * 60 * 1000, forceRefresh: isRefresh, tags: [CacheTags.EVENTS] }),
         cachedApi.officers.listAll(isRefresh ? 0 : 5 * 60 * 1000),
         api.signatories.list()
       ]);
@@ -557,7 +565,11 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         payload.activity_name = selectedActivityName === 'Custom' ? customActivityName : selectedActivityName;
       }
 
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, ID.unique(), payload);
+      const createdDoc = await databases.createDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, ID.unique(), payload);
+
+      // Optimistic update
+      setExpenses(prev => [createdDoc as unknown as ExpenseDoc, ...prev]);
+      dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
 
       addToast({ type: 'success', title: 'Expense Added', message: `Expense recorded successfully.` });
       setExpenseDesc('');
@@ -611,7 +623,11 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         payload.activity = selectedRevActivityName === 'Custom' ? customRevActivityName : selectedRevActivityName;
       }
 
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), payload);
+      const createdDoc = await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), payload);
+
+      // Optimistic update
+      setRevenue(prev => [createdDoc as unknown as RevenueDoc, ...prev]);
+      dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
 
       addToast({ type: 'success', title: 'Revenue Recorded', message: `Revenue record created successfully.` });
       setRevenueDesc('');
@@ -636,6 +652,14 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
     
     // Close modal immediately to avoid UI blocking
     setDeleteConfirm({ open: false, id: null, type: null });
+
+    // Optimistic delete
+    if (type === 'revenue') {
+      setRevenue(prev => prev.filter(r => r.$id !== id));
+    } else {
+      setExpenses(prev => prev.filter(e => e.$id !== id));
+    }
+
     addToast({ 
       type: 'info', 
       title: type === 'revenue' ? 'Deleting Revenue' : 'Deleting Expense', 
@@ -651,6 +675,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
           await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_EXPENSES, id);
           addToast({ type: 'success', title: 'Success', message: 'Expense entry deleted successfully.' });
         }
+        dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
         loadData(true);
       } catch (err: any) {
         addToast({ 
@@ -658,6 +683,7 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
           title: 'Error', 
           message: err.message || `Failed to delete ${type} entry.` 
         });
+        loadData(true);
       }
     })();
   };
