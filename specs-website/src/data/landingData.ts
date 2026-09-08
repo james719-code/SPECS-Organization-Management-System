@@ -183,7 +183,7 @@ export const SITE_LEADERSHIP = {
   officers: INTERIM_OFFICERS.filter(officer => !officer.committee),
   creativeMedia: INTERIM_OFFICERS.filter(officer => officer.committee),
   developers: [
-    { name: 'James Ryan S. Gallego', course: 'BS in Computer Science', year: '4th Year', quote: "It is never too late to be what you might have been", fileId: 'president' }
+    { name: 'James Ryan S. Gallego', course: 'BS in Computer Science', year: '4th Year', quote: "It is never too late to be what you might have been", fileId: '' }
   ]
 };
 
