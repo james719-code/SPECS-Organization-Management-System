@@ -1,0 +1,24 @@
+{
+  "name": "specs-membership-promo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "preview:scenes": "node scripts/preview-scenes.mjs",
+    "soundtrack": "node scripts/soundtrack.mjs",
+    "start": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx SpecsPromo out/specs-membership.mp4 --concurrency=2",
+    "still": "remotion still src/index.tsx SpecsPromo out/preview.png --frame=1140",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.512",
+    "@fontsource/poppins": "5.2.7",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.512"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -7,7 +7,7 @@ import {
   MapPin, Clock, Menu, X, ChevronRight, Mail, Phone, Compass, ShieldCheck, ExternalLink, Sun, Moon, RotateCw,
   BookOpen, GitBranch
 } from 'lucide-react';
-import { COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS, BUCKET_ID_EVENT_IMAGES } from '../shared/constants';
+import { BUCKET_ID_EVENT_IMAGES } from '../shared/constants';
 const BUCKET_ID_PICTURES = (import.meta.env.VITE_BUCKET_ID_PICTURES as string) || 'pictures';
 import { SITE_LEADERSHIP, FAQS } from '../data/landingData';
 import { usePageMeta, SPECS_STRUCTURED_DATA } from '../shared/seo';
@@ -21,6 +21,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
   const [events, setEvents] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
+  const officers = SITE_LEADERSHIP.officers;
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingStories, setLoadingStories] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'completed'>('all');
@@ -102,7 +103,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
     description: 'Official organization management portal for SPECS — the Society of Programmers and Enthusiasts in Computer Science at Partido State University. Manage member profiles, track attendance, settle dues, explore events, and showcase student portfolios.',
   });
 
-  // Fetch Events and Stories with Fallback
+  // Fetch events and stories with fallback
   useEffect(() => {
     let isMounted = true;
 
@@ -439,7 +440,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                 onClick={() => setAboutTab('team')}
                 className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'team' ? 'bg-white dark:bg-slate-900 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
-                Adviser & Tech Team
+                Creative Media & Tech Team
               </button>
             </div>
           </div>
@@ -753,32 +754,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
               {/* Officers Grid */}
               <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white text-center mb-10">Officers & Representatives</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                  {SITE_LEADERSHIP.officers.map((off, idx) => {
-                    const avatarUrl = getPictureUrl(off.fileId, 120);
-                    return (
-                      <div 
-                        key={idx}
-                        className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 p-5 text-center shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 duration-200"
-                      >
-                        {avatarUrl ? (
-                          <img 
-                            src={avatarUrl} 
-                            alt={off.name}
-                            className="h-20 w-20 rounded-full object-cover mx-auto mb-4 border-2 border-[#0d6b66] dark:border-teal-500 p-0.5"
-                          />
-                        ) : (
-                          <div className="h-20 w-20 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 font-bold flex items-center justify-center text-lg mx-auto mb-4 border border-teal-100 dark:border-teal-900/50">
-                            {off.name.split(' ').slice(0, 2).map(n => n[0]).join('')}
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white text-center mb-10">List of Interim Officers</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {officers.map((off) => {
+                      const avatarUrl = getPictureUrl(off.fileId, 120);
+                      const initials = off.name
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase() || 'OF';
+
+                      return (
+                        <div
+                          key={off.name}
+                          className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 p-5 text-center shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 duration-200"
+                        >
+                          {avatarUrl && (
+                            <img
+                              src={avatarUrl}
+                              alt={off.name}
+                              className="h-20 w-20 rounded-full object-cover mx-auto mb-3 border border-[#0d6b66]"
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none';
+                                const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          )}
+                          <div
+                            style={{ display: avatarUrl ? 'none' : 'flex' }}
+                            className="h-20 w-20 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 font-bold flex items-center justify-center text-lg mx-auto mb-4 border border-teal-100 dark:border-teal-900/50"
+                          >
+                            {initials}
                           </div>
-                        )}
-                        <h5 className="font-extrabold text-slate-900 dark:text-white text-sm tracking-tight mb-1 truncate">{off.name}</h5>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">{off.position}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <h5 className="font-extrabold text-slate-900 dark:text-white text-sm tracking-tight mb-1 break-words" title={off.name}>{off.name}</h5>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">{off.position}</p>
+                          <p className="mt-2 text-xs text-teal-700 dark:text-teal-400">{off.section}</p>
+                          {off.committee && <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{off.committee}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
               </div>
             </div>
           )}
@@ -826,28 +845,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
               {/* Publicity/Media Segment */}
               <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white text-center mb-8">Publicity and Media Team</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6">
-                  {SITE_LEADERSHIP.publicityAndMedia.map((pub, idx) => {
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white text-center mb-8">Creative Media & Committees</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
+                  {SITE_LEADERSHIP.creativeMedia.map((pub, idx) => {
                     const avatarUrl = getPictureUrl(pub.fileId, 120);
                     return (
                       <div 
                         key={idx}
                         className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-805/85 p-4 text-center shadow-sm hover:shadow-md transition-all"
                       >
-                        {avatarUrl ? (
-                          <img 
-                            src={avatarUrl} 
-                            alt={pub.name}
-                            className="h-16 w-16 rounded-full object-cover mx-auto mb-3 border border-[#0d6b66] p-0.5"
-                          />
-                        ) : (
-                          <div className="h-16 w-16 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-450 font-bold flex items-center justify-center text-base mx-auto mb-3 border border-teal-100 dark:border-teal-900/50">
+                          {avatarUrl && (
+                            <img
+                              src={avatarUrl}
+                              alt={pub.name}
+                              className="h-16 w-16 rounded-full object-cover mx-auto mb-3 border border-[#0d6b66]"
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none';
+                                const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          )}
+                          <div style={{ display: avatarUrl ? 'none' : 'flex' }} className="h-16 w-16 rounded-full bg-teal-50 dark:bg-slate-800 text-[#0d6b66] dark:text-teal-450 font-bold flex items-center justify-center text-base mx-auto mb-3 border border-teal-100 dark:border-teal-900/50">
                             {pub.name.split(' ').slice(0, 2).map(n => n[0]).join('')}
                           </div>
-                        )}
-                        <h5 className="font-bold text-slate-900 dark:text-white text-xs tracking-tight mb-0.5 truncate">{pub.name}</h5>
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs tracking-tight mb-0.5 break-words">{pub.name}</h5>
                         <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">{pub.position}</p>
+                        <p className="mt-2 text-xs text-teal-700 dark:text-teal-400">{pub.section}</p>
                       </div>
                     );
                   })}
