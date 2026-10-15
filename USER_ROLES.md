@@ -5,7 +5,9 @@ This document describes the features, views, and system permissions for each of 
 2. **Officer**
 3. **Admin**
 
-The system employs client-side role-based routing (defined in [auth.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/guard/auth.js)) paired with Appwrite server-side collection permissions to ensure data isolation and security.
+The system employs client-side role-based routing (implemented under `specs-website/src/guard/` and `specs-website/src/shared/AuthContext.tsx`) paired with Firebase Authentication, Firestore Security Rules, and privileged Supabase Edge Function checks to ensure data isolation and security. Firebase custom claims/account projections are the role source for the migrated runtime; Appwrite Teams are no longer required.
+
+The older file links in this guide describe the pre-migration JavaScript dashboard layout. The current React implementation lives under `specs-website/src/pages/`, `specs-website/src/components/`, and `specs-website/src/shared/`.
 
 ---
 
@@ -25,7 +27,7 @@ The system employs client-side role-based routing (defined in [auth.js](file:///
 | **Story Draft Approval** | - | ✅ | ✅ | [officer/views/stories.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-officer/views/stories.js) / [admin/views/stories.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/stories.js) |
 | **Event Planning & Editing** | - | ✅ | ✅ | [officer/views/events.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-officer/views/events.js) / [admin/views/events.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/events.js) |
 | **File Upload & Resume / Schedules** | - | ✅ | ✅ | [officer/views/files.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-officer/views/files.js) / [admin/views/files.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/files.js) |
-| **Account Lifecycle Management** | - | - | ✅ | [admin/views/accounts.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/accounts.js) (Cloud Function integration) |
+| **Account Lifecycle Management** | - | - | ✅ | `src/pages/admin/AdminAccounts.tsx` via the `specs-api` Supabase Edge Function |
 | **Event Attendance Tracking** | - | - | ✅ | [admin/views/attendance.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/attendance.js) |
 | **Broadcasting Announcements** | - | - | ✅ | [admin/views/announcements.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/announcements.js) |
 | **Analytics & Reports Export** | - | - | ✅ | [admin/views/reports.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/reports.js) |
@@ -171,7 +173,7 @@ Admins hold the highest privilege, controlling accounts, databases, global setti
   * Deactivate or reactivate accounts instantly.
   * **Role Promotion/Demotion:** Promote a student to Officer role or demote an Officer back to a Student.
     > [!IMPORTANT]
-    > Promotion and demotion invoke server-side operations managed securely via an **Appwrite Cloud Function**.
+    > Promotion and demotion invoke server-side operations managed securely via the **Supabase `specs-api` Edge Function**.
   * Export account databases to CSV.
 
 ### 📅 Event Management (Timeline)
@@ -227,10 +229,10 @@ Admins hold the highest privilege, controlling accounts, databases, global setti
 
 ### 📢 Announcements Composer
 * **View File:** [announcements.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/announcements.js)
-* **Description:** Broadcast announcements to targeted groups.
+* **Description:** Publish in-app announcements to targeted groups; email is reserved for deliberate one-to-one messages.
 * **Key Features:**
   * Select target audiences: `All`, `Students`, `Officers`, or custom groupings.
-  * Formats notification content, copies template code to clipboard, or invokes mailto actions for distribution.
+  * Targets `all`, `students`, `officers`, or specific accounts and writes notifications through the `publish_notification` Edge action.
 
 ### 📊 Reports & CSV Export
 * **View File:** [reports.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/reports.js)

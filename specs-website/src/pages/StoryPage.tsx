@@ -4,8 +4,7 @@ import { cachedApi, api } from '../shared/api';
 import { storage } from '../shared/appwrite';
 import { ArrowLeft, Calendar, User, ExternalLink } from 'lucide-react';
 import { formatDate } from '../shared/formatters';
-
-const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES || 'highlight-images';
+import { BUCKET_ID_HIGHLIGHT_IMAGES } from '../shared/constants';
 
 const StoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

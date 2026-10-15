@@ -38,7 +38,7 @@ export class AppwriteAuthProvider extends IAuthProvider {
     }
 
     async confirmPasswordRecovery(userId: string, secret: string, password: string): Promise<void> {
-        await this.account.updateRecovery(userId, secret, password, password);
+        await this.account.updateRecovery(userId, secret, password);
     }
 
     async sendVerification(redirectUrl: string): Promise<void> {
@@ -47,6 +47,40 @@ export class AppwriteAuthProvider extends IAuthProvider {
 
     async confirmVerification(userId: string, secret: string): Promise<void> {
         await this.account.updateVerification(userId, secret);
+    }
+
+    // Compatibility aliases used by the existing UI facade.
+    async get(): Promise<any> {
+        return this.getCurrentUser();
+    }
+
+    async createEmailPasswordSession(email: string, password: string): Promise<any> {
+        return this.login(email, password);
+    }
+
+    async deleteSession(_sessionId = 'current'): Promise<void> {
+        return this.logout();
+    }
+
+    async create(userId: string, email: string, password: string, name: string): Promise<any> {
+        const requestedId = userId || ID.unique();
+        return await this.account.create(requestedId, email, password, name);
+    }
+
+    async createRecovery(email: string, redirectUrl: string): Promise<void> {
+        return this.sendPasswordRecovery(email, redirectUrl);
+    }
+
+    async updateRecovery(userId: string, secret: string, password: string): Promise<void> {
+        return this.confirmPasswordRecovery(userId, secret, password);
+    }
+
+    async createVerification(redirectUrl: string): Promise<void> {
+        return this.sendVerification(redirectUrl);
+    }
+
+    async updateVerification(userId: string, secret: string): Promise<void> {
+        return this.confirmVerification(userId, secret);
     }
 }
 

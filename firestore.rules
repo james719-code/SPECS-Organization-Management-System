@@ -1,0 +1,185 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function accountExists() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/accounts/$(request.auth.uid));
+    }
+
+    function account() {
+      return get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return accountExists() && account().type == 'admin';
+    }
+
+    function isOfficerOrAdmin() {
+      return accountExists() && (account().type == 'officer' || account().type == 'admin');
+    }
+
+    function isStudentOwner(studentId) {
+      return signedIn() && (
+        request.auth.uid == studentId
+        || (accountExists() && account().studentId == studentId)
+      );
+    }
+
+    match /accounts/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isOfficerOrAdmin());
+      // New public signups may only create a student account. Role changes,
+      // verification, and deactivation are backend/admin operations.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.type == 'student'
+        && request.resource.data.verified == false
+        && request.resource.data.deactivated == false;
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username']));
+      // Account/Auth deletion is coordinated by the backend action so a
+      // client cannot leave an orphaned Firebase Auth user behind.
+      allow delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if signedIn();
+      allow create: if isOfficerOrAdmin() || (signedIn() && request.auth.uid == studentId);
+      allow update: if isOfficerOrAdmin()
+        || (isStudentOwner(studentId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'email', 'student_id', 'yearLevel', 'section', 'address', 'volunteer_request_status'
+          ]));
+      allow delete: if isOfficerOrAdmin();
+    }
+
+    match /officers/{officerId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if signedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /team_memberships/{membershipId} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    match /settings/{settingId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Keep collection permissions explicit. A broad wildcard match would be
+    // OR-ed with the rules above and could accidentally let an officer write
+    // accounts, settings, or team memberships.
+    match /events/{documentId} {
+      // The public landing page contains the organization's event calendar.
+      // Only non-archived event documents are public; signed-in users may
+      // still read archived events for dashboard/history views. `null` is
+      // treated as not archived for legacy Appwrite rows.
+      allow read: if signedIn()
+        || resource.data.archived == false
+        || resource.data.archived == null;
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /attendance/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /payments/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /revenue/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /expenses/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /stories/{documentId} {
+      // Published stories are shown on the public landing page. Pending
+      // stories remain visible only to signed-in dashboard users.
+      allow read: if signedIn() || resource.data.isAccepted == true;
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /files/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /tasks/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /starting_balances/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /signatories/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /event_non_org/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOfficerOrAdmin();
+    }
+
+    match /metadata/{documentId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /notifications_all/{notificationId} {
+      allow read: if signedIn() && accountExists() && account().deactivated != true;
+      allow write: if isAdmin();
+    }
+
+    match /notifications_students/{notificationId} {
+      allow read: if signedIn() && accountExists() && account().type == 'student' && account().deactivated != true;
+      allow write: if isAdmin();
+    }
+
+    match /notifications_officers/{notificationId} {
+      allow read: if signedIn() && accountExists()
+        && (account().type == 'officer' || account().type == 'admin')
+        && account().deactivated != true;
+      allow write: if isAdmin();
+    }
+
+    match /notifications_direct/{notificationId} {
+      allow read: if signedIn() && resource.data.recipientUid == request.auth.uid;
+      allow write: if isAdmin();
+    }
+
+    match /notification_reads/{readId} {
+      allow read: if signedIn() && resource.data.userUid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.userUid == request.auth.uid
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
+      allow delete: if signedIn() && resource.data.userUid == request.auth.uid;
+    }
+  }
+}

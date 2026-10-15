@@ -9,6 +9,11 @@ import { vi } from 'vitest';
 vi.stubEnv('VITE_APPWRITE_ENDPOINT', 'https://test.appwrite.io/v1');
 vi.stubEnv('VITE_APPWRITE_PROJECT_ID', 'test-project');
 vi.stubEnv('VITE_USE_MOCK_DATA', 'true');
+// Unit tests exercise the compatibility facade with Appwrite-shaped mocks.
+// Keep the local Firebase runtime configuration from changing that test mode.
+vi.stubEnv('VITE_DB_PROVIDER', 'appwrite');
+vi.stubEnv('VITE_AUTH_PROVIDER', 'appwrite');
+vi.stubEnv('VITE_STORAGE_PROVIDER', 'appwrite');
 
 // Mock IntersectionObserver
 class MockIntersectionObserver {

@@ -6,11 +6,9 @@ import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
 import { storage, functions } from '../../shared/appwrite';
-import { FUNCTION_ID } from '../../shared/constants';
+import { FUNCTION_ID, BUCKET_ID_HIGHLIGHT_IMAGES } from '../../shared/constants';
 import { Query, ID } from 'appwrite';
 import type { StoryDoc } from '../../types/database';
-
-const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES || 'highlight-images';
 
 interface StoryLink {
   url: string;

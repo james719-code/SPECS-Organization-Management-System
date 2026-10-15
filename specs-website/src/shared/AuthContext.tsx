@@ -21,6 +21,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<AccountDoc | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
 
+  const clearAuthCaches = useCallback(() => {
+    api.cache.clearAll();
+    cachedApi.users.invalidateAuth();
+  }, []);
+
   const fetchAuth = useCallback(async () => {
     try {
       // Check Remember Me preference
@@ -35,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
           // ignore session delete error
         }
-        cachedApi.users.invalidateAuth();
+        clearAuthCaches();
         setUser(null);
         setProfile(null);
         setStatus('unauthenticated');
@@ -44,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const currentUser = await cachedApi.users.getCurrent();
       if (!currentUser) {
+        clearAuthCaches();
         setUser(null);
         setProfile(null);
         setStatus('unauthenticated');
@@ -64,24 +70,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
           // ignore
         }
-        cachedApi.users.invalidateAuth();
+        clearAuthCaches();
         setUser(null);
         setProfile(null);
         setStatus('unauthenticated');
       }
     } catch (error) {
+      clearAuthCaches();
       setUser(null);
       setProfile(null);
       setStatus('unauthenticated');
     }
-  }, []);
+  }, [clearAuthCaches]);
 
   useEffect(() => {
     fetchAuth();
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'specs_auth_event' || e.key === 'specs_remember') {
-        cachedApi.users.invalidateAuth();
+        clearAuthCaches();
         fetchAuth();
       }
     };
@@ -106,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.setItem('specs_session', '1');
 
     // Invalidate stale user cache so fresh user data is fetched
-    cachedApi.users.invalidateAuth();
+    clearAuthCaches();
 
     // Direct API fetch to get immediate fresh profile data
     const currentUser = await api.users.getCurrent();
@@ -118,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (e) {
         // ignore
       }
-      cachedApi.users.invalidateAuth();
+      clearAuthCaches();
       localStorage.removeItem('specs_remember');
       localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
       sessionStorage.removeItem('specs_session');
@@ -141,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.warn('[AuthContext] Failed to delete session on logout:', err);
     }
-    cachedApi.users.invalidateAuth();
+    clearAuthCaches();
     localStorage.removeItem('specs_remember');
     localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
     sessionStorage.removeItem('specs_session');
@@ -151,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshAuth = async () => {
-    cachedApi.users.invalidateAuth();
+    clearAuthCaches();
     await fetchAuth();
   };
 

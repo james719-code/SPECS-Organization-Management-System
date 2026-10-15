@@ -25,6 +25,7 @@ import CookieBanner from './components/CookieBanner';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 const PendingVerificationPage = lazy(() => import('./pages/PendingVerificationPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const StoryPage = lazy(() => import('./pages/StoryPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
@@ -90,20 +91,35 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    // Maintenance settings are private configuration. Do not issue a
+    // Firestore request for them from the public landing page, where the
+    // signed-out user is intentionally not allowed to read settings.
+    if (status === 'loading') return;
+    if (status !== 'authenticated') {
+      setLoadingMaintenance(false);
+      return;
+    }
+
+    let isMounted = true;
     const checkMaintenance = async () => {
       try {
         const meta = await cachedApi.metadata.get();
-        setIsMaintenance(!!meta?.ismaintenance);
+        if (isMounted) setIsMaintenance(!!meta?.ismaintenance);
       } catch (err) {
-        console.warn('Failed to load system metadata collection:', err);
-        setIsMaintenance(false);
+        if (isMounted) {
+          console.warn('Failed to load system metadata:', err);
+          setIsMaintenance(false);
+        }
       } finally {
-        setLoadingMaintenance(false);
+        if (isMounted) setLoadingMaintenance(false);
       }
     };
 
     checkMaintenance();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [status]);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
@@ -122,6 +138,7 @@ export default function App() {
       <Suspense fallback={fallbackSpinner}>
         <Routes>
           <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
+          <Route path="/verify" element={<VerifyEmailPage />} />
           <Route path="*" element={<MaintenancePage theme={theme} toggleTheme={toggleTheme} isLoggedIn={!!userRole} />} />
         </Routes>
       </Suspense>
@@ -137,6 +154,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/signup" element={<SignupPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage theme={theme} toggleTheme={toggleTheme} />} />
+      <Route path="/verify" element={<VerifyEmailPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/terms" element={<TermsOfServicePage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/pending" element={<PendingVerificationPage />} />

@@ -190,9 +190,10 @@ const AdminOverview: React.FC = () => {
           setSmtpReminderDismissed(true);
           return;
         }
-        if (accDoc.officers) {
-          let offId = accDoc.officers;
-          if (typeof offId === 'object' && offId.$id) offId = offId.$id;
+        const linkedOfficer: any = accDoc.officers || accDoc.officerId || accDoc.officerSnapshot;
+        if (linkedOfficer) {
+          let offId = linkedOfficer;
+          if (typeof offId === 'object') offId = offId.$id || offId.id;
           const offDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, offId);
           if (!offDoc.email || !offDoc.token_email) {
             setShowSmtpReminder(true);

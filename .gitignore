@@ -15,6 +15,12 @@ coverage/
 !.env.example
 *.local
 
+# Local Firebase/Supabase state and credentials
+supabase/.temp/
+supabase/functions/.env*
+**/*firebase-adminsdk*.json
+**/service-account*.json
+
 # Logs
 logs/
 *.log

@@ -4,13 +4,17 @@ import { formatCurrency } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
+import { Download, Loader2 } from 'lucide-react';
 import { account, databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
 import type { PaymentDoc } from '../../types/database';
+import { downloadPaymentReceipt } from '../../shared/paymentReceipt';
 
 const StudentPayments: React.FC = () => {
   const [payments, setPayments] = useState<PaymentDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [studentName, setStudentName] = useState('Student');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const loadPayments = async () => {
@@ -20,7 +24,9 @@ const StudentPayments: React.FC = () => {
       
       // Get student profile ID
       const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
-      const studentId = accountDoc.students?.$id || accountDoc.students;
+      const studentId = accountDoc.studentId || accountDoc.students?.$id || accountDoc.students;
+      const studentRelation = accountDoc.students && typeof accountDoc.students === 'object' ? accountDoc.students : null;
+      setStudentName(accountDoc.studentSnapshot?.name || studentRelation?.name || accountDoc.displayName || user.name || 'Student');
       
       if (!studentId) {
         setLoading(false);
@@ -35,6 +41,18 @@ const StudentPayments: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to load transaction history.' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadReceipt = async (payment: PaymentDoc) => {
+    setDownloadingId(payment.$id);
+    try {
+      await downloadPaymentReceipt(payment, studentName);
+      addToast({ type: 'success', title: 'Receipt Downloaded', message: 'The receipt was generated in your browser.' });
+    } catch (error: any) {
+      addToast({ type: 'error', title: 'Receipt Failed', message: error?.message || 'Unable to generate the receipt.' });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -70,6 +88,7 @@ const StudentPayments: React.FC = () => {
                     <th className="px-6 py-3 text-right">Amount</th>
                     <th className="px-6 py-3 text-center">Status</th>
                     <th className="px-6 py-3 text-right">Method</th>
+                    <th className="px-6 py-3 text-right">Receipt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -108,6 +127,9 @@ const StudentPayments: React.FC = () => {
                         </td>
                         <td className="px-6 py-3.5 text-right text-xs text-slate-450">
                           {payment.is_paid ? (payment.modal_paid || 'Collected by Staff') : '-'}
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          {payment.is_paid && <button type="button" onClick={() => void handleDownloadReceipt(payment)} disabled={downloadingId === payment.$id} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-2.5 py-1.5 text-xs font-semibold text-[#0d6b66] hover:bg-teal-50 disabled:opacity-50"><Download className="h-3.5 w-3.5" />{downloadingId === payment.$id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Download Receipt'}</button>}
                         </td>
                       </tr>
                     );
@@ -167,6 +189,7 @@ const StudentPayments: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  {payment.is_paid && <button type="button" onClick={() => void handleDownloadReceipt(payment)} disabled={downloadingId === payment.$id} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-[#0d6b66] hover:bg-teal-50 disabled:opacity-50"><Download className="h-3.5 w-3.5" />{downloadingId === payment.$id ? 'Generating…' : 'Download Receipt'}</button>}
                 </div>
               );
             })}

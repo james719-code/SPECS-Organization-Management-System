@@ -1,4 +1,4 @@
-import { databases, storage, account } from './appwrite.js';
+import { databases, storage, account, functions } from './appwrite.js';
 import { 
     DATABASE_ID,
     COLLECTION_ID_EVENTS,
@@ -16,7 +16,13 @@ import {
     COLLECTION_ID_STARTING_BALANCES,
     COLLECTION_ID_SIGNATORIES,
     COLLECTION_ID_EVENT_NON_ORG,
-    BUCKET_ID_EVENT_IMAGES
+    COLLECTION_ID_NOTIFICATIONS_ALL,
+    COLLECTION_ID_NOTIFICATIONS_STUDENTS,
+    COLLECTION_ID_NOTIFICATIONS_OFFICERS,
+    COLLECTION_ID_NOTIFICATIONS_DIRECT,
+    COLLECTION_ID_NOTIFICATION_READS,
+    BUCKET_ID_EVENT_IMAGES,
+    FUNCTION_ID
 } from './constants.js';
 import { Query, ID } from 'appwrite';
 import { dataCache, imageCache, generateCacheKey } from './cache.js';
@@ -33,17 +39,35 @@ import {
   FileDoc,
   OfficerDoc,
   TaskDoc,
-  AdminDoc
+  AdminDoc,
+  NotificationDoc,
+  NotificationAudience,
+  NotificationPriority
 } from '../types/database';
 
 export { ApiError, ErrorCodes };
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
+// Vitest stubs the provider to Appwrite for the compatibility API tests. Keep
+// the runtime Firebase-only query workarounds out of that mocked environment.
+const USE_FIREBASE_DATABASE = import.meta.env.VITE_DB_PROVIDER === 'firebase' && import.meta.env.MODE !== 'test';
+
+async function syncStudentProjection(studentId: string): Promise<void> {
+    if (!USE_FIREBASE_DATABASE || !functions) return;
+    const execution = await functions.createExecution(
+        FUNCTION_ID || '',
+        JSON.stringify({ action: 'sync_student_snapshot', payload: { studentId } })
+    );
+    let response: any = {};
+    try { response = JSON.parse(execution?.responseBody || '{}'); } catch { /* the write already succeeded; the next repair can retry */ }
+    if (!response.success && response.error) throw new Error(response.error);
+}
 
 export const CacheTags = {
     EVENTS: 'events',
     PAYMENTS: 'payments',
+    NOTIFICATIONS: 'notifications',
     ATTENDANCE: 'attendance',
     STUDENTS: 'students',
     ACCOUNTS: 'accounts',
@@ -71,9 +95,164 @@ export interface ListOptions {
   includeArchived?: boolean;
 }
 
+function relationId(value: any): string | null {
+    if (typeof value === 'string' && value) return value;
+    if (value && typeof value === 'object') {
+        if (typeof value.$id === 'string' && value.$id) return value.$id;
+        if (typeof value.id === 'string' && value.id) return value.id;
+    }
+    return null;
+}
+
+function legacyRelation(value: any, snapshot: any): any {
+    if (!snapshot) return value;
+    const id = relationId(value) || relationId(snapshot);
+    if (!id) return value;
+    return { ...snapshot, $id: id };
+}
+
+function adaptReadModelDocument<T extends Record<string, any>>(document: T): T {
+    const result = { ...document } as Record<string, any>;
+    const relations = [
+        ['students', 'studentId', 'studentSnapshot'],
+        ['officers', 'officerId', 'officerSnapshot'],
+        ['admins', 'adminId', 'adminSnapshot'],
+        ['events', 'eventId', 'eventSnapshot'],
+    ] as const;
+
+    for (const [field, idField, snapshotField] of relations) {
+        const snapshot = result[snapshotField];
+        // Canonical Firestore rows may intentionally omit the legacy Appwrite
+        // relation field. Recreate the small relation value for UI code that
+        // still consumes the compatibility shape.
+        if ((result[field] === undefined || result[field] === null || result[field] === '') && result[idField]) {
+            result[field] = result[idField];
+        }
+        if (!snapshot) continue;
+        const value = result[field];
+        if (Array.isArray(value)) {
+            result[field] = value.map(item => legacyRelation(item, snapshot));
+        } else if (value === null || typeof value !== 'object') {
+            result[field] = legacyRelation(value, snapshot);
+        }
+    }
+    return result as T;
+}
+
+function adaptReadModelDocuments<T extends Record<string, any>>(documents: T[]): T[] {
+    return documents.map(adaptReadModelDocument);
+}
+
+function compactProjection(value: Record<string, any>): Record<string, any> {
+    return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined));
+}
+
+function projectionStudent(document: any): Record<string, any> | null {
+    if (!document) return null;
+    const id = relationId(document);
+    return compactProjection({
+        id,
+        $id: id,
+        name: document.name,
+        email: document.email,
+        section: document.section,
+        yearLevel: document.yearLevel,
+        student_id: document.student_id,
+        is_volunteer: document.is_volunteer,
+        volunteer_request_status: document.volunteer_request_status,
+    });
+}
+
+function projectionEvent(document: any): Record<string, any> | null {
+    if (!document) return null;
+    const id = relationId(document);
+    return compactProjection({
+        id,
+        $id: id,
+        event_name: document.event_name,
+        date_to_held: document.date_to_held,
+        location: document.location,
+        archived: document.archived,
+    });
+}
+
+function projectionOfficer(document: any, student: any): Record<string, any> | null {
+    if (!document) return null;
+    const id = relationId(document);
+    const studentProjection = projectionStudent(student || document.students);
+    return compactProjection({
+        id,
+        $id: id,
+        position: document.position,
+        displayName: studentProjection?.name || document.displayName || null,
+        email: document.email || studentProjection?.email || null,
+        pictureId: document.pictureId || null,
+        studentId: relationId(document.students) || studentProjection?.id || null,
+        students: studentProjection,
+    });
+}
+
+async function relationDocument(collectionId: string, value: any): Promise<any | null> {
+    const relation = Array.isArray(value) ? value[0] : value;
+    if (!relation) return null;
+    if (typeof relation === 'object') return relation;
+    try {
+        return await databases.getDocument(DATABASE_ID, collectionId, relation);
+    } catch {
+        return null;
+    }
+}
+
+async function withRelationshipProjections(
+    data: any,
+    options: {
+        studentField?: string;
+        studentIdField?: string;
+        studentSnapshotField?: string;
+        eventField?: string;
+        eventIdField?: string;
+        eventSnapshotField?: string;
+        officerField?: string;
+        officerIdField?: string;
+        officerSnapshotField?: string;
+    } = {},
+): Promise<Record<string, any>> {
+    if (!USE_FIREBASE_DATABASE) return data;
+
+    const studentField = options.studentField || 'students';
+    const studentIdField = options.studentIdField || 'studentId';
+    const studentSnapshotField = options.studentSnapshotField || 'studentSnapshot';
+    const eventField = options.eventField || 'events';
+    const eventIdField = options.eventIdField || 'eventId';
+    const eventSnapshotField = options.eventSnapshotField || 'eventSnapshot';
+    const officerField = options.officerField || 'officers';
+    const officerIdField = options.officerIdField || 'officerId';
+    const officerSnapshotField = options.officerSnapshotField || 'officerSnapshot';
+
+    const [student, event, officer] = await Promise.all([
+        relationDocument(COLLECTION_ID_STUDENTS, data[studentField]),
+        relationDocument(COLLECTION_ID_EVENTS, data[eventField]),
+        relationDocument(COLLECTION_ID_OFFICERS, data[officerField]),
+    ]);
+    const studentId = relationId(data[studentField]);
+    const eventId = relationId(data[eventField]);
+    const officerId = relationId(data[officerField]);
+
+    return compactProjection({
+        ...data,
+        [studentIdField]: studentId || null,
+        [studentSnapshotField]: projectionStudent(student),
+        [eventIdField]: eventId || null,
+        [eventSnapshotField]: projectionEvent(event),
+        [officerIdField]: officerId || null,
+        [officerSnapshotField]: projectionOfficer(officer, student),
+        dataModelVersion: 2,
+    });
+}
+
 function createPaginatedResponse<T>(result: any, limit: number, offset: number): PaginatedResponse<T> {
     return {
-        documents: result.documents,
+        documents: adaptReadModelDocuments(result.documents || []),
         total: result.total,
         limit,
         offset,
@@ -112,7 +291,7 @@ async function listAllDocuments<T>(collectionId: string, queries: any[] = [], { 
     }
 
     return {
-        documents,
+        documents: adaptReadModelDocuments(documents as Record<string, any>[]) as T[],
         total,
         limit,
         offset: 0,
@@ -139,6 +318,46 @@ export const api = {
             try {
                 const { limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, includeArchived = false } = normalizeListOptions(options);
                 const pageSize = clampPageSize(limit);
+
+                // Firestore treats Appwrite's `notEqual('archived', true)` as
+                // an inequality range. Combining it with the date ordering
+                // requires a composite/multiple-range index and also excludes
+                // legacy rows whose archived field is null. Read the ordered
+                // event set and apply the existing `!== true` semantics in
+                // memory for Firebase instead.
+                if (USE_FIREBASE_DATABASE && !includeArchived) {
+                    // Migrated Appwrite rows may contain either archived:false
+                    // or archived:null (the old schema default). Read both
+                    // simple equality sets and merge them locally so the
+                    // public landing page needs no composite index.
+                    const resultSets = await Promise.all([
+                        [Query.equal('archived', false)],
+                        [Query.isNull('archived')],
+                    ].map((queries) => listAllDocuments<EventDoc>(
+                        COLLECTION_ID_EVENTS,
+                        queries,
+                        { maxPages: 10 }
+                    )));
+                    const documentsById = new Map<string, EventDoc>();
+                    resultSets.forEach((result) => result.documents.forEach((document) => {
+                        documentsById.set(String(document.$id), document);
+                    }));
+                    const active = [...documentsById.values()].filter(doc => doc.archived !== true);
+                    active.sort((left: any, right: any) => {
+                        const leftTime = new Date(left.date_to_held || 0).getTime();
+                        const rightTime = new Date(right.date_to_held || 0).getTime();
+                        return orderDesc ? rightTime - leftTime : leftTime - rightTime;
+                    });
+                    const documents = active.slice(offset, offset + pageSize);
+                    return {
+                        documents,
+                        total: active.length,
+                        limit: pageSize,
+                        offset,
+                        hasMore: offset + documents.length < active.length
+                    };
+                }
+
                 const queries = [Query.limit(pageSize), Query.offset(offset)];
                 if (!includeArchived) {
                     queries.push(Query.notEqual('archived', true));
@@ -156,7 +375,7 @@ export const api = {
         },
         async get(eventId: string): Promise<EventDoc> {
             try {
-                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId);
+                return adaptReadModelDocument(await databases.getDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId));
             } catch (error) {
                 throw createApiError(error, `Failed to get event ${eventId}`);
             }
@@ -164,7 +383,7 @@ export const api = {
         async listAll({ orderDesc = 'date_to_held', maxPages = 10, includeArchived = false } = {}): Promise<PaginatedResponse<EventDoc>> {
             try {
                 const queries: any[] = [];
-                if (!includeArchived) {
+                if (!includeArchived && !USE_FIREBASE_DATABASE) {
                     queries.push(Query.notEqual('archived', true));
                 }
                 if (orderDesc) queries.push(Query.orderDesc(orderDesc));
@@ -180,7 +399,16 @@ export const api = {
         },
         async create(data: Partial<EventDoc>): Promise<EventDoc> {
             try {
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), data);
+                const projectedData = USE_FIREBASE_DATABASE
+                    ? {
+                        ...data,
+                        createdByUid: data.createdByUid || data.added_by || null,
+                        imageFileId: data.imageFileId || data.image_file || null,
+                        collaboratorIds: data.collaboratorIds || data.collab || [],
+                        dataModelVersion: 2,
+                    }
+                    : data;
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_EVENTS, ID.unique(), projectedData);
                 dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 return result;
             } catch (error) {
@@ -189,7 +417,16 @@ export const api = {
         },
         async update(eventId: string, data: Partial<EventDoc>): Promise<EventDoc> {
             try {
-                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, data);
+                const projectedData = USE_FIREBASE_DATABASE
+                    ? {
+                        ...data,
+                        ...(data.added_by !== undefined ? { createdByUid: data.added_by } : {}),
+                        ...(data.image_file !== undefined ? { imageFileId: data.image_file } : {}),
+                        ...(data.collab !== undefined ? { collaboratorIds: data.collab } : {}),
+                        dataModelVersion: 2,
+                    }
+                    : data;
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_EVENTS, eventId, projectedData);
                 dataCache.invalidateTags([CacheTags.EVENTS, CacheTags.DASHBOARD, CacheTags.LANDING]);
                 return result;
             } catch (error) {
@@ -240,12 +477,17 @@ export const api = {
         },
         async listForStudent(studentId: string): Promise<PaginatedResponse<PaymentDoc>> {
             try {
-                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, [
-                    Query.equal('students', studentId),
-                    Query.orderDesc('date_paid'),
-                    Query.limit(100)
-                ]);
-                return createPaginatedResponse<PaymentDoc>(result, 100, 0);
+                const queries: any[] = [Query.equal(USE_FIREBASE_DATABASE ? 'studentId' : 'students', studentId)];
+                if (!USE_FIREBASE_DATABASE) queries.push(Query.orderDesc('date_paid'));
+                queries.push(Query.limit(100));
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_PAYMENTS, queries);
+                const documents = USE_FIREBASE_DATABASE
+                    ? [...(result.documents || [])].sort((left: any, right: any) =>
+                        new Date(String(right.date_paid || right.$createdAt || 0)).getTime()
+                        - new Date(String(left.date_paid || left.$createdAt || 0)).getTime()
+                    )
+                    : result.documents;
+                return createPaginatedResponse<PaymentDoc>({ ...result, documents }, 100, 0);
             } catch (error) {
                 throw createApiError(error, `Failed to list payments for student ${studentId}`);
             }
@@ -259,7 +501,13 @@ export const api = {
         },
         async create(data: Partial<PaymentDoc>): Promise<PaymentDoc> {
             try {
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), data);
+                const projectedData = await withRelationshipProjections(data, {
+                    eventField: 'events',
+                });
+                if (USE_FIREBASE_DATABASE) {
+                    projectedData.amount = Number(data.price || 0) * Number(data.quantity || 1);
+                }
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, ID.unique(), projectedData);
                 dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 return result;
             } catch (error) {
@@ -321,7 +569,7 @@ export const api = {
             try {
                 if (!payment.is_paid) {
                     const targetName = `${payment.item_name} (Paid by ${studentName.trim()})`;
-                    await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
+                    const revenueData = {
                         name: targetName,
                         isEvent: payment.is_event,
                         event: (payment.is_event && payment.events) ? (typeof payment.events === 'object' ? payment.events.$id : payment.events) : null,
@@ -330,7 +578,16 @@ export const api = {
                         price: payment.price,
                         date_earned: new Date().toISOString(),
                         recorder: recorderId
+                    };
+                    const projectedRevenue = await withRelationshipProjections(revenueData, {
+                        studentField: 'students',
+                        eventField: 'event',
+                        officerField: 'officers',
                     });
+                    if (USE_FIREBASE_DATABASE) {
+                        projectedRevenue.amount = Number(payment.price || 0) * Number(payment.quantity || 1);
+                    }
+                    await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), projectedRevenue);
                 }
                 const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, payment.$id, { 
                     is_paid: true, 
@@ -347,15 +604,78 @@ export const api = {
         }
     },
 
+    notifications: {
+        async listForCurrentUser(): Promise<NotificationDoc[]> {
+            if (!USE_FIREBASE_DATABASE) return [];
+            const user = await account.get();
+            const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
+            const roleCollection = accountDoc.type === 'student'
+                ? COLLECTION_ID_NOTIFICATIONS_STUDENTS
+                : COLLECTION_ID_NOTIFICATIONS_OFFICERS;
+            const [all, role, direct, reads] = await Promise.all([
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_NOTIFICATIONS_ALL, [Query.orderDesc('createdAt'), Query.limit(100)]),
+                databases.listDocuments(DATABASE_ID, roleCollection, [Query.orderDesc('createdAt'), Query.limit(100)]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_NOTIFICATIONS_DIRECT, [Query.equal('recipientUid', user.$id), Query.limit(100)]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_ID_NOTIFICATION_READS, [Query.equal('userUid', user.$id), Query.limit(200)])
+            ]);
+            const readById = new Map<string, string | null>((reads.documents || []).map((read: any) => [String(read.notificationId), read.readAt || null]));
+            const now = Date.now();
+            const merged = [...(all.documents || []), ...(role.documents || []), ...(direct.documents || [])]
+                .map((document: any) => ({ ...document, readAt: readById.get(document.$id) || null }))
+                .filter((document: any) => !document.expiresAt || Date.parse(String(document.expiresAt)) > now)
+                .filter((document: any, index: number, list: any[]) => list.findIndex((item) => item.$id === document.$id) === index)
+                .sort((left: any, right: any) => Date.parse(String(right.createdAt || right.$createdAt || 0)) - Date.parse(String(left.createdAt || left.$createdAt || 0)));
+            return merged as NotificationDoc[];
+        },
+        async markRead(notificationId: string): Promise<void> {
+            if (!USE_FIREBASE_DATABASE) return;
+            const user = await account.get();
+            const id = `${user.$id}__${notificationId}`;
+            const data = { userUid: user.$id, notificationId, readAt: new Date().toISOString() };
+            try {
+                await databases.updateDocument(DATABASE_ID, COLLECTION_ID_NOTIFICATION_READS, id, data);
+            } catch {
+                await databases.createDocument(DATABASE_ID, COLLECTION_ID_NOTIFICATION_READS, id, data);
+            }
+            dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
+        },
+        async markAllRead(): Promise<void> {
+            const notifications = await api.notifications.listForCurrentUser();
+            await Promise.all(notifications.filter((notification) => !notification.readAt).map((notification) => api.notifications.markRead(notification.$id)));
+        },
+        async publish(input: {
+            title: string;
+            body: string;
+            audience: NotificationAudience;
+            userIds?: string[];
+            priority?: NotificationPriority;
+            link?: string;
+            expiresAt?: string;
+        }): Promise<any> {
+            if (!functions) throw new Error('Notification service is unavailable');
+            const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action: 'publish_notification', payload: input }));
+            let result: any = {};
+            try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* handled below */ }
+            if (execution?.status === 'failed' || result.success === false) throw new Error(result.error || 'Failed to publish notification');
+            dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
+            return result;
+        }
+    },
+
     // --- ATTENDANCE ---
     attendance: {
         async listForStudent(studentId: string): Promise<PaginatedResponse<AttendanceDoc>> {
             try {
-                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, [
-                    Query.equal('students', studentId),
-                    Query.orderDesc('$createdAt')
-                ]);
-                return createPaginatedResponse<AttendanceDoc>(result, 100, 0);
+                const queries: any[] = [Query.equal(USE_FIREBASE_DATABASE ? 'studentId' : 'students', studentId)];
+                if (!USE_FIREBASE_DATABASE) queries.push(Query.orderDesc('$createdAt'));
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ATTENDANCE, queries);
+                const documents = USE_FIREBASE_DATABASE
+                    ? [...(result.documents || [])].sort((left: any, right: any) =>
+                        new Date(String(right.$createdAt || right.createdAt || 0)).getTime()
+                        - new Date(String(left.$createdAt || left.createdAt || 0)).getTime()
+                    )
+                    : result.documents;
+                return createPaginatedResponse<AttendanceDoc>({ ...result, documents }, 100, 0);
             } catch (error) {
                 throw createApiError(error, `Failed to list attendance for student ${studentId}`);
             }
@@ -459,7 +779,8 @@ export const api = {
                 if (officerId && officerId !== 'admin') {
                     data.officers = [officerId];
                 }
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), data);
+                const projectedData = await withRelationshipProjections(data);
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), projectedData);
                 dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 return result;
             } catch (error) {
@@ -492,7 +813,8 @@ export const api = {
                 if (officerId && officerId !== 'admin') {
                     data.officers = [officerId];
                 }
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), data);
+                const projectedData = await withRelationshipProjections(data);
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_ATTENDANCE, ID.unique(), projectedData);
                 dataCache.invalidateTags([CacheTags.ATTENDANCE, CacheTags.EVENTS, CacheTags.DASHBOARD]);
                 return result;
             } catch (error) {
@@ -547,7 +869,8 @@ export const api = {
         },
         async getAccount(accountId: string): Promise<AccountDoc> {
             try {
-                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
+                const result = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
+                return adaptReadModelDocument(result);
             } catch (error) {
                 throw createApiError(error, `Failed to get account ${accountId}`);
             }
@@ -602,6 +925,16 @@ export const api = {
 
     // --- STUDENT PROFILES ---
     students: {
+        async updateProfile(studentId: string, data: Partial<StudentDoc>): Promise<StudentDoc> {
+            try {
+                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId, data);
+                await syncStudentProjection(studentId);
+                dataCache.invalidateTags([CacheTags.STUDENTS, CacheTags.ACCOUNTS, CacheTags.DASHBOARD]);
+                return adaptReadModelDocument(result);
+            } catch (error) {
+                throw createApiError(error, `Failed to update student profile ${studentId}`);
+            }
+        },
         async listProfiles({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = null }: any = {}): Promise<PaginatedResponse<StudentDoc>> {
             try {
                 const pageSize = clampPageSize(limit);
@@ -709,9 +1042,21 @@ export const api = {
 
     // --- STORIES ---
     stories: {
-        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, extraQueries = [] }: any = {}): Promise<PaginatedResponse<StoryDoc>> {
+        async list({ limit = DEFAULT_PAGE_SIZE, offset = 0, orderDesc = true, extraQueries = [], publicOnly = false }: any = {}): Promise<PaginatedResponse<StoryDoc>> {
             try {
                 const pageSize = clampPageSize(limit);
+                if (USE_FIREBASE_DATABASE && publicOnly) {
+                    const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STORIES, [
+                        Query.equal('isAccepted', true),
+                        Query.limit(pageSize),
+                        Query.offset(offset),
+                    ]);
+                    const documents = [...(result.documents || [])].sort((left: any, right: any) =>
+                        new Date(String(right.$createdAt || right.createdAt || 0)).getTime()
+                        - new Date(String(left.$createdAt || left.createdAt || 0)).getTime()
+                    );
+                    return createPaginatedResponse<StoryDoc>({ ...result, documents }, pageSize, offset);
+                }
                 const queries = [...extraQueries, Query.limit(pageSize), Query.offset(offset)];
                 if (orderDesc) queries.push(Query.orderDesc('$createdAt'));
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_STORIES, queries);
@@ -722,14 +1067,21 @@ export const api = {
         },
         async get(storyId: string): Promise<StoryDoc> {
             try {
-                return await databases.getDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId);
+                return adaptReadModelDocument(await databases.getDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId));
             } catch (error) {
                 throw createApiError(error, `Failed to get story ${storyId}`);
             }
         },
         async create(data: Partial<StoryDoc>): Promise<StoryDoc> {
             try {
-                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_STORIES, ID.unique(), data);
+                const projectedData = await withRelationshipProjections(data, {
+                    studentIdField: 'authorId',
+                    studentSnapshotField: 'authorSnapshot',
+                });
+                if (USE_FIREBASE_DATABASE) {
+                    projectedData.imageFileId = data.imageFileId || data.image_bucket || null;
+                }
+                const result = await databases.createDocument(DATABASE_ID, COLLECTION_ID_STORIES, ID.unique(), projectedData);
                 dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
                 return result;
             } catch (error) {
@@ -1008,6 +1360,13 @@ export const api = {
     metadata: {
         async get(): Promise<any> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    try {
+                        return adaptReadModelDocument(await databases.getDocument(DATABASE_ID, 'settings', 'app'));
+                    } catch {
+                        // Allow first-run deployments to fall back to the legacy metadata collection.
+                    }
+                }
                 const result = await databases.listDocuments(DATABASE_ID, 'metadata', [Query.limit(1)]);
                 return result.documents[0] || null;
             } catch (error) {
@@ -1016,18 +1375,22 @@ export const api = {
         },
         async create(data: any): Promise<any> {
             try {
-                const result = await databases.createDocument(DATABASE_ID, 'metadata', ID.unique(), data);
+                const result = USE_FIREBASE_DATABASE
+                    ? await databases.createDocument(DATABASE_ID, 'settings', 'app', data)
+                    : await databases.createDocument(DATABASE_ID, 'metadata', ID.unique(), data);
                 dataCache.invalidateTags([CacheTags.DASHBOARD]);
-                return result;
+                return adaptReadModelDocument(result);
             } catch (error) {
                 throw createApiError(error, 'Failed to create system metadata');
             }
         },
         async update(metadataId: string, data: any): Promise<any> {
             try {
-                const result = await databases.updateDocument(DATABASE_ID, 'metadata', metadataId, data);
+                const result = USE_FIREBASE_DATABASE
+                    ? await databases.updateDocument(DATABASE_ID, 'settings', 'app', data)
+                    : await databases.updateDocument(DATABASE_ID, 'metadata', metadataId, data);
                 dataCache.invalidateTags([CacheTags.DASHBOARD]);
-                return result;
+                return adaptReadModelDocument(result);
             } catch (error) {
                 throw createApiError(error, `Failed to update system metadata ${metadataId}`);
             }
@@ -1037,6 +1400,7 @@ export const api = {
     cache: {
         clearAll(): void {
             dataCache.clear();
+            imageCache.clear();
         },
         clearByPattern(pattern: string): void {
             dataCache.clear(pattern);
@@ -1109,6 +1473,16 @@ export const cachedApi = {
                 ttl,
                 staleTtl: 2 * 60 * 1000,
                 tags: [CacheTags.PAYMENTS, CacheTags.FINANCE]
+            });
+        }
+    },
+
+    notifications: {
+        async listForCurrentUser(ttl = 30 * 1000): Promise<NotificationDoc[]> {
+            return dataCache.getOrFetch('notifications_current_user', () => api.notifications.listForCurrentUser(), {
+                ttl,
+                staleTtl: 2 * 60 * 1000,
+                tags: [CacheTags.NOTIFICATIONS]
             });
         }
     },

@@ -5,6 +5,7 @@ import { Sun, Moon, Menu, LogOut, Upload, Loader2, Camera } from 'lucide-react';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS, BUCKET_ID_PICTURES } from '../shared/constants';
 import { ID } from 'appwrite';
 import { useAuth } from '../shared/AuthContext';
+import NotificationBell from './notifications/NotificationBell';
 
 interface LinkItem {
   to: string;
@@ -79,9 +80,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
             user.$id
           );
           
-          let offId = accDoc.officers;
+          let offId = accDoc.officers || accDoc.officerId || accDoc.officerSnapshot;
           if (offId && typeof offId === 'object') {
-            offId = offId.$id;
+            offId = offId.$id || offId.id;
           }
           
           if (offId) {
@@ -277,6 +278,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
             <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{title}</h2>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}

@@ -1,9 +1,11 @@
 # 🗄️ Database Schema Documentation (v2.6)
 
-This document describes all 15 database collections (13 active, 2 unused) and 7 storage buckets in the database used by the SPECS Organization Management System.
+This document describes the migrated data shape used by the SPECS Organization Management System. The production backend is now Firebase Firestore, with Firebase Authentication for identities, Supabase Storage for files, and Supabase Edge Functions for privileged writes.
 
 > **Referenced by:** [README.md](README.md) — see the Database Schema section for a relationship overview.
-> **Last audited:** 2026-07-03 via `specs-website/scripts/audit-collections.mjs` against live Appwrite database `6858fee6003b57a2b4b7`.
+> **Current backend:** Firebase project `specs-website-e902b` and Supabase function `specs-api`.
+> **Last data audit:** 2026-10-15. The live audit found 159 Firebase Auth users and 620 Firestore documents across the migrated collections.
+> **Compatibility note:** The Appwrite collection IDs and relationship terminology retained in the field tables are historical migration references. Firebase uses the collection names (`accounts`, `students`, `events`, and so on), not the old Appwrite database or collection IDs.
 
 ---
 
@@ -36,7 +38,7 @@ officers
 **Collection ID:** `6858feff002fb157e032`
 **Env var:** `VITE_COLLECTION_ID_ACCOUNTS`
 
-Central hub collection linking Appwrite Auth users to their role-specific data.
+Central hub collection linking Firebase Auth UIDs to their role-specific data. It also stores bounded snapshots used by the Firestore read model.
 
 | Column name | Type | Size / Limits | Required | Indexed | Default value | Relationship Details |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -44,7 +46,7 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | **`username`** | string | Size: 150 | ✅ | ✅ | - | - |
 | **`type`** | enum | `student`, `officer`, `admin` | ✅ | - | - | - |
 | **`verified`** | boolean | - | - | - | `false` | - |
-| **`deactivated`** | boolean | - | - | - | `false` | Managed via Cloud Function |
+| **`deactivated`** | boolean | - | - | - | `false` | Managed through the privileged Supabase Edge Function |
 | **`students`** | relationship | - | - | - | `NULL` | One to one → `students` [onDelete: cascade] |
 | **`admins`** | relationship | - | - | - | `NULL` | One to one → `admins` [onDelete: cascade] |
 | **`officers`** | relationship | - | - | - | `NULL` | One to one → `officers` [onDelete: cascade] |
@@ -281,7 +283,7 @@ Central hub collection linking Appwrite Auth users to their role-specific data.
 | `title_index` | key | `title` | ASC |
 
 > **Note:** The `meaning[]` array provides user-facing display names / labels for the corresponding `related_links[]` entries (mapped by index) so that users see friendly labels instead of raw URLs.
-> **Approval workflow:** Officer sets `officerApproval=true` → story moves to admin queue. Admin sets `adminApproval=true` and `isAccepted=true` → story is published. Managed via Cloud Function (`approve_story` action).
+> **Approval workflow:** Officer sets `officerApproval=true` → story moves to the admin queue. Admin sets `adminApproval=true` and `isAccepted=true` → story is published. Privileged approval is handled by the Supabase Edge Function (`approve_story` action).
 
 ---
 
@@ -405,29 +407,49 @@ Task management collection for tracking to-do items with file attachments and co
 
 ---
 
-## Storage Buckets
+## In-App Notification Collections
 
-The application uses 6 storage buckets for file management:
+Announcements are stored in Firestore rather than sent as bulk email:
+
+| Collection | Purpose |
+| --- | --- |
+| `notifications_all` | Notifications visible to all signed-in users |
+| `notifications_students` | Notifications visible to students |
+| `notifications_officers` | Notifications visible to officers and administrators |
+| `notifications_direct` | Direct notifications keyed by `recipientUid` |
+| `notification_reads` | Per-user read state keyed by user UID and notification ID |
+
+Publishing is restricted to administrators through the `publish_notification`
+Supabase Edge Function action. Read state is user-owned and does not require a
+composite Firestore index.
+
+## Supabase Storage Buckets
+
+The migrated application stores files in Supabase Storage. Bucket authorization is enforced by the `specs-api` Edge Function using its allow-list configuration:
 
 | Bucket | Env Variable | Purpose |
 | --- | --- | --- |
-| **Event Images** | `VITE_BUCKET_ID_EVENT_IMAGES` | Cover images for events |
-| **User Uploads** | `VITE_BUCKET_ID_UPLOADS` | General file uploads by officers |
-| **Resumes** | `VITE_BUCKET_ID_RESUMES` | Officer resume files |
-| **Schedules** | `VITE_BUCKET_ID_SCHEDULES` | Officer schedule files |
-| **Public Files** | `VITE_BUCKET_PUBLIC_FILES` | Downloadable resources on the landing page |
-| **Highlight Images** | `VITE_BUCKET_ID_HIGHLIGHT_IMAGES` | Cover images for volunteer stories/highlights |
-| **Pictures** | `VITE_BUCKET_ID_PICTURES` | Officer profile pictures |
+| **`specs-events`** | `STORAGE_ALLOWED_BUCKETS` | Cover images for events |
+| **`specs-files`** | `STORAGE_ALLOWED_BUCKETS` | General file uploads by officers |
+| **`specs-picture`** | `STORAGE_ALLOWED_BUCKETS` | Officer profile pictures |
+| **`specs-schedule`** | `STORAGE_ALLOWED_BUCKETS` | Officer schedule files |
+| **`specs-public-files`** | `STORAGE_ALLOWED_BUCKETS` | Downloadable resources on the landing page |
+| **`specs-highlights`** | `STORAGE_ALLOWED_BUCKETS` | Cover images for volunteer stories/highlights |
+
+Payment receipts are generated in the browser for download and are not persisted as storage files.
 
 ---
 
-## Cloud Function & Teams
+## Firebase Auth, Firestore Rules, and Supabase Edge Functions
 
-| Resource | Env Variable | Purpose |
+| Resource | Configuration | Purpose |
 | --- | --- | --- |
-| **Cloud Function** | `VITE_FUNCTION_ID` | Server-side account management (promote, demote, deactivate, reactivate, delete, volunteer & story approval) |
-| **Email Function** | `VITE_EMAIL_FUNCTION_ID` | Email notification delivery |
-| **Students Team** | `VITE_TEAM_ID_STUDENTS` | Team-based access control for student role |
-| **Officers Team** | `VITE_TEAM_ID_OFFICERS` | Team-based access control for officer role |
-| **Admins Team** | `VITE_TEAM_ID_ADMINS` | Team-based access control for admin role |
-| **Volunteers Team** | `VITE_TEAM_ID_VOLUNTEERS` | Team-based access control for volunteer sub-role |
+| **Firebase Authentication** | Firebase project configuration | Sign-up, sign-in, verification, and password recovery |
+| **Firestore Security Rules** | `firestore.rules` | Client read/write isolation by authentication and role |
+| **Supabase Edge Function** | `supabase/functions/specs-api/` | Account management, notifications, email, and signed storage operations |
+| **Student role** | `accounts.type == "student"` | Firestore role policy and UI routing |
+| **Officer role** | `accounts.type == "officer"` | Firestore role policy and UI routing |
+| **Admin role** | `accounts.type == "admin"` | Privileged administrative operations |
+| **Volunteer status** | `students.is_volunteer` and request status | Volunteer workflow and story permissions |
+
+For the current projection fields and notification collections, see [FIRESTORE_READ_MODEL.md](FIRESTORE_READ_MODEL.md) and [supabase/README.md](supabase/README.md).

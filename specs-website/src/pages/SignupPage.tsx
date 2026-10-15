@@ -110,23 +110,47 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
       // 5. Create Account relation document
       //    - `username` belongs here on AccountDoc
       //    - relationship field is `students` (not `student`)
+      // Firebase also stores a compact read-model projection so account lists
+      // do not need to resolve the student relation on every render. Keep the
+      // Appwrite payload unchanged because its collection schema is strict.
+      const accountData: Record<string, any> = {
+        username: username,
+        type: 'student',
+        students: studentDoc.$id,
+        verified: false,
+        deactivated: false
+      };
+      if (import.meta.env.VITE_DB_PROVIDER === 'firebase') {
+        accountData.studentId = studentDoc.$id;
+        accountData.displayName = name;
+        accountData.email = email;
+        accountData.studentSnapshot = {
+          id: studentDoc.$id,
+          $id: studentDoc.$id,
+          name,
+          email,
+          section,
+          yearLevel: parseInt(yearLevel, 10),
+          student_id: Number(studentId.trim()),
+          is_volunteer: false
+        };
+        accountData.dataModelVersion = 2;
+        accountData.snapshotUpdatedAt = new Date();
+      }
       const accountDoc = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID_ACCOUNTS,
         user.$id,
-        {
-          username: username,
-          type: 'student',
-          students: studentDoc.$id,
-          verified: false,
-          deactivated: false
-        }
+        accountData
       );
       createdAccountDocId = accountDoc.$id;
 
       // 6. Send verification email
       try {
-        await account.createVerification(window.location.origin + '/verify');
+        const verificationRedirect = import.meta.env.VITE_AUTH_PROVIDER === 'firebase'
+          ? `${window.location.origin}/login?verified=1`
+          : `${window.location.origin}/verify`;
+        await account.createVerification(verificationRedirect);
       } catch (err) {
         console.warn('Could not trigger verification email automatically:', err);
       }

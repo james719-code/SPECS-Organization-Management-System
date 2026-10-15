@@ -60,7 +60,7 @@ const StudentAttendance: React.FC = () => {
       
       // Get student profile ID
       const accountDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, user.$id);
-      const studentId = accountDoc.students?.$id || accountDoc.students;
+      const studentId = accountDoc.studentId || accountDoc.students?.$id || accountDoc.students;
 
       console.log("[StudentAttendance] Logged-in Auth ID (Account ID):", user.$id);
       console.log("[StudentAttendance] Resolved Student Profile ID:", studentId);

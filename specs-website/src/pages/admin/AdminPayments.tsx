@@ -14,7 +14,7 @@ import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail, Prin
 import { functions, databases } from '../../shared/appwrite';
 import { EMAIL_FUNCTION_ID, DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
 import { ID } from 'appwrite';
-import { getReceiptHtml, getPaymentReminderHtml } from '../../shared/emailTemplates';
+import { getPaymentReminderHtml } from '../../shared/emailTemplates';
 
 interface AdminPaymentsProps {
   isCreateView?: boolean;
@@ -60,7 +60,6 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
   // Record Outside Payment View State
   const [nonBscsName, setNonBscsName] = useState('');
-  const [payerEmail, setPayerEmail] = useState('');
   const [datePaid, setDatePaid] = useState(new Date().toISOString().split('T')[0]);
   const [modality, setModality] = useState<'cash' | 'gcash'>('cash');
 
@@ -328,46 +327,9 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         });
         dataCache.invalidateTags([CacheTags.FINANCE, CacheTags.DASHBOARD]);
 
-        // 3. Optional Email Receipt (Background)
-        if (payerEmail.trim()) {
-          const datePaidStr = new Date(datePaid).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-          });
-          const htmlBody = getReceiptHtml(
-            nonBscsName,
-            item.name,
-            item.price,
-            item.quantity,
-            datePaidStr,
-            paymentDoc.$id
-          );
-          (async () => {
-            try {
-              await functions.createExecution(
-                EMAIL_FUNCTION_ID,
-                JSON.stringify({
-                  action: 'send_email',
-                  payload: {
-                    to: payerEmail,
-                    subject: `Payment Receipt: ${item.name}`,
-                    body: htmlBody,
-                    html: true
-                  }
-                })
-              );
-            } catch (emailErr: any) {
-              console.error('[AdminPayments] Failed to send email receipt:', emailErr);
-            }
-          })();
-        }
       }
 
       addToast({ type: 'success', title: 'Success', message: 'Outside payment collections recorded.' });
-      if (payerEmail.trim()) {
-        addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt(s) dispatched to ${payerEmail}.` });
-      }
 
       // Reset states & navigate back to outside tab
       localStorage.setItem('admin_payments_tab', 'outside');
@@ -375,7 +337,6 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       
       setNonBscsName('');
       setDynamicItems([{ id: Date.now().toString(), name: '', price: 0, quantity: 1 }]);
-      setPayerEmail('');
       setIsEventLink(false);
       setActivityName('');
       setSelectedEventId('');
@@ -464,43 +425,6 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId, verifierName);
         addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
         
-        // Send Email Receipt if student email exists (Background)
-        const sEmail = studentProfile?.email;
-        if (sEmail) {
-          try {
-            const datePaidStr = new Date().toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-            const htmlBody = getReceiptHtml(
-              sName,
-              payment.item_name,
-              payment.price,
-              payment.quantity,
-              datePaidStr,
-              payment.$id
-            );
-            await functions.createExecution(
-              EMAIL_FUNCTION_ID,
-              JSON.stringify({
-                action: 'send_email',
-                payload: {
-                  to: sEmail,
-                  subject: `Payment Receipt: ${payment.item_name}`,
-                  body: htmlBody,
-                  html: true
-                }
-              })
-            );
-            addToast({ type: 'info', title: 'Receipt Sent', message: `Email receipt dispatched to ${sEmail}.` });
-          } catch (emailErr: any) {
-            console.error('[AdminPayments] Failed to send email receipt:', emailErr);
-            addToast({ type: 'warning', title: 'Receipt Not Sent', message: `Payment marked paid, but email receipt failed to send to ${sEmail}.` });
-          }
-        }
         loadData(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to process payment.' });
@@ -1640,18 +1564,6 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Optional Email Receipt</label>
-                <input
-                  type="email"
-                  placeholder="payer@example.com"
-                  value={payerEmail}
-                  onChange={e => setPayerEmail(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-[#0d6b66] focus:ring-1 focus:ring-[#0d6b66] bg-white transition-colors"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block font-medium">An official PDF email receipt will be generated and dispatched if an email address is supplied.</span>
-              </div>
-
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Select Modality</label>
                 <div className="grid grid-cols-2 gap-4">
@@ -2287,10 +2199,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   onClick={handleNotifyDues}
                   disabled={notifying}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-bold text-xs px-3.5 py-2.5 shadow-sm disabled:opacity-50 transition-all duration-200"
-                  title="Notify student of outstanding payments via email"
+                  title="Send Personal Email about outstanding payments"
                 >
                   {notifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-                  Notify Dues
+                  Send Personal Email
                 </button>
               )}
             </div>

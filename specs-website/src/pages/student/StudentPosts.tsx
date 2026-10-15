@@ -9,9 +9,8 @@ import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { account } from '../../shared/appwrite';
+import { BUCKET_ID_HIGHLIGHT_IMAGES } from '../../shared/constants';
 import { PenTool, Calendar, Globe, Award, Check, Clock, UserCheck, ShieldCheck, Trash2, Edit3, Plus, X, Loader2 } from 'lucide-react';
-
-const BUCKET_ID_HIGHLIGHT_IMAGES = import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES || 'highlight-images';
 
 interface StoryLink {
   url: string;
@@ -51,7 +50,8 @@ const StudentPosts: React.FC = () => {
 
       // Get account document links
       const accountDoc = await cachedApi.users.getAccount(user.$id);
-      const studentId = accountDoc.students?.$id || accountDoc.students;
+      const studentId = accountDoc.studentId ||
+        (accountDoc.students && typeof accountDoc.students === 'object' ? accountDoc.students.$id : accountDoc.students);
       
       if (!studentId) {
         setLoading(false);

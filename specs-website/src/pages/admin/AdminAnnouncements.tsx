@@ -8,8 +8,6 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import { SkeletonList } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { AccountDoc } from '../../types/database';
-import { functions } from '../../shared/appwrite';
-import { EMAIL_FUNCTION_ID } from '../../shared/constants';
 
 interface AnnouncementDraft {
   id: string;
@@ -24,6 +22,10 @@ const STORAGE_KEY = 'admin_announcements_drafts';
 
 const getAccountEmail = (a: AccountDoc): string => {
   if (!a) return '';
+  if (a.email) return a.email;
+  if (a.studentSnapshot?.email) return a.studentSnapshot.email;
+  if (a.adminSnapshot?.email) return a.adminSnapshot.email;
+  if (a.officerSnapshot?.email) return a.officerSnapshot.email;
   if (a.type === 'admin' && a.admins && typeof a.admins === 'object') {
     return (a.admins as any).email || '';
   }
@@ -35,6 +37,9 @@ const getAccountEmail = (a: AccountDoc): string => {
 
 const getAccountName = (a: AccountDoc): string => {
   if (!a) return '';
+  if (a.displayName) return a.displayName;
+  if (a.studentSnapshot?.name) return a.studentSnapshot.name;
+  if (a.adminSnapshot?.fullName) return a.adminSnapshot.fullName;
   if (a.type === 'admin' && a.admins && typeof a.admins === 'object') {
     return (a.admins as any).fullName || a.username || '';
   }
@@ -144,16 +149,11 @@ const AdminAnnouncements: React.FC = () => {
   
   // Custom Selection state
   const [accountsList, setAccountsList] = useState<AccountDoc[]>([]);
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [senderEmail, setSenderEmail] = useState('noreply@specs.org');
   const [senderName, setSenderName] = useState('SPECS Administrator');
   
-  // Recipient Emails caching
-  const [studentEmails, setStudentEmails] = useState<string[]>([]);
-  const [officerEmails, setOfficerEmails] = useState<string[]>([]);
-  const [allEmails, setAllEmails] = useState<string[]>([]);
-
   // Deletion confirm
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; draftId: string | null }>({ open: false, draftId: null });
 
@@ -177,13 +177,6 @@ const AdminAnnouncements: React.FC = () => {
       const accounts = res.documents;
       console.log('Composer fetched accounts:', accounts);
       setAccountsList(accounts);
-      const all = accounts.map(getAccountEmail).filter(Boolean);
-      const students = accounts.filter(a => a.type === 'student').map(getAccountEmail).filter(Boolean);
-      const officers = accounts.filter(a => a.type === 'officer').map(getAccountEmail).filter(Boolean);
-
-      setAllEmails(all);
-      setStudentEmails(students);
-      setOfficerEmails(officers);
     } catch (err: any) {
       console.error('Failed to load user emails for composer:', err);
       addToast({ type: 'error', title: 'Loading Recipients Failed', message: err.message || 'Failed to retrieve database accounts.' });
@@ -277,18 +270,10 @@ const AdminAnnouncements: React.FC = () => {
     setSubject('');
     setMessage('');
     setRecipients('all');
-    setSelectedEmails([]);
+    setSelectedUserIds([]);
     setUserSearchQuery('');
     setActiveTab('write');
   };
-
-  // Build target emails
-  const targetEmails = useMemo(() => {
-    if (recipients === 'students') return studentEmails;
-    if (recipients === 'officers') return officerEmails;
-    if (recipients === 'specific') return selectedEmails;
-    return allEmails;
-  }, [recipients, studentEmails, officerEmails, allEmails, selectedEmails]);
 
   // Filtered accounts based on search query in specific select modal
   const filteredSearchAccounts = useMemo(() => {
@@ -316,99 +301,38 @@ const AdminAnnouncements: React.FC = () => {
     }
   };
 
-  const handleOpenEmailClient = () => {
-    if (!subject || !message) {
-      addToast({ type: 'warning', title: 'Cannot Open Mail', message: 'Subject and body cannot be empty.' });
-      return;
-    }
-
-    const bccList = targetEmails.join(',');
-    const mailtoUrl = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-    window.open(mailtoUrl, '_blank');
-    addToast({ type: 'info', title: 'Opening Email Client', message: `Pre-populating Bcc list with ${targetEmails.length} recipients.` });
-  };
-
   const handleSendAnnouncement = async () => {
     if (!subject || !message) {
-      addToast({ type: 'warning', title: 'Cannot Send', message: 'Subject and body cannot be empty.' });
+      addToast({ type: 'warning', title: 'Cannot Publish', message: 'Subject and body cannot be empty.' });
       return;
     }
 
-    if (recipients === 'specific' && selectedEmails.length === 0) {
+    if (recipients === 'specific' && selectedUserIds.length === 0) {
       addToast({ type: 'warning', title: 'No Recipients Selected', message: 'Please select at least one user from the list.' });
       return;
     }
+    if (recipients === 'specific' && selectedUserIds.length > 100) {
+      addToast({ type: 'warning', title: 'Too Many Recipients', message: 'Specific in-app announcements are limited to 100 accounts.' });
+      return;
+    }
 
+    setSending(true);
     try {
-      let action = 'send_announcement';
-      const htmlBody = getAnnouncementHtml(subject, message, senderName, senderEmail);
-      let payload: any = {
-        subject: subject,
-        body: htmlBody,
-        html: true
-      };
-
-      if (recipients === 'specific') {
-        action = 'send_email';
-        payload.to = selectedEmails;
-      } else {
-        payload.recipients = recipients;
-      }
-
-      // Close the modal, reset form, and display dispatching toast immediately
+      await api.notifications.publish({
+        title: subject.trim(),
+        body: message.trim(),
+        audience: recipients,
+        userIds: recipients === 'specific' ? selectedUserIds : undefined,
+        priority: 'normal'
+      });
       setIsComposerOpen(false);
       resetForm();
-      addToast({ 
-        type: 'info', 
-        title: 'Sending Announcement', 
-        message: 'The announcement is being dispatched in the background...' 
-      });
-
-      // Run bulk email dispatch in background
-      (async () => {
-        try {
-          const response = await functions.createExecution(
-            EMAIL_FUNCTION_ID,
-            JSON.stringify({
-              action,
-              payload
-            })
-          );
-
-          let result;
-          try {
-            result = JSON.parse(response.responseBody);
-          } catch (e) {
-            result = { success: false, error: 'Failed to parse response body' };
-          }
-
-          if (response.status === 'failed' || !result.success) {
-            throw new Error(result.error || 'Execution failed');
-          }
-
-          addToast({ 
-            type: 'success', 
-            title: 'Sent Successfully', 
-            message: recipients === 'specific'
-              ? `Announcement successfully sent to ${selectedEmails.length} selected recipients.`
-              : `Announcement successfully dispatched to ${recipients} recipients.` 
-          });
-        } catch (err: any) {
-          console.error('Failed to send announcement via function:', err);
-          addToast({ 
-            type: 'error', 
-            title: 'Send Failed', 
-            message: err.message || 'Failed to dispatch email announcement.' 
-          });
-        }
-      })();
+      addToast({ type: 'success', title: 'Published In-App', message: 'The announcement is now available in recipients’ notification inboxes.' });
     } catch (err: any) {
-      console.error('Failed to prepare announcement payload:', err);
-      addToast({ 
-        type: 'error', 
-        title: 'Preparation Failed', 
-        message: err.message || 'Failed to prepare announcement for dispatch.' 
-      });
+      console.error('Failed to publish announcement:', err);
+      addToast({ type: 'error', title: 'Publish Failed', message: err.message || 'Failed to publish in-app announcement.' });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -418,7 +342,7 @@ const AdminAnnouncements: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Compose & Share</h1>
-          <p className="text-sm text-slate-500 mt-1">Draft announcements, copy to clipboard, or fire mail clients.</p>
+          <p className="text-sm text-slate-500 mt-1">Save local drafts and publish role-based updates to the in-app inbox.</p>
         </div>
         <button
           onClick={() => {
@@ -440,7 +364,7 @@ const AdminAnnouncements: React.FC = () => {
           <div className="h-12 w-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto text-[#0d6b66]">
             <Mail className="h-6 w-6" />
           </div>
-          <h3 className="font-bold text-slate-800">Email All Users</h3>
+                  <h3 className="font-bold text-slate-800">Notify All Users</h3>
           <p className="text-xs text-slate-400">Draft updates for all community members</p>
         </div>
 
@@ -451,7 +375,7 @@ const AdminAnnouncements: React.FC = () => {
           <div className="h-12 w-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
             <GraduationCap className="h-6 w-6" />
           </div>
-          <h3 className="font-bold text-slate-800">Email Students</h3>
+                  <h3 className="font-bold text-slate-800">Notify Students</h3>
           <p className="text-xs text-slate-400">Compose announcement for students only</p>
         </div>
 
@@ -462,8 +386,8 @@ const AdminAnnouncements: React.FC = () => {
           <div className="h-12 w-12 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto text-blue-600">
             <Shield className="h-6 w-6" />
           </div>
-          <h3 className="font-bold text-slate-800">Email Officers</h3>
-          <p className="text-xs text-slate-400">Send updates to assigned officer list</p>
+                  <h3 className="font-bold text-slate-800">Notify Officers</h3>
+          <p className="text-xs text-slate-400">Publish updates to the officer inbox</p>
         </div>
       </div>
 
@@ -559,7 +483,7 @@ const AdminAnnouncements: React.FC = () => {
                     : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
               >
-                Preview Styled Email
+                Preview Announcement
               </button>
             </div>
 
@@ -574,10 +498,10 @@ const AdminAnnouncements: React.FC = () => {
                       onChange={e => setRecipients(e.target.value as any)}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#0d6b66] outline-none"
                     >
-                      <option value="all">All Users ({allEmails.length} active)</option>
-                      <option value="students">All Students ({studentEmails.length} active)</option>
-                      <option value="officers">All Officers ({officerEmails.length} active)</option>
-                      <option value="specific">Specific Users ({selectedEmails.length} selected)</option>
+                      <option value="all">All Users ({accountsList.filter(a => a.verified && !a.deactivated).length} active)</option>
+                      <option value="students">All Students ({accountsList.filter(a => a.type === 'student' && a.verified && !a.deactivated).length} active)</option>
+                      <option value="officers">All Officers ({accountsList.filter(a => a.type === 'officer' && a.verified && !a.deactivated).length} active)</option>
+                      <option value="specific">Specific Users ({selectedUserIds.length} selected)</option>
                     </select>
                   </div>
 
@@ -585,17 +509,18 @@ const AdminAnnouncements: React.FC = () => {
                     <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
                       <div className="flex justify-between items-center gap-2">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                          Select Recipients ({selectedEmails.length} selected)
+                          Select Recipients ({selectedUserIds.length} selected)
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
-                            const verifiedEmails = accountsList.map(a => a.email).filter(Boolean) as string[];
-                            setSelectedEmails(selectedEmails.length === verifiedEmails.length ? [] : verifiedEmails);
+                           onClick={() => {
+                             const eligible = accountsList.map(a => a.$id);
+                             const next = selectedUserIds.length === eligible.length ? [] : eligible;
+                             setSelectedUserIds(next);
                           }}
                           className="text-[10px] text-[#0d6b66] hover:underline font-bold"
                         >
-                          {selectedEmails.length === (accountsList.map(a => a.email).filter(Boolean) as string[]).length ? 'Deselect All' : 'Select All'}
+                           {selectedUserIds.length === accountsList.length ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
                       <input
@@ -611,19 +536,17 @@ const AdminAnnouncements: React.FC = () => {
                         ) : (
                           filteredSearchAccounts.map(acc => {
                             const email = getAccountEmail(acc);
-                            if (!email) return null;
-                            const isChecked = selectedEmails.includes(email);
+                             const isChecked = selectedUserIds.includes(acc.$id);
                             return (
                               <label key={acc.$id} className="flex items-center gap-2 hover:bg-slate-50 p-1 rounded cursor-pointer text-xs select-none">
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={() => {
-                                    if (isChecked) {
-                                      setSelectedEmails(selectedEmails.filter(e => e !== email));
-                                    } else {
-                                      setSelectedEmails([...selectedEmails, email]);
-                                    }
+                                     const next = isChecked
+                                       ? selectedUserIds.filter(id => id !== acc.$id)
+                                       : [...selectedUserIds, acc.$id];
+                                     setSelectedUserIds(next);
                                   }}
                                   className="rounded text-[#0d6b66] focus:ring-[#0d6b66] border-slate-300"
                                 />
@@ -632,7 +555,7 @@ const AdminAnnouncements: React.FC = () => {
                                     {getAccountName(acc)}
                                   </span>
                                   <span className="text-[10px] text-slate-400">
-                                    {email} • <span className="capitalize text-[9px] px-1 bg-slate-100 text-slate-500 rounded">{acc.type}</span>
+                                    {email || 'No email on file'} • <span className="capitalize text-[9px] px-1 bg-slate-100 text-slate-500 rounded">{acc.type}</span>
                                   </span>
                                 </div>
                               </label>
@@ -673,7 +596,7 @@ const AdminAnnouncements: React.FC = () => {
               ) : (
                 <div className="space-y-2">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
-                    Styled HTML Email Preview
+                     Announcement Preview
                   </span>
                   <iframe
                     title="Announcement Preview"
@@ -701,13 +624,6 @@ const AdminAnnouncements: React.FC = () => {
                 >
                   Copy Text
                 </button>
-                <button
-                  type="button"
-                  onClick={handleOpenEmailClient}
-                  className="flex-1 sm:flex-initial rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-xs"
-                >
-                  Open Mail Client
-                </button>
               </div>
               
               <button
@@ -722,12 +638,12 @@ const AdminAnnouncements: React.FC = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Sending...
+                    Publishing...
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    Send Now
+                    Publish In-App
                   </>
                 )}
               </button>

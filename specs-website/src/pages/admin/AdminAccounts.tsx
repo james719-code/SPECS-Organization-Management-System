@@ -304,32 +304,19 @@ const AdminAccounts: React.FC = () => {
 
     (async () => {
       try {
-        const currentUser = await cachedApi.users.getCurrent();
         await logDebugContext('reset_password', acc.$id);
-        // Resolve email from the account's students relationship if present
-        const studentRel = (acc as any).students;
-        const email: string | undefined =
-          typeof studentRel === 'object' && studentRel?.email
-            ? studentRel.email
-            : undefined;
-
-        if (!email) {
-          throw new Error('Could not resolve email for this account. Open the student profile to find the email.');
-        }
-
         const execution = await functions.createExecution(
           FUNCTION_ID,
           JSON.stringify({
             action: 'reset_password',
-            payload: { userId: acc.$id, email },
-            requestingUserId: currentUser?.$id,
+            payload: { userId: acc.$id },
           }),
           false
         );
         let result: any = {};
         try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
         if (result.success === false) throw new Error(result.error || 'Failed to send reset email');
-        addToast({ type: 'success', title: 'Email Sent', message: `Password reset email sent to ${email}.` });
+        addToast({ type: 'success', title: 'Email Sent', message: 'Password reset email sent to the account email on file.' });
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || `Failed to send password reset for "${acc.username}"` });
       } finally {

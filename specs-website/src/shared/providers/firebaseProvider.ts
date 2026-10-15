@@ -17,6 +17,12 @@ let firebaseDb: any = null;
 async function initFirebase(config: any) {
     if (firebaseApp) return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
 
+    const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+    const missingKeys = requiredKeys.filter((key) => typeof config?.[key] !== 'string' || !config[key].trim());
+    if (missingKeys.length > 0) {
+        throw new Error(`Firebase configuration is incomplete. Missing: ${missingKeys.join(', ')}. Set the VITE_FIREBASE_* values in specs-website/.env and restart Vite.`);
+    }
+
     const { initializeApp } = await import('firebase/app');
     const { getAuth } = await import('firebase/auth');
     const { getFirestore } = await import('firebase/firestore');
@@ -26,6 +32,13 @@ async function initFirebase(config: any) {
     firebaseDb = getFirestore(firebaseApp);
 
     return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
+}
+
+/** Return the shared Firebase Auth instance for function/storage requests. */
+export async function getFirebaseIdToken(config: any): Promise<string | null> {
+    const { auth } = await initFirebase(config);
+    if (!auth.currentUser) return null;
+    return auth.currentUser.getIdToken();
 }
 
 /**
@@ -53,7 +66,7 @@ export class FirebaseAuthProvider extends IAuthProvider {
         const auth = await this._ensureAuth();
         const { onAuthStateChanged } = await import('firebase/auth');
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const unsubscribe = onAuthStateChanged(auth, (user: any) => {
                 unsubscribe();
                 if (user) {
@@ -64,7 +77,11 @@ export class FirebaseAuthProvider extends IAuthProvider {
                         emailVerification: user.emailVerified
                     });
                 } else {
-                    reject(new Error('Not authenticated'));
+                    // A missing Firebase session is a normal signed-out state,
+                    // not a provider failure. Returning null lets the shared
+                    // API/auth cache handle it consistently with Appwrite's
+                    // 401 response.
+                    resolve(null);
                 }
             });
         });
@@ -106,7 +123,8 @@ export class FirebaseAuthProvider extends IAuthProvider {
         const auth = await this._ensureAuth();
         const { sendPasswordResetEmail } = await import('firebase/auth');
         await sendPasswordResetEmail(auth, email, {
-            url: redirectUrl
+            url: redirectUrl,
+            handleCodeInApp: false
         });
     }
 
@@ -121,7 +139,8 @@ export class FirebaseAuthProvider extends IAuthProvider {
         const { sendEmailVerification } = await import('firebase/auth');
         if (auth.currentUser) {
             await sendEmailVerification(auth.currentUser, {
-                url: redirectUrl
+                url: redirectUrl,
+                handleCodeInApp: false
             });
             return;
         }
@@ -158,6 +177,24 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
 
     private _parseAppwriteQuery(queryStr: string | any) {
         const str = typeof queryStr === 'string' ? queryStr : String(queryStr);
+
+        // Appwrite's current web SDK serializes Query helpers as JSON, for
+        // example: {"method":"equal","attribute":"type","values":["student"]}.
+        // Keep support for the older equal("field", "value") form below,
+        // because both forms may exist while the compatibility layer is in use.
+        try {
+            const structured = JSON.parse(str);
+            if (structured && typeof structured.method === 'string') {
+                const values = Array.isArray(structured.values) ? structured.values : [];
+                const args = structured.attribute !== undefined
+                    ? [structured.attribute, ...values]
+                    : values;
+                return { method: structured.method, args };
+            }
+        } catch {
+            // Fall through to the legacy function-style parser.
+        }
+
         const match = str.match(/^(\w+)\((.+)\)$/);
         if (!match) return null;
 
@@ -210,57 +247,81 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
     }
 
     private async _convertQueries(queries: any[]) {
-        const { where, orderBy, limit: firestoreLimit } = await import('firebase/firestore');
+        const { where, orderBy } = await import('firebase/firestore');
         
-        const constraints = [];
+        const constraints: any[] = [];
         let limitValue = null;
         let offsetValue = 0;
 
         for (const query of queries) {
             const parsed = this._parseAppwriteQuery(query);
-            if (!parsed) continue;
+            if (!parsed) {
+                throw new Error(`[FirebaseProvider] Unsupported Appwrite query: ${String(query)}`);
+            }
 
             const { method, args } = parsed;
 
+            const fieldName = (value: any) => value === '$createdAt' ? 'createdAt' : value === '$updatedAt' ? 'updatedAt' : value;
+            const comparisonValues = () => {
+                if (args.length < 2) return [];
+                if (args.length === 2 && Array.isArray(args[1])) return args[1];
+                return args.slice(1);
+            };
+            const firstComparisonValue = () => comparisonValues()[0];
+
             switch (method) {
                 case 'equal':
-                    if (args.length >= 2) {
-                        constraints.push(where(args[0], '==', args[1]));
+                    {
+                        const values = comparisonValues();
+                        if (values.length === 1) constraints.push(where(fieldName(args[0]), '==', values[0]));
+                        else if (values.length > 1) constraints.push(where(fieldName(args[0]), 'in', values));
                     }
                     break;
                 case 'notEqual':
-                    if (args.length >= 2) {
-                        constraints.push(where(args[0], '!=', args[1]));
+                    {
+                        const values = comparisonValues();
+                        if (values.length === 1) constraints.push(where(fieldName(args[0]), '!=', values[0]));
+                        else if (values.length > 1) constraints.push(where(fieldName(args[0]), 'not-in', values));
+                    }
+                    break;
+                case 'isNotNull':
+                    if (args.length >= 1) {
+                        constraints.push(where(fieldName(args[0]), '!=', null));
+                    }
+                    break;
+                case 'isNull':
+                    if (args.length >= 1) {
+                        constraints.push(where(fieldName(args[0]), '==', null));
                     }
                     break;
                 case 'greaterThan':
                     if (args.length >= 2) {
-                        constraints.push(where(args[0], '>', args[1]));
+                        constraints.push(where(fieldName(args[0]), '>', firstComparisonValue()));
                     }
                     break;
                 case 'greaterThanEqual':
                     if (args.length >= 2) {
-                        constraints.push(where(args[0], '>=', args[1]));
+                        constraints.push(where(fieldName(args[0]), '>=', firstComparisonValue()));
                     }
                     break;
                 case 'lessThan':
                     if (args.length >= 2) {
-                        constraints.push(where(args[0], '<', args[1]));
+                        constraints.push(where(fieldName(args[0]), '<', firstComparisonValue()));
                     }
                     break;
                 case 'lessThanEqual':
                     if (args.length >= 2) {
-                        constraints.push(where(args[0], '<=', args[1]));
+                        constraints.push(where(fieldName(args[0]), '<=', firstComparisonValue()));
                     }
                     break;
                 case 'orderDesc':
                     if (args.length >= 1) {
-                        constraints.push(orderBy(args[0], 'desc'));
+                        constraints.push(orderBy(fieldName(args[0]), 'desc'));
                     }
                     break;
                 case 'orderAsc':
                     if (args.length >= 1) {
-                        constraints.push(orderBy(args[0], 'asc'));
+                        constraints.push(orderBy(fieldName(args[0]), 'asc'));
                     }
                     break;
                 case 'limit':
@@ -270,44 +331,59 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
                     break;
                 case 'offset':
                     offsetValue = Number(args[0]);
-                    console.warn('[FirebaseProvider] offset() is not efficiently supported in Firestore. Consider cursor-based pagination.');
                     break;
+                default:
+                    throw new Error(`[FirebaseProvider] Unsupported Appwrite query method: ${method}`);
             }
-        }
-
-        if (limitValue !== null) {
-            constraints.push(firestoreLimit(limitValue));
         }
 
         return { constraints, limitValue, offsetValue };
     }
 
-    async listDocuments(databaseId: string, collectionId: string, queries: any[] = []): Promise<{ documents: any[]; total: number }> {
+    async listDocuments(_databaseId: string, collectionId: string, queries: any[] = []): Promise<{ documents: any[]; total: number }> {
         const db = await this._ensureDb();
-        const { collection, getDocs, query } = await import('firebase/firestore');
+        const { collection, getCountFromServer, getDocs, limit: firestoreLimit, query } = await import('firebase/firestore');
 
         const collectionRef = collection(db, collectionId);
 
-        const { constraints, offsetValue } = await this._convertQueries(queries);
-        const q = query(collectionRef, ...constraints);
-        const snapshot = await getDocs(q);
+        const { constraints, limitValue, offsetValue } = await this._convertQueries(queries);
+        const readConstraints = [...constraints];
+        if (limitValue !== null) {
+            // Firestore's web SDK has no portable offset constraint. Read
+            // through the requested page and slice locally so offset pages do
+            // not accidentally repeat page 1 or return an empty page.
+            readConstraints.push(firestoreLimit(Math.max(limitValue + offsetValue, 1)));
+        }
+        const pageQuery = query(collectionRef, ...readConstraints);
+        const snapshot = await getDocs(pageQuery);
 
-        let documents = snapshot.docs.map(doc => ({
-            $id: doc.id,
-            ...doc.data()
-        }));
+        const documents = snapshot.docs
+            .slice(offsetValue, limitValue === null ? undefined : offsetValue + limitValue)
+            .map(doc => this._withAppwriteAliases(doc.id, doc.data()));
 
-        if (offsetValue > 0) {
-            documents = documents.slice(offsetValue);
+        // Firestore aggregation queries are a separate permission-checked
+        // request (`runAggregationQuery`). Public landing-page collections
+        // allow document reads but do not need an exact server-side count.
+        // Avoid sending the aggregation request while signed out; the
+        // document page still provides an accurate total for the public
+        // event/story reads, and authenticated dashboard reads retain exact
+        // counts when rules permit them.
+        let total = offsetValue + documents.length;
+        if (firebaseAuth?.currentUser) {
+            try {
+                total = (await getCountFromServer(query(collectionRef, ...constraints))).data().count;
+            } catch (error) {
+                console.warn('[FirebaseProvider] Count aggregation unavailable; using page count.', error);
+            }
         }
 
         return {
             documents,
-            total: documents.length
+            total
         };
     }
 
-    async getDocument(databaseId: string, collectionId: string, documentId: string): Promise<any> {
+    async getDocument(_databaseId: string, collectionId: string, documentId: string): Promise<any> {
         const db = await this._ensureDb();
         const { doc, getDoc } = await import('firebase/firestore');
 
@@ -318,52 +394,58 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
             throw new Error(`Document not found: ${documentId}`);
         }
 
+        return this._withAppwriteAliases(docSnap.id, docSnap.data());
+    }
+
+    private _withAppwriteAliases(id: string, data: any) {
+        const asDate = (value: any) => value && typeof value.toDate === 'function' ? value.toDate() : value;
         return {
-            $id: docSnap.id,
-            ...docSnap.data()
+            $id: id,
+            ...data,
+            ...(data.createdAt !== undefined && data.$createdAt === undefined ? { $createdAt: asDate(data.createdAt) } : {}),
+            ...(data.updatedAt !== undefined && data.$updatedAt === undefined ? { $updatedAt: asDate(data.updatedAt) } : {})
         };
     }
 
-    async createDocument(databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
+    private _cleanWriteData(data: any, timestamp: any, includeCreatedAt = true) {
+        const { $createdAt, $updatedAt, ...rest } = data || {};
+        return {
+            ...rest,
+            ...(includeCreatedAt ? { createdAt: data?.createdAt ?? $createdAt ?? timestamp } : {}),
+            updatedAt: data?.updatedAt ?? $updatedAt ?? timestamp
+        };
+    }
+
+    async createDocument(_databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
         const db = await this._ensureDb();
-        const { doc, setDoc } = await import('firebase/firestore');
+        const { doc, setDoc, Timestamp } = await import('firebase/firestore');
 
         const id = documentId === 'unique()' ? crypto.randomUUID() : documentId;
         const docRef = doc(db, collectionId, id);
 
-        const docData = {
-            ...data,
-            $createdAt: new Date().toISOString(),
-            $updatedAt: new Date().toISOString()
-        };
+        const timestamp = Timestamp.now();
+        const docData = this._cleanWriteData(data, timestamp);
 
         await setDoc(docRef, docData);
 
         return {
-            $id: id,
-            ...docData
+            ...this._withAppwriteAliases(id, docData)
         };
     }
 
-    async updateDocument(databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
+    async updateDocument(_databaseId: string, collectionId: string, documentId: string, data: any): Promise<any> {
         const db = await this._ensureDb();
-        const { doc, updateDoc, getDoc } = await import('firebase/firestore');
+        const { doc, updateDoc, getDoc, Timestamp } = await import('firebase/firestore');
 
         const docRef = doc(db, collectionId, documentId);
 
-        await updateDoc(docRef, {
-            ...data,
-            $updatedAt: new Date().toISOString()
-        });
+        await updateDoc(docRef, this._cleanWriteData(data, Timestamp.now(), false));
 
         const updated = await getDoc(docRef);
-        return {
-            $id: updated.id,
-            ...updated.data()
-        };
+        return this._withAppwriteAliases(updated.id, updated.data());
     }
 
-    async deleteDocument(databaseId: string, collectionId: string, documentId: string): Promise<void> {
+    async deleteDocument(_databaseId: string, collectionId: string, documentId: string): Promise<void> {
         const db = await this._ensureDb();
         const { doc, deleteDoc } = await import('firebase/firestore');
 

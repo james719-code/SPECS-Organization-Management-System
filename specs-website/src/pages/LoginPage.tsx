@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
 import { useAuth } from '../shared/AuthContext';
 
@@ -18,11 +18,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [notice, setNotice] = useState('');
 
   usePageMeta({
     title: 'Sign In',
     description: 'Sign in to the SPECS Organization Portal to access your dashboard, manage your profile, track attendance, view events, and settle membership dues.',
   });
+
+  useEffect(() => {
+    if (searchParams.get('passwordReset') === '1') setNotice('Password reset complete. Sign in with your new password.');
+    if (searchParams.get('verified') === '1') setNotice('Email verified. You can now sign in.');
+  }, [searchParams]);
 
   useEffect(() => {
     if (status === 'authenticated' && profile) {
@@ -81,6 +88,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
           <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-950/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-xs font-semibold text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{notice}</span>
           </div>
         )}
 

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { cachedApi, api } from '../../shared/api';
 import { showToast } from '../../shared/toast';
-import { account, databases, Query } from '../../shared/appwrite';
+import { account, databases, functions, Query } from '../../shared/appwrite';
 import { 
   Loader2, Heart, Award, CheckCircle2, XCircle, Clock, Send, PenTool, ShieldAlert,
   BookOpen, Globe, LayoutGrid, CreditCard, FileText, User as UserIcon, Trash2
 } from 'lucide-react';
-import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS } from '../../shared/constants';
+import { DATABASE_ID, COLLECTION_ID_STUDENTS, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS, FUNCTION_ID } from '../../shared/constants';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
@@ -73,12 +73,13 @@ const StudentProfile: React.FC = () => {
       setAccountData(accountDoc);
       setEditUsername(accountDoc.username || '');
       setAccountType(accountDoc.type || 'student');
-      if (accountDoc.students) {
+      const linkedStudent = accountDoc.students || accountDoc.studentId || accountDoc.studentSnapshot;
+      if (linkedStudent) {
         let studentDoc = null;
-        if (typeof accountDoc.students === 'object' && accountDoc.students.$id && accountDoc.students.name) {
-          studentDoc = accountDoc.students;
+        if (typeof linkedStudent === 'object' && (linkedStudent.$id || linkedStudent.id) && linkedStudent.name) {
+          studentDoc = linkedStudent;
         } else {
-          const studentId = typeof accountDoc.students === 'object' ? accountDoc.students.$id : accountDoc.students;
+          const studentId = typeof linkedStudent === 'object' ? linkedStudent.$id || linkedStudent.id : linkedStudent;
           studentDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId);
         }
         setStudentData(studentDoc);
@@ -87,10 +88,11 @@ const StudentProfile: React.FC = () => {
       }
 
       // Fetch officer SMTP credentials if user is an officer
-      if (accountDoc.type === 'officer' && accountDoc.officers) {
+      const linkedOfficer = accountDoc.officers || accountDoc.officerId || accountDoc.officerSnapshot;
+      if (accountDoc.type === 'officer' && linkedOfficer) {
         try {
-          let offId = accountDoc.officers;
-          if (typeof offId === 'object' && offId.$id) offId = offId.$id;
+          let offId = linkedOfficer;
+          if (typeof offId === 'object') offId = offId.$id || offId.id;
           const offDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_OFFICERS, offId);
           setOfficerDocId(offDoc.$id);
           setOfficerEmail(offDoc.email || '');
@@ -139,7 +141,7 @@ const StudentProfile: React.FC = () => {
         updated.student_id = parsedId;
       }
 
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, updated);
+      await api.students.updateProfile(studentData.$id, updated);
       setStudentData((prev: any) => ({ ...prev, ...updated }));
       api.cache.clearTags(['students', 'accounts', 'dashboard']);
       setIsEditOpen(false);
@@ -155,8 +157,21 @@ const StudentProfile: React.FC = () => {
     if (deleteConfirmText !== 'DELETE') return;
     setDeletingAccount(true);
     try {
-      if (studentData) {
-        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id);
+      if (currentUser) {
+        const execution = await functions.createExecution(
+          FUNCTION_ID,
+          JSON.stringify({
+            action: 'delete_account',
+            payload: { userId: currentUser.$id },
+            requestingUserId: currentUser.$id,
+          }),
+          false
+        );
+        let result: any = {};
+        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* handled below */ }
+        if (result.success === false) {
+          throw new Error(result.error || 'Failed to delete account');
+        }
       }
       api.cache.clearTags(['students', 'accounts', 'dashboard']);
       await logout();
@@ -232,7 +247,7 @@ const StudentProfile: React.FC = () => {
     if (!studentData) return;
     setSubmittingVolunteerAction(true);
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+      await api.students.updateProfile(studentData.$id, {
         volunteer_request_status: 'pending'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'pending' }));
@@ -252,7 +267,7 @@ const StudentProfile: React.FC = () => {
     }
     setSubmittingVolunteerAction(true);
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+      await api.students.updateProfile(studentData.$id, {
         volunteer_request_status: 'backout_pending'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'backout_pending' }));
@@ -272,7 +287,7 @@ const StudentProfile: React.FC = () => {
     }
     setSubmittingVolunteerAction(true);
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+      await api.students.updateProfile(studentData.$id, {
         volunteer_request_status: 'none'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'none' }));
@@ -292,7 +307,7 @@ const StudentProfile: React.FC = () => {
     }
     setSubmittingVolunteerAction(true);
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentData.$id, {
+      await api.students.updateProfile(studentData.$id, {
         volunteer_request_status: 'approved'
       });
       setStudentData((prev: any) => ({ ...prev, volunteer_request_status: 'approved' }));

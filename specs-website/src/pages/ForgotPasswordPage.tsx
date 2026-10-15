@@ -31,6 +31,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
 
   const navigate = useNavigate();
   const isMock = import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_DATA === 'true';
+  const isFirebase = import.meta.env.VITE_AUTH_PROVIDER === 'firebase';
 
   usePageMeta({
     title: 'Reset Password',
@@ -80,19 +81,31 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
     setSuccess(false);
 
     try {
-      const redirectUrl = `${window.location.origin}/forgot-password`;
+      const redirectUrl = isFirebase
+        ? `${window.location.origin}/login?passwordReset=1`
+        : `${window.location.origin}/forgot-password`;
       await account.createRecovery(email, redirectUrl);
       
       setSuccess(true);
       setSuccessMessage(
         isMock
           ? 'Mock reset link generated. Check the box below or check the console log to copy the reset URL.'
-          : 'Check your email! We have sent a secure recovery link to reset your password.'
+          : isFirebase
+            ? 'If an account matches that email, a secure password-reset link is on its way.'
+            : 'Check your email! We have sent a secure recovery link to reset your password.'
       );
       setCountdown(30);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || 'Failed to send recovery email. Please check the email address.');
+      if (isFirebase) {
+        // Keep Firebase account existence private. The user sees the same result
+        // whether the address is registered or not.
+        setSuccess(true);
+        setSuccessMessage('If an account matches that email, a secure password-reset link is on its way.');
+        setCountdown(30);
+      } else {
+        setError(err?.message || 'Failed to send recovery email. Please check the email address.');
+      }
     } finally {
       setLoading(false);
     }
@@ -117,9 +130,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
     }
 
     try {
-      if (!userId || !secret) {
-        throw new Error('Invalid recovery parameters in URL.');
-      }
+      if (!userId || !secret) throw new Error('Invalid recovery parameters in URL.');
       await account.updateRecovery(userId, secret, password);
       setSuccess(true);
       setSuccessMessage('Password reset successfully! You can now log in with your new password.');
@@ -137,7 +148,9 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
     setError('');
 
     try {
-      const redirectUrl = `${window.location.origin}/forgot-password`;
+      const redirectUrl = isFirebase
+        ? `${window.location.origin}/login?passwordReset=1`
+        : `${window.location.origin}/forgot-password`;
       await account.createRecovery(email, redirectUrl);
       setSuccessMessage(
         isMock
@@ -147,13 +160,18 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ theme, toggleTh
       setCountdown(30);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || 'Failed to resend recovery email.');
+      if (isFirebase) {
+        setSuccessMessage('If an account matches that email, a new secure password-reset link is on its way.');
+        setCountdown(30);
+      } else {
+        setError(err?.message || 'Failed to resend recovery email.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const isResetting = !!(userId && secret);
+  const isResetting = !isFirebase && !!(userId && secret);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 transition-colors duration-300 relative overflow-hidden">

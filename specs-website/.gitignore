@@ -19,6 +19,13 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.migration.example
+
+# Completed migration tooling, exports, and local checkpoints
+.migration/
+data/
+migration/
+migration-java/
 
 # Editor directories and files
 .vscode/*

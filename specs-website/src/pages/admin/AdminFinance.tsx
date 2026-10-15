@@ -462,11 +462,9 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
 
       // 3. Build queries for revenues/expenses based on school year date boundaries
       const revenueQueries: any[] = [
-        Query.orderDesc('$createdAt'),
         Query.limit(500)
       ];
       const expenseQueries: any[] = [
-        Query.orderDesc('$createdAt'),
         Query.limit(500)
       ];
 
@@ -503,8 +501,20 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
         api.signatories.list()
       ]);
 
-      setRevenue(revenueRes.documents as RevenueDoc[]);
-      setExpenses(expensesRes.documents as ExpenseDoc[]);
+      const byCreatedAtDesc = (left: { $createdAt?: unknown }, right: { $createdAt?: unknown }) => {
+        const timestamp = (value: unknown) => {
+          if (value instanceof Date) return value.getTime();
+          if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+            return value.toDate().getTime();
+          }
+          const parsed = value ? new Date(String(value)).getTime() : 0;
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        return timestamp(right.$createdAt) - timestamp(left.$createdAt);
+      };
+
+      setRevenue(([...(revenueRes.documents || [])] as RevenueDoc[]).sort(byCreatedAtDesc));
+      setExpenses(([...(expensesRes.documents || [])] as ExpenseDoc[]).sort(byCreatedAtDesc));
       setPendingPayments((paymentsRes.documents as PaymentDoc[]).filter(p => !p.is_paid));
       setEventsList(eventsRes.documents as EventDoc[]);
       setOfficersList(officersRes.documents as any);

@@ -1,0 +1,4 @@
+project_id = "ssqlrogfnterrxmurcys"
+
+[functions.specs-api]
+verify_jwt = false

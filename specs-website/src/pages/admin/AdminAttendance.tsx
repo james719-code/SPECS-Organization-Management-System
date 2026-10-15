@@ -2992,7 +2992,7 @@ const AdminAttendance: React.FC = () => {
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
                     <label htmlFor="notifyViaEmailCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Notify attendee via email
+                      Send Personal Email to Attendee
                     </label>
                   </div>
 
@@ -3033,7 +3033,7 @@ const AdminAttendance: React.FC = () => {
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
                     <label htmlFor="notifyViaEmailCheckQr" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Notify attendee via email
+                      Send Personal Email to Attendee
                     </label>
                   </div>
 

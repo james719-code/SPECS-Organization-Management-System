@@ -101,7 +101,7 @@ const VolunteersManagement: React.FC = () => {
         }
       } else {
         // Fallback: direct DB write when function not configured
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, student.$id, fallbackPayloads[action]);
+        await api.students.updateProfile(student.$id, fallbackPayloads[action]);
       }
 
       api.cache.clearTags(['students', 'accounts', 'dashboard']);

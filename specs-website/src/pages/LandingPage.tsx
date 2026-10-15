@@ -7,11 +7,11 @@ import {
   MapPin, Clock, Menu, X, ChevronRight, Mail, Phone, Compass, ShieldCheck, ExternalLink, Sun, Moon, RotateCw,
   BookOpen, GitBranch
 } from 'lucide-react';
-import { BUCKET_ID_EVENT_IMAGES } from '../shared/constants';
-const BUCKET_ID_PICTURES = (import.meta.env.VITE_BUCKET_ID_PICTURES as string) || 'pictures';
+import { BUCKET_ID_EVENT_IMAGES, BUCKET_ID_PICTURES } from '../shared/constants';
 import { SITE_LEADERSHIP, FAQS } from '../data/landingData';
 import { usePageMeta, SPECS_STRUCTURED_DATA } from '../shared/seo';
 import MockTerminal from '../components/MockTerminal';
+import { useAuth } from '../shared/AuthContext';
 
 interface LandingPageProps {
   theme: 'light' | 'dark';
@@ -19,10 +19,12 @@ interface LandingPageProps {
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
+  const { status: authStatus } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const officers = SITE_LEADERSHIP.officers;
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventsError, setEventsError] = useState(false);
   const [loadingStories, setLoadingStories] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'completed'>('all');
   const [aboutTab, setAboutTab] = useState<'mission' | 'officers' | 'team'>('mission');
@@ -31,7 +33,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
   // Dynamic telemetry stats state
   const [stats, setStats] = useState({
-    members: 0,
+    members: null as number | null,
     events: 0,
     stories: 0,
     loading: true,
@@ -44,19 +46,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
     "Client container handshake established."
   ]);
 
-  // Query live portal stats directly from Appwrite (with mock fallback)
+  // Query live portal stats from the configured provider.
   const fetchStats = async () => {
     setStats(prev => ({ ...prev, loading: true }));
     setLogs(prev => [...prev, "Syncing telemetry nodes..."]);
     try {
-      const [membersRes, eventsRes, storiesRes] = await Promise.all([
-        api.students.listProfiles({ limit: 1 }),
+      const [eventsRes, storiesRes] = await Promise.all([
         api.events.list({ limit: 1 }),
-        api.stories.list({ limit: 1 })
+        api.stories.list({ limit: 1, publicOnly: true })
       ]);
+      const membersRes = authStatus === 'authenticated'
+        ? await api.students.listProfiles({ limit: 1 })
+        : { total: 0 };
       
       setStats({
-        members: membersRes.total || 0,
+        members: authStatus === 'authenticated' ? (membersRes.total || 0) : null,
         events: eventsRes.total || 0,
         stories: storiesRes.total || 0,
         loading: false,
@@ -65,37 +69,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       setLogs([
         "fetch specs-database-nodes --verbose",
         "Appwrite Database clusters connected successfully.",
-        `Telemetry synced: ${membersRes.total || 0} students, ${eventsRes.total || 0} events active.`
+        authStatus === 'authenticated'
+          ? `Telemetry synced: ${membersRes.total || 0} students, ${eventsRes.total || 0} events active.`
+          : `Public telemetry synced: ${eventsRes.total || 0} events, ${storiesRes.total || 0} stories.`
       ]);
     } catch (err) {
-      console.warn("Failed to fetch live stats from API, trying mock data...", err);
-      try {
-        const { mockStudents, mockEvents, mockStories } = await import('../shared/mock/mockData.js');
-        const membersCount = mockStudents?.length || 0;
-        const eventsCount = mockEvents?.length || 0;
-        const storiesCount = mockStories?.length || 0;
-        setStats({
-          members: membersCount,
-          events: eventsCount,
-          stories: storiesCount,
-          loading: false,
-          error: false
-        });
-        setLogs([
-          "fetch specs-database-nodes --verbose",
-          "API Node connection timed out. Handshake fallback to local Cache.",
-          `Telemetry synced (Cached): ${membersCount} students, ${eventsCount} events loaded.`
-        ]);
-      } catch (_) {
-        setStats(prev => ({ ...prev, loading: false, error: true }));
-        setLogs(prev => [...prev, "Sync error: Fallback cache failed."]);
-      }
+      console.warn("Failed to fetch live stats from the configured provider.", err);
+      setStats(prev => ({ ...prev, loading: false, error: true }));
+      setLogs(prev => [...prev, "Sync error: live provider request failed."]);
     }
   };
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (authStatus !== 'loading') fetchStats();
+  }, [authStatus]);
 
   // Set page meta (title, description, OG tags) for SEO
   usePageMeta({
@@ -103,7 +90,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
     description: 'Official organization management portal for SPECS — the Society of Programmers and Enthusiasts in Computer Science at Partido State University. Manage member profiles, track attendance, settle dues, explore events, and showcase student portfolios.',
   });
 
-  // Fetch events and stories with fallback
+  // Fetch events and stories from the configured provider. Mock data must not
+  // appear when Firebase is unavailable because it makes stale seed records
+  // look like current production data.
   useEffect(() => {
     let isMounted = true;
 
@@ -112,17 +101,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
         const eventsRes = await api.events.list({ limit: 20 });
         if (isMounted) {
           setEvents(eventsRes.documents || []);
+          setEventsError(false);
           setLoadingEvents(false);
         }
       } catch (err) {
         console.error("Error fetching events:", err);
         if (isMounted) {
-          try {
-            const { mockEvents } = await import('../shared/mock/mockData.js');
-            setEvents(mockEvents || []);
-          } catch (_) {
-            setEvents([]);
-          }
+          setEvents([]);
+          setEventsError(true);
           setLoadingEvents(false);
         }
       }
@@ -130,7 +116,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
 
     async function fetchStories() {
       try {
-        const storiesRes = await api.stories.list({ limit: 10 });
+        const storiesRes = await api.stories.list({ limit: 10, publicOnly: true });
         if (isMounted) {
           const accepted = (storiesRes.documents || []).filter((s: any) => s.isAccepted);
           setStories(accepted);
@@ -139,13 +125,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       } catch (err) {
         console.error("Error fetching stories:", err);
         if (isMounted) {
-          try {
-            const { mockStories } = await import('../shared/mock/mockData.js');
-            const accepted = (mockStories || []).filter((s: any) => s.isAccepted);
-            setStories(accepted);
-          } catch (_) {
-            setStories([]);
-          }
+          setStories([]);
           setLoadingStories(false);
         }
       }
@@ -511,7 +491,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           <div className="h-9 w-16 bg-white/10 rounded animate-pulse"></div>
                         ) : (
                           <span className="block text-3xl font-extrabold tracking-tight text-white">
-                            {stats.members}
+                            {stats.members ?? '—'}
                           </span>
                         )}
                       </div>
@@ -924,6 +904,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
               {[1, 2].map(idx => (
                 <div key={idx} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-900 animate-pulse border border-slate-200 dark:border-slate-800"></div>
               ))}
+            </div>
+          ) : eventsError ? (
+            <div className="rounded-2xl border border-dashed border-red-200 dark:border-red-900/50 p-12 text-center bg-red-50/50 dark:bg-red-950/10 max-w-md mx-auto">
+              <Calendar className="h-8 w-8 text-red-400 dark:text-red-500 mx-auto mb-3" />
+              <h4 className="font-bold text-slate-900 dark:text-white">Events are temporarily unavailable</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Please try again later. No placeholder events are being shown.</p>
             </div>
           ) : filteredEvents.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center bg-slate-50 dark:bg-slate-900/20 max-w-md mx-auto">

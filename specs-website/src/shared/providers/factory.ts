@@ -14,6 +14,15 @@ const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER || 'appwrite';
 const DB_PROVIDER = import.meta.env.VITE_DB_PROVIDER || 'appwrite';
 const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'appwrite';
 
+const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+
 // Cached provider instances
 let _authProvider: any = null;
 let _databaseProvider: any = null;
@@ -73,11 +82,7 @@ async function initializeProviders(): Promise<void> {
         _authProvider = providers.auth;
     } else if (AUTH_PROVIDER === 'firebase') {
         const { createFirebaseProviders } = await import('./firebaseProvider.js');
-        const providers = createFirebaseProviders({
-            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID
-        });
+        const providers = createFirebaseProviders(firebaseConfig);
         _authProvider = providers.auth;
     }
 
@@ -90,11 +95,7 @@ async function initializeProviders(): Promise<void> {
         _databaseProvider = providers.database;
     } else if (DB_PROVIDER === 'firebase') {
         const { createFirebaseProviders } = await import('./firebaseProvider.js');
-        const providers = createFirebaseProviders({
-            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID
-        });
+        const providers = createFirebaseProviders(firebaseConfig);
         _databaseProvider = providers.database;
     }
 
@@ -113,6 +114,14 @@ async function initializeProviders(): Promise<void> {
             publicUrl: import.meta.env.VITE_R2_PUBLIC_URL as string
         });
         _storageProvider = providers.storage;
+    } else if (STORAGE_PROVIDER === 'supabase-edge') {
+        const { createSupabaseStorageProvider } = await import('./supabaseStorageProvider.js');
+        _storageProvider = createSupabaseStorageProvider({
+            url: import.meta.env.VITE_SUPABASE_URL as string,
+            anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+            functionUrl: import.meta.env.VITE_SUPABASE_FUNCTION_URL as string,
+            firebaseConfig
+        });
     }
 
     _initialized = true;

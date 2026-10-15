@@ -1,8 +1,10 @@
 # SPECS Organization Management System
 
-![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=appwrite) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge) ![Tests](https://img.shields.io/badge/Tests-283%20passed-brightgreen?style=for-the-badge)
+![Project Banner](https://img.shields.io/badge/SPECS-Organization%20Portal-blue?style=for-the-badge&logo=firebase) ![Status](https://img.shields.io/badge/Status-Maintained-green?style=for-the-badge) ![License](https://img.shields.io/badge/License-BSD%203--Clause-orange?style=for-the-badge) ![Tests](https://img.shields.io/badge/Tests-283%20passed-brightgreen?style=for-the-badge)
 
-A centralized web application built with **React 19**, **TypeScript**, **TailwindCSS**, and **Appwrite** to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
+A centralized web application built with **React 19**, **TypeScript**, **TailwindCSS**, **Firebase**, and **Supabase Edge Functions** to serve as the central hub for the **Society of Programmers and Enthusiasts in Computer Science (SPECS)**.
+
+The current runtime uses **Firebase Authentication and Firestore** for identity and application data, **Supabase Storage** for files, and the `supabase/functions/specs-api` Edge Function for privileged operations. The Appwrite provider remains only as a compatibility path for older environments; new deployments should use Firebase and Supabase.
 
 ---
 
@@ -39,18 +41,9 @@ graph TB
     end
 
     subgraph "Backend Providers"
-        APPWRITE[Appwrite BaaS]
-        FIREBASE[Firebase]
-        R2[Cloudflare R2]
-    end
-
-    subgraph "Appwrite Services"
-        direction TB
-        AUTH_SVC[Authentication]
-        DB_SVC[Database<br/>15 Collections]
-        STORE_SVC[Storage<br/>6 Buckets]
-        FUNC_SVC[Cloud Functions]
-        TEAMS_SVC[Teams / RBAC]
+        FIREBASE[Firebase Auth + Firestore]
+        SUPABASE[Supabase Edge Functions + Storage]
+        APPWRITE[Appwrite compatibility]
     end
 
     UI --> PAGES
@@ -58,17 +51,13 @@ graph TB
     CACHE --> AUTH
     CACHE --> DB
     CACHE --> STORAGE
-    AUTH --> APPWRITE
     AUTH --> FIREBASE
-    DB --> APPWRITE
     DB --> FIREBASE
-    STORAGE --> APPWRITE
-    STORAGE --> R2
-    APPWRITE --> AUTH_SVC
-    APPWRITE --> DB_SVC
-    APPWRITE --> STORE_SVC
-    APPWRITE --> FUNC_SVC
-    APPWRITE --> TEAMS_SVC
+    STORAGE --> SUPABASE
+    PAGES --> SUPABASE
+    APPWRITE -. legacy provider .-> AUTH
+    APPWRITE -. legacy provider .-> DB
+    APPWRITE -. legacy provider .-> STORAGE
 ```
 
 ## Database Entity Relationships
@@ -112,9 +101,9 @@ In building this application, specific architectural and technical choices were 
 * **Decision:** We migrated from Vanilla JavaScript to React 19 and TypeScript.
 * **Reasoning:** As the application grew in size (14+ admin views, shared components, complex state management), Vanilla JS became hard to scale. React provides a component-driven architecture for high reusability, and TypeScript ensures compile-time type safety, minimizing runtime exceptions and ReferenceErrors.
 
-### 2. Appwrite BaaS
-* **Decision:** We utilized Appwrite for the backend instead of building a custom REST API with Node/Express.
-* **Reasoning:** As a student-led project with tight deadlines, we needed a secure, production-ready backend immediately. Appwrite handles Authentication, Database (CRUD), File Storage, Cloud Functions, and Teams out-of-the-box, allowing us to focus 100% on the frontend logic and user experience.
+### 2. Firebase and Supabase
+* **Decision:** Firebase Authentication and Firestore are the canonical identity and data services. Supabase Edge Functions and Storage provide the privileged server boundary and file storage.
+* **Reasoning:** Firestore rules handle normal reads and role isolation, while the Edge Function keeps service-account credentials, account mutations, email dispatch, and signed storage operations off the client.
 
 ### 3. TailwindCSS for Styling
 * **Decision:** Replaced Plain CSS/SCSS with TailwindCSS.
@@ -122,7 +111,7 @@ In building this application, specific architectural and technical choices were 
 
 ### 4. Multi-Provider Architecture
 * **Decision:** Built an abstraction layer with provider interfaces for Auth, Database, and Storage.
-* **Reasoning:** To allow swapping backend services (e.g., Firebase for auth, Cloudflare R2 for storage) without changing application code. Each provider implements a common interface.
+* **Reasoning:** To keep the frontend independent from backend details. Firebase/Supabase is the production path, while Appwrite remains available only for compatibility and controlled rollback.
 
 ---
 
@@ -130,20 +119,20 @@ In building this application, specific architectural and technical choices were 
 
 ### General
 - **User Authentication:** Secure login/signup with university email validation, verification, and session expiry detection.
-- **Role-Based Access:** Separated dashboards and permissions for `students`, `officers`, and `admins` with team-based access control via Appwrite Teams.
+- **Role-Based Access:** Separated dashboards and permissions for `students`, `officers`, and `admins` using Firebase Auth claims/account projections and Firestore Security Rules.
 - **Public Landing Page (7 routes):** Home, Events, About Us, Resources, Stories, Story Detail, Login/Signup.
 - **Volunteer System:** Full lifecycle — students request volunteer status, officers approve/reject, volunteers create posts, and can request to leave (`none` → `pending` → `approved`/`rejected`, plus `backout_pending`).
 - **Stories & Highlights:** Volunteer-authored blog posts with officer/admin approval workflow (`officerApproval` + `adminApproval`), published to the public landing page.
 - **QR Code Scanner:** Fullscreen scanner for quick student lookup and event check-in via `html5-qrcode`.
 - **PDF Export:** Report generation and printing with `jspdf` and `html2canvas`.
 - **Centralized Caching:** localStorage-based image and data caches with TTL, LRU eviction, stale-while-revalidate, request deduplication, and tag-based invalidation.
-- **Structured Error Handling:** Typed `ApiError` classes with error code enums and Appwrite error mapping.
+- **Structured Error Handling:** Typed `ApiError` classes with Firebase and Supabase error mapping.
 - **Toast Notifications:** Custom toast system with 4 types (success, error, warning, info), auto-dismiss, progress bars, and pause-on-hover.
 - **Confirmation Modals:** Custom reusable `ConfirmModal` component with 5 visual variants.
 
 ### Student Dashboard (5 views)
 - **Event Calendar:** View upcoming and past events.
-- **Payment Tracking:** See pending and completed payments with payment card summaries.
+- **Payment Tracking:** See pending and completed payments with payment card summaries; download paid receipts as browser-generated PDFs.
 - **Attendance History:** View personal event attendance records.
 - **Profile Settings:** Update personal info, request volunteer status, or request to leave the volunteer program.
 - **Volunteer Posts:** Create, edit, and delete blog posts with cover images (for approved volunteers only).
@@ -160,7 +149,7 @@ In building this application, specific architectural and technical choices were 
 
 ### Admin Panel (13 views)
 - **Dashboard Stats:** At-a-glance overview with Chart.js / Recharts visualizations and animated counters.
-- **Account Management:** Approve, verify, deactivate/reactivate, and delete accounts. Promote students to officers or demote via Appwrite Cloud Functions. CSV export.
+- **Account Management:** Approve, verify, deactivate/reactivate, and delete accounts. Promote students to officers or demote through the Supabase `specs-api` Edge Function. CSV export.
 - **Event Management:** A timeline view to add, edit, and delete events with related links and collaborators.
 - **Attendance Management:** Event-based attendance tracking with student search autocomplete and non-member support.
 - **Payment Management:** Assign and manage payments (individually or by bulk) with support for non-BSCS students.
@@ -170,7 +159,7 @@ In building this application, specific architectural and technical choices were 
 - **Volunteer Management:** Full volunteer lifecycle management.
 - **Stories Management:** Full CRUD, approval workflow, filtering by status, and statistics.
 - **Task Management:** Create and track admin/officer tasks with completion state.
-- **Announcements:** Draft composition with recipient targeting (all/students/officers), copy-to-clipboard, and open-in-email-client.
+- **Announcements:** Draft and publish in-app notifications for all students, officers, or selected accounts; bulk announcement email is not used.
 - **Settings:** Admin profile and preferences.
 
 ---
@@ -184,8 +173,9 @@ In building this application, specific architectural and technical choices were 
 | **Charts** | Chart.js, Recharts | ^4.5.0 / ^3.9.0 |
 | **PDF / Print** | jspdf, html2canvas | ^4.2.1 / ^1.4.1 |
 | **QR Scanner** | html5-qrcode | ^2.3.8 |
-| **Backend** | Appwrite Cloud (BaaS) | SDK ^18.1.1 |
-| **Server SDK** | node-appwrite (Cloud Functions) | ^17.0.0 |
+| **Authentication / Database** | Firebase Authentication + Firestore | Firebase Web SDK |
+| **Server boundary** | Supabase Edge Functions (`specs-api`) | Deno / TypeScript |
+| **File storage** | Supabase Storage | Supabase client + signed URLs |
 | **Build Tool** | Vite | 7.1.11 |
 | **Testing** | Vitest, jsdom, @testing-library/dom, @testing-library/user-event | ^2.1.8 |
 | **Coverage** | @vitest/coverage-v8 | ^2.1.8 |
@@ -261,7 +251,7 @@ VITE_USE_MOCK_DATA=true
 When enabled:
 - Authentication is bypassed with auto-login
 - All API calls return realistic mock data across all 15 collections (accounts, students, officers, admins, events, stories, payments, files, attendance, expenses, revenue, tasks, starting_balances, volunteer_requests)
-- Full CRUD operations with Appwrite Query string parsing simulation (`equal`, `notEqual`, `orderDesc`, `orderAsc`, `limit`, `offset`, `search`)
+- Full CRUD operations through the provider abstraction, with Firebase cursor pagination and a compatibility adapter for legacy Appwrite-style filters
 - Pagination simulation with 200ms simulated network delay
 - A Dev Quick Login panel appears on the landing page
 
@@ -346,9 +336,8 @@ The application supports multiple backend providers through an abstraction layer
 ### Supported Providers
 | Provider | Auth | Database | Storage | Implementation |
 |----------|------|----------|---------|---------------|
-| Appwrite | Yes | Yes | Yes | `appwriteProvider.ts` |
-| Firebase | Yes | Yes | No | `firebaseProvider.ts` (lazy SDK loading) |
-| Cloudflare R2 | No | No | Yes | `cloudflareR2Provider.ts` (pre-signed URLs) |
+| Firebase + Supabase | Yes | Yes | Yes | `firebaseProvider.ts`, `supabaseStorageProvider.ts` |
+| Appwrite | Yes | Yes | Yes | `appwriteProvider.ts` (legacy compatibility) |
 
 ---
 
@@ -359,7 +348,8 @@ The application supports multiple backend providers through an abstraction layer
 - [Node.js](https://nodejs.org/) (v18+)
 - [npm](https://www.npmjs.com/)
 - [Git](https://git-scm.com/)
-- [Appwrite Cloud](https://cloud.appwrite.io/) account
+- A Firebase project with Authentication, Firestore, and authorized web domains
+- A Supabase project with Storage and the Supabase CLI linked to the project
 
 ### Step-by-Step Setup
 
@@ -376,81 +366,49 @@ cd SPECS-Organization-Management-System/specs-website
 npm install
 ```
 
-#### 3. Set Up Appwrite Backend
+#### 3. Configure Firebase and Supabase
 
-1. **Create New Project** on [Appwrite Cloud](https://cloud.appwrite.io/).
-2. **Add Web Platform:** Name it, and set the hostname to `localhost`.
-3. **Create Database & Collections:**
-   * Create a new database (e.g., `Main Database`).
-   * Inside the database, create the following **13 active collections**: `accounts`, `students`, `officers`, `admins`, `events`, `attendance`, `payments`, `revenue`, `expenses`, `stories`, `files`, `tasks`, `starting_balances`.
-   * Set the necessary permissions, attributes, and relationships for each collection as detailed in [DATABASE.md](DATABASE.md).
-4. **Create Storage Buckets (6):**
-   * `Event Images` — Cover images for events
-   * `User Uploads` — General file uploads by officers
-   * `Pictures` — Officer profile pictures
-   * `Schedules` — Officer schedule files
-   * `Public Files` — Downloadable resources on the landing page
-   * `Highlight Images` — Cover images for volunteer stories/highlights
-5. **Create Teams:**
-   * `Students` — for student role access control.
-   * `Officers` — for officer role access control.
-6. **Deploy Cloud Functions:**
-   * Create an Appwrite Cloud Function for account management operations (promote/demote).
-   * Optionally deploy an email notification function.
+1. Create or select the Firebase project used by the application.
+2. Enable Firebase Email/Password Authentication and Firestore.
+3. Add `localhost` and the production domain under Firebase Authentication authorized domains.
+4. Deploy the rules from the repository root:
+
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+5. Link the Supabase project and deploy the privileged function:
+
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref YOUR_SUPABASE_PROJECT_REF
+   npx supabase functions deploy specs-api
+   ```
+
+6. Add the Edge Function secrets described in [supabase/README.md](supabase/README.md). Keep service-account JSON and provider keys out of the repository.
 
 #### 4. Environment Setup
 
-Create a file named `.env.local` in the `specs-website` directory and populate it with your Appwrite credentials.
+Create `specs-website/.env` locally from `specs-website/.env.example` and select Firebase for Auth and Firestore, with Supabase for Storage and privileged functions.
 
 ```ini
-# .env.local
-# Replace placeholders with your actual Appwrite IDs
+# Firebase web configuration
+VITE_FIREBASE_API_KEY="<YOUR_FIREBASE_WEB_API_KEY>"
+VITE_FIREBASE_AUTH_DOMAIN="<YOUR_PROJECT_ID>.firebaseapp.com"
+VITE_FIREBASE_PROJECT_ID="<YOUR_PROJECT_ID>"
+VITE_FIREBASE_STORAGE_BUCKET="<YOUR_PROJECT_ID>.firebasestorage.app"
+VITE_FIREBASE_MESSAGING_SENDER_ID="<YOUR_MESSAGING_SENDER_ID>"
+VITE_FIREBASE_APP_ID="<YOUR_FIREBASE_APP_ID>"
 
-VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
-VITE_APPWRITE_PROJECT_ID="<YOUR_PROJECT_ID>"
+# Supabase public client configuration
+VITE_SUPABASE_URL="https://<YOUR_SUPABASE_PROJECT_REF>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<YOUR_SUPABASE_ANON_KEY>"
+VITE_SUPABASE_FUNCTION_URL="https://<YOUR_SUPABASE_PROJECT_REF>.supabase.co/functions/v1/specs-api"
 
-# Database
-VITE_DATABASE_ID="<YOUR_DATABASE_ID>"
-
-# Core Collections
-VITE_COLLECTION_ID_ACCOUNTS="<YOUR_ACCOUNTS_COLLECTION_ID>"
-VITE_COLLECTION_ID_STUDENTS="<YOUR_STUDENTS_COLLECTION_ID>"
-VITE_COLLECTION_ID_OFFICERS="<YOUR_OFFICERS_COLLECTION_ID>"
-VITE_COLLECTION_ID_ADMINS="<YOUR_ADMINS_COLLECTION_ID>"
-
-# Events & Attendance
-VITE_COLLECTION_ID_EVENTS="<YOUR_EVENTS_COLLECTION_ID>"
-VITE_COLLECTION_ID_ATTENDANCE="<YOUR_ATTENDANCE_COLLECTION_ID>"
-
-# Finance
-VITE_COLLECTION_ID_PAYMENTS="<YOUR_PAYMENTS_COLLECTION_ID>"
-VITE_COLLECTION_ID_REVENUE="<YOUR_REVENUE_COLLECTION_ID>"
-VITE_COLLECTION_ID_EXPENSES="<YOUR_EXPENSES_COLLECTION_ID>"
-VITE_COLLECTION_ID_STARTING_BALANCES="<YOUR_STARTING_BALANCES_COLLECTION_ID>"
-
-# Content & Files
-VITE_COLLECTION_ID_STORIES="<YOUR_STORIES_COLLECTION_ID>"
-VITE_COLLECTION_ID_TASKS="<YOUR_TASKS_COLLECTION_ID>"
-VITE_COLLECTION_ID_FILES="<YOUR_FILES_COLLECTION_ID>"
-
-# Storage Buckets (6)
-VITE_BUCKET_ID_EVENT_IMAGES="<YOUR_EVENT_IMAGES_BUCKET_ID>"
-VITE_BUCKET_ID_UPLOADS="<YOUR_UPLOADS_BUCKET_ID>"
-VITE_BUCKET_ID_PICTURES="<YOUR_PICTURES_BUCKET_ID>"
-VITE_BUCKET_ID_SCHEDULES="<YOUR_SCHEDULES_BUCKET_ID>"
-VITE_BUCKET_PUBLIC_FILES="<YOUR_PUBLIC_FILES_BUCKET_ID>"
-VITE_BUCKET_ID_HIGHLIGHT_IMAGES="<YOUR_HIGHLIGHT_IMAGES_BUCKET_ID>"
-
-# Cloud Functions & Teams
-VITE_FUNCTION_ID="<YOUR_CLOUD_FUNCTION_ID>"
-VITE_EMAIL_FUNCTION_ID="<YOUR_EMAIL_FUNCTION_ID>"
-VITE_TEAM_ID_STUDENTS="<YOUR_STUDENTS_TEAM_ID>"
-VITE_TEAM_ID_OFFICERS="<YOUR_OFFICERS_TEAM_ID>"
-
-# Provider Selection (appwrite, firebase, cloudflare-r2)
-VITE_AUTH_PROVIDER=appwrite
-VITE_DB_PROVIDER=appwrite
-VITE_STORAGE_PROVIDER=appwrite
+# Provider selection
+VITE_AUTH_PROVIDER=firebase
+VITE_DB_PROVIDER=firebase
+VITE_STORAGE_PROVIDER=supabase-edge
 ```
 
 #### 5. Run the Development Server
@@ -464,7 +422,7 @@ Open your browser and navigate to `http://localhost:5173`.
 
 ## Database Schema
 
-The database uses a **relational model** with `accounts` as the central hub. There are **15 collections** (13 active, 2 unused):
+The production database is **Firestore**, using document collections with `accounts` as the central identity projection. Collection names remain close to the migrated Appwrite schema so existing business logic and reports can be reconciled. The read-model projections and snapshot rules are documented in [FIRESTORE_READ_MODEL.md](FIRESTORE_READ_MODEL.md).
 
 ### Active Collections (13)
 | # | Collection | Env Variable | Description |
@@ -508,15 +466,17 @@ starting_balances, tasks, files, revenue (standalone)
 
 For complete collection schemas with all fields, types, constraints, indexes, and relationship details, see [DATABASE.md](DATABASE.md).
 
-### Storage Buckets (6)
+### Supabase Storage Buckets
 | Bucket | Env Variable | Purpose |
 |--------|-------------|---------|
-| **Event Images** | `VITE_BUCKET_ID_EVENT_IMAGES` | Cover images for events |
-| **User Uploads** | `VITE_BUCKET_ID_UPLOADS` | General file uploads by officers |
-| **Pictures** | `VITE_BUCKET_ID_PICTURES` | Officer profile pictures |
-| **Schedules** | `VITE_BUCKET_ID_SCHEDULES` | Officer schedule files |
-| **Public Files** | `VITE_BUCKET_PUBLIC_FILES` | Downloadable resources on the landing page |
-| **Highlight Images** | `VITE_BUCKET_ID_HIGHLIGHT_IMAGES` | Cover images for volunteer stories/highlights |
+| `specs-events` | `STORAGE_ALLOWED_BUCKETS` | Cover images for events |
+| `specs-files` | `STORAGE_ALLOWED_BUCKETS` | General file uploads by officers |
+| `specs-picture` | `STORAGE_ALLOWED_BUCKETS` | Officer profile pictures |
+| `specs-schedule` | `STORAGE_ALLOWED_BUCKETS` | Officer schedule files |
+| `specs-public-files` | `STORAGE_ALLOWED_BUCKETS` | Downloadable resources on the landing page |
+| `specs-highlights` | `STORAGE_ALLOWED_BUCKETS` | Cover images for volunteer stories/highlights |
+
+Receipts are generated in the browser and downloaded by the student. They are not uploaded to Supabase Storage or emailed automatically.
 
 ---
 
@@ -566,20 +526,21 @@ specs-website/
 │   │   └── landing/                 # Public landing page routes (7 routes)
 │   └── shared/                      # Shared code
 │       ├── api.ts                   # Centralized API layer (15 namespaces)
-│       ├── appwrite.ts              # Appwrite client setup
+│       ├── appwrite.ts              # Legacy-compatible client/provider setup
 │       ├── cache.ts                 # Data/Image two-tier caching layer
 │       ├── constants.ts             # Environment variables & collection IDs
 │       ├── formatters.ts            # Currency, date, time formatters
 │       ├── utils.ts                 # Debounce, copy, and helper functions
 │       ├── mock/                    # Development mock system
-│       │   ├── mockApiService.js    # In-memory mock backend (simulates Appwrite SDK)
+│       │   ├── mockApiService.js    # In-memory mock backend for local development
 │       │   └── mockData.js          # Mock data for all 15 collections
 │       └── providers/               # Multi-provider abstraction layer
 │           ├── interface.ts         # IAuthProvider, IDatabaseProvider, IStorageProvider
 │           ├── factory.ts           # Provider factory (loads based on .env)
-│           ├── appwriteProvider.ts  # Appwrite implementation
-│           ├── firebaseProvider.ts  # Firebase implementation (lazy-loaded)
-│           └── cloudflareR2Provider.ts # Cloudflare R2 implementation
+│           ├── appwriteProvider.ts  # Legacy Appwrite compatibility
+│           ├── firebaseProvider.ts  # Firebase Auth/Firestore implementation
+│           ├── supabaseStorageProvider.ts # Supabase Storage implementation
+│           └── firebaseFunctionProvider.ts # Supabase Edge Function client
 ├── package.json
 ├── vite.config.ts
 ├── vitest.config.ts
@@ -590,27 +551,27 @@ specs-website/
 
 ## Development Mock Mode & Architecture
 
-To facilitate rapid frontend development and offline testing, this portal includes a full multi-provider and mocking architecture.
+To facilitate rapid frontend development and offline testing, this portal includes a provider abstraction and mocking architecture.
 
 ### 1. Mock Mode Configuration
-By default, in local development mode, you can bypass connection to a real Appwrite instance by setting `VITE_USE_MOCK_DATA="true"` in your `.env.local` file.
+In local development mode, you can bypass connection to Firebase and Supabase by setting `VITE_USE_MOCK_DATA="true"` in your local `.env` file.
 * This directs the provider factory (`src/shared/providers/factory.ts`) to initialize mock implementations of the `auth`, `database`, and `storage` provider classes.
 * All data changes and query filters are simulated in-memory using `src/shared/mock/mockApiService.js`, providing pre-populated relational mocks for all 15 collections (students, officers, events, payments, stories, tasks, starting balances, and more).
 * A quick login panel is exposed on the login screen to easily log in as `student`, `officer`, or `admin` accounts.
-* Query simulation supports `equal`, `notEqual`, `orderDesc`, `orderAsc`, `limit`, `offset`, and `search` filters matching the Appwrite Query syntax.
+* Query simulation supports the filtering and pagination patterns used by the Firebase provider.
 
 ### 2. Multi-Provider Abstraction
-The system code is decoupled from Appwrite using a set of common interface abstractions located in `src/shared/providers/interface.ts`:
+The system code is decoupled from backend services using common interface abstractions located in `src/shared/providers/interface.ts`:
 * **`IAuthProvider`**: Controls user state retrieval, user session logins, recovery, and token validations.
 * **`IDatabaseProvider`**: Standardizes document read, list, and write queries.
 * **`IStorageProvider`**: Manages bucket listings, uploads, downloads, and image previews.
 
-The factory `src/shared/providers/factory.ts` loads the active client module depending on your `.env` settings (`VITE_AUTH_PROVIDER`, `VITE_DB_PROVIDER`, `VITE_STORAGE_PROVIDER`), making it easy to migrate modules to alternative systems (like Firebase or Cloudflare R2).
+The factory `src/shared/providers/factory.ts` loads the active client module depending on your `.env` settings (`VITE_AUTH_PROVIDER`, `VITE_DB_PROVIDER`, `VITE_STORAGE_PROVIDER`). The production combination is Firebase Auth/Firestore plus Supabase Storage and Edge Functions.
 
-### 3. Backend Cloud Functions
-For administrative operations requiring elevated server-side privileges (e.g. promoting a student to an officer or bulk verification), requests are sent to the Appwrite Cloud Function ID defined by `VITE_FUNCTION_ID`.
-* The server-side codebase runs within a secure execution context, verifying permissions and editing credentials inside the Appwrite Auth and Database services.
-* It safely updates roles and active states without exposing direct write scopes on the client.
+### 3. Supabase Edge Function
+For administrative operations requiring elevated server-side privileges (e.g. promoting a student to an officer or bulk verification), requests are sent to the `specs-api` Supabase Edge Function.
+* The function verifies Firebase ID tokens and performs privileged Firebase Auth/Firestore and Supabase Storage operations server-side.
+* It safely updates roles and active states without exposing service-account or service-role credentials to the client.
 
 ---
 

@@ -26,6 +26,38 @@ const avatarColors = [
   { bg: 'bg-slate-100 text-slate-600', border: 'border-slate-200' },
 ];
 
+function relationId(value: any): string | null {
+  if (!value) return null;
+  if (typeof value === 'object') return value.$id || value.id || null;
+  return String(value);
+}
+
+async function findAccountForStudent(studentId: string): Promise<AccountDoc | null> {
+  // `students` is the migrated Appwrite-compatible relation. `studentId` is
+  // the canonical Firestore read-model field. Query both so older migrated
+  // rows and newly-created Firebase rows behave identically.
+  const relationResult = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
+    Query.equal('students', studentId)
+  ]);
+  const relationMatch = (relationResult.documents || []).find((document: any) =>
+    relationId(document.students) === studentId || document.studentId === studentId
+  );
+  if (relationMatch) return relationMatch as AccountDoc;
+
+  try {
+    const canonicalResult = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
+      Query.equal('studentId', studentId)
+    ]);
+    const canonicalMatch = (canonicalResult.documents || []).find((document: any) =>
+      relationId(document.students) === studentId || document.studentId === studentId
+    );
+    return (canonicalMatch as AccountDoc | undefined) || null;
+  } catch {
+    // Appwrite schemas may not contain the Firebase-only canonical field.
+    return null;
+  }
+}
+
 const AdminStudents: React.FC = () => {
   const [students, setStudents] = useState<StudentDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,27 +117,30 @@ const AdminStudents: React.FC = () => {
   useEffect(() => {
     if (!detailStudent) {
       setLinkedAccount(null);
+      setLoadingAccount(false);
       return;
     }
+
+    let cancelled = false;
+    setLinkedAccount(null);
     const fetchLinkedAccount = async () => {
       setLoadingAccount(true);
       try {
-        const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
-          Query.equal('students', detailStudent.$id)
-        ]);
-        if (res.documents.length > 0) {
-          setLinkedAccount(res.documents[0] as AccountDoc);
-        } else {
-          setLinkedAccount(null);
-        }
+        const accountForStudent = await findAccountForStudent(detailStudent.$id);
+        if (cancelled) return;
+        setLinkedAccount(accountForStudent);
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to load linked account:', err);
         setLinkedAccount(null);
       } finally {
-        setLoadingAccount(false);
+        if (!cancelled) setLoadingAccount(false);
       }
     };
     fetchLinkedAccount();
+    return () => {
+      cancelled = true;
+    };
   }, [detailStudent]);
 
   const handlePromoteOfficer = async () => {
@@ -259,7 +294,7 @@ const AdminStudents: React.FC = () => {
         email: editEmail.trim() || null,
       };
 
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, detailStudent.$id, updated);
+      await api.students.updateProfile(detailStudent.$id, updated);
       
       const updatedDoc = { ...detailStudent, ...updated } as StudentDoc;
       setDetailStudent(updatedDoc);
@@ -361,12 +396,7 @@ const AdminStudents: React.FC = () => {
           targetAccount = linkedAccount;
         } else {
           // If deleted from list directly, look up the linked account
-          const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
-            Query.equal('students', student.$id)
-          ]);
-          if (res.documents.length > 0) {
-            targetAccount = res.documents[0] as AccountDoc;
-          }
+          targetAccount = await findAccountForStudent(student.$id);
         }
 
         if (!targetAccount) {
@@ -426,12 +456,9 @@ const AdminStudents: React.FC = () => {
         await Promise.all(ids.map(async (id) => {
           try {
             // Find linked account
-            const res = await databases.listDocuments(DATABASE_ID, COLLECTION_ID_ACCOUNTS, [
-              Query.equal('students', id)
-            ]);
-            
-            if (res.documents.length > 0) {
-              const targetAccount = res.documents[0];
+            const targetAccount = await findAccountForStudent(id);
+
+            if (targetAccount) {
               // Call cloud function to delete the entire account and auth user
               const execution = await functions.createExecution(
                 FUNCTION_ID,
