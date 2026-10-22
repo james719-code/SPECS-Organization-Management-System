@@ -9,7 +9,11 @@ import { firebaseConfig, functions } from './appwrite';
 import { FUNCTION_ID } from './constants';
 import { getFirebaseApp } from './providers/firebaseProvider';
 
-const VAPID_KEY = (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined)?.trim();
+const RAW_VAPID_KEY = (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined)?.trim();
+// A Web Push public key is 65 bytes of base64url (87 characters) starting with "B".
+// Anything else (empty, or a different credential pasted by mistake) disables push instead of failing at subscribe time.
+const VAPID_KEY = RAW_VAPID_KEY && /^B[A-Za-z0-9_-]{80,90}$/.test(RAW_VAPID_KEY) ? RAW_VAPID_KEY : undefined;
+if (RAW_VAPID_KEY && !VAPID_KEY) console.warn('[push] VITE_FIREBASE_VAPID_KEY is not a valid Web Push key; push notifications are disabled. Copy the key pair from Firebase Console > Project settings > Cloud Messaging > Web Push certificates.');
 const SW_URL = '/firebase-messaging-sw.js';
 const PREF_KEY = 'specs_push_state';
 const RESYNC_MS = 12 * 60 * 60 * 1000;
@@ -17,6 +21,12 @@ const RESYNC_MS = 12 * 60 * 60 * 1000;
 export type PushStatus = 'unavailable' | 'blocked' | 'prompt' | 'enabled' | 'off';
 
 type StoredState = { uid: string; token: string; at: number } | { off: true };
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+    });
 
 const readState = (): StoredState | null => {
     try { return JSON.parse(localStorage.getItem(PREF_KEY) || 'null'); } catch { return null; }
@@ -41,7 +51,7 @@ export function getPushStatus(): PushStatus {
 }
 
 async function callFunction(action: string, payload: Record<string, unknown>) {
-    const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action, payload }));
+    const execution = await withTimeout(functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action, payload })), 20000, 'The server did not respond. Try again.');
     let result: any = {};
     try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
     if (result.success === false) throw new Error(result.error || 'Request failed');
@@ -51,10 +61,15 @@ async function callFunction(action: string, payload: Record<string, unknown>) {
 async function currentToken(): Promise<string> {
     const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
     if (!(await isSupported())) throw new Error('This browser does not support push notifications');
-    const registration = await navigator.serviceWorker.register(SW_URL);
-    await navigator.serviceWorker.ready;
+    const registration = await withTimeout(navigator.serviceWorker.register(SW_URL), 15000, 'Could not register the notification service worker.');
+    await withTimeout(navigator.serviceWorker.ready, 15000, 'The notification service worker did not start.');
     const app = await getFirebaseApp(firebaseConfig);
-    const token = await getToken(getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+    // pushManager.subscribe can stall when the browser cannot reach its push service (network filters, privacy modes).
+    const token = await withTimeout(
+        getToken(getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }),
+        25000,
+        'Your browser could not reach its push service. Check that notifications are allowed and that no blocker or VPN is interfering.'
+    );
     if (!token) throw new Error('Could not get a push token from this browser');
     return token;
 }

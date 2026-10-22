@@ -4,7 +4,7 @@ import { AuthGuard } from './guard/auth';
 import { useGlobalLoading } from './shared/pendingTracker';
 import {
   LayoutDashboard, User, Calendar, CreditCard, CheckSquare, FileText, Settings,
-  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2, BookOpen, ScrollText, Printer
+  Users, Award, FileSpreadsheet, Activity, Bell, Landmark, UserCheck, Loader2, BookOpen, ScrollText, Printer, Megaphone
 } from 'lucide-react';
 
 // Core imports
@@ -53,6 +53,7 @@ const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'));
 const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'));
 const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
+const Announcements = lazy(() => import('./pages/shared/Announcements'));
 const AdminStories = lazy(() => import('./pages/admin/AdminStories'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminOfficers = lazy(() => import('./pages/admin/AdminOfficers'));
@@ -174,6 +175,7 @@ export default function App() {
                   groupName: 'General',
                   items: [
                     { to: '/dashboard/student', label: 'My Profile', icon: <User className="h-4 w-4" /> },
+                    { to: '/dashboard/student/announcements', label: 'Announcements', icon: <Megaphone className="h-4 w-4" /> },
                     { to: '/dashboard/student/tutorials', label: 'Student Tutorials', icon: <ScrollText className="h-4 w-4" /> },
                     { to: '/dashboard/student/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> }
                   ]
@@ -204,6 +206,7 @@ export default function App() {
         <Route path="posts" element={<StudentPosts />} />
         <Route path="constitution" element={<StudentConstitution />} />
         <Route path="tutorials" element={<StudentTutorials />} />
+        <Route path="announcements" element={<Announcements />} />
         <Route path="profile" element={<Navigate to="/dashboard/student" replace />} />
       </Route>
 
@@ -223,6 +226,7 @@ export default function App() {
                   items: [
                     { to: '/dashboard/officer', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
                     { to: '/dashboard/officer/profile', label: 'My Profile', icon: <User className="h-4 w-4" /> },
+                    { to: '/dashboard/officer/announcements', label: 'Announcements', icon: <Megaphone className="h-4 w-4" /> },
                     { to: '/dashboard/officer/my-attendance', label: 'My Attendance', icon: <CheckSquare className="h-4 w-4" /> },
                     { to: '/dashboard/officer/constitution', label: 'Constitution & By-Laws', icon: <BookOpen className="h-4 w-4" /> },
                     { to: '/dashboard/officer/tutorials', label: 'Officer Tutorials', icon: <ScrollText className="h-4 w-4" /> }
@@ -278,6 +282,7 @@ export default function App() {
         <Route path="non-org-events" element={<AdminNonOrgEvents />} />
         <Route path="constitution" element={<OfficerConstitution />} />
         <Route path="tutorials" element={<OfficerTutorials />} />
+        <Route path="announcements" element={<Announcements />} />
       </Route>
 
       {/* Role-Guarded Admin Routes */}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, BellRing, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { cachedApi, api, CacheTags } from '../../shared/api';
 import { account } from '../../shared/appwrite';
@@ -9,6 +10,11 @@ import type { NotificationDoc } from '../../types/database';
 
 const NotificationBell: React.FC = () => {
   const { addToast } = useToast();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // /dashboard/<role>/... -> that role's announcements page (admins publish from their own page).
+  const role = pathname.split('/')[2];
+  const announcementsPath = ['student', 'officer', 'admin'].includes(role) ? `/dashboard/${role}/announcements` : null;
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +116,7 @@ const NotificationBell: React.FC = () => {
               <BellRing className="h-4 w-4 shrink-0 text-[#0d6b66] dark:text-teal-400" />
               <p className="min-w-0 flex-1 text-[11px] leading-snug text-slate-600 dark:text-slate-300">
                 {pushStatus === 'enabled' && 'Push alerts are on for this device.'}
-                {pushStatus === 'blocked' && 'Notifications are blocked. Allow them for this site in your browser settings.'}
+                {pushStatus === 'blocked' && 'Notifications are blocked for this site. Click the lock icon next to the address bar, set Notifications to Allow, then refresh the page.'}
                 {(pushStatus === 'prompt' || pushStatus === 'off') && 'Get alerts on this device even when the tab is closed.'}
               </p>
               {pushStatus !== 'blocked' && (
@@ -144,6 +150,15 @@ const NotificationBell: React.FC = () => {
               </button>
             ))}
           </div>
+          {announcementsPath && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); navigate(announcementsPath); }}
+              className="block w-full border-t border-slate-100 px-4 py-2.5 text-center text-xs font-semibold text-[#0d6b66] hover:bg-slate-50 dark:border-slate-800 dark:text-teal-400 dark:hover:bg-slate-800/70"
+            >
+              View all announcements
+            </button>
+          )}
         </div>
       )}
     </div>
