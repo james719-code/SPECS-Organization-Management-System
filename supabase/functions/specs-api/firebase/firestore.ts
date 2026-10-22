@@ -42,7 +42,7 @@ export class FirestoreRestClient {
 
   private async request(path: string, init: RequestInit = {}): Promise<JsonMap> {
     const token = await firebaseAccessToken();
-    const response = await fetch(`${this.baseUrl}/${path}`, {
+    const response = await fetch(path.startsWith(':') ? `${this.baseUrl}${path}` : `${this.baseUrl}/${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
     });
@@ -71,6 +71,40 @@ export class FirestoreRestClient {
       pageToken = String(page.nextPageToken || '');
     } while (pageToken);
     return documents;
+  }
+
+  async listPage(collection: string, limit: number, cursor?: string): Promise<JsonMap> {
+    const query = new URLSearchParams({ pageSize: String(limit) });
+    if (cursor) query.set('pageToken', cursor);
+    const page = await this.request(`${encodeURIComponent(collection)}?${query}`);
+    return {
+      documents: ((page.documents || []) as JsonMap[]).map(decodeDocument),
+      nextCursor: page.nextPageToken || null,
+    };
+  }
+
+  async queryPage(collection: string, limit: number, cursor: string | undefined, filters: Array<{ field: string; value: unknown }>): Promise<JsonMap> {
+    const query: JsonMap = {
+      from: [{ collectionId: collection }], limit: limit + 1,
+      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+    };
+    // Firestore requires a unary filter for null equality.
+    if (filters.length) query.where = { compositeFilter: { op: 'AND', filters: filters.map(({ field, value }) => value === null
+      ? { unaryFilter: { field: { fieldPath: field }, op: 'IS_NULL' } }
+      : { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: encodeValue(value) } }) } };
+    if (cursor) query.startAt = { before: false, values: [{ referenceValue: `projects/${firebaseProjectId()}/databases/(default)/documents/${collection}/${cursor}` }] };
+    const rows = await this.request(':runQuery', { method: 'POST', body: JSON.stringify({ structuredQuery: query }) }) as unknown as Array<{ document?: JsonMap }>;
+    const documents = rows.flatMap((row) => row.document ? [decodeDocument(row.document)] : []);
+    const hasMore = documents.length > limit;
+    const page = documents.slice(0, limit);
+    return { documents: page, nextCursor: hasMore ? page.at(-1)?.$id : null };
+  }
+
+  async create(collection: string, id: string, data: JsonMap): Promise<JsonMap> {
+    const path = `${encodeURIComponent(collection)}?documentId=${encodeURIComponent(id)}`;
+    return decodeDocument(await this.request(path, {
+      method: 'POST', body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encodeValue(value)])) }),
+    }));
   }
 
   async set(collection: string, id: string, data: JsonMap): Promise<JsonMap> {

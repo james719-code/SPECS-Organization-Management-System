@@ -28,6 +28,7 @@ export function errorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error);
   if (/missing firebase|invalid firebase|id token|jwt|jws|claim|issuer|audience|unauthorized|forbidden|insufficient role|authenticated|permission/i.test(message)) return 401;
   if (/not found/i.test(message)) return 404;
+  if (/already.exists/i.test(message)) return 409;
   if (/cannot|invalid|required|unsupported|only /i.test(message)) return 400;
   return 500;
 }
