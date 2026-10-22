@@ -172,7 +172,7 @@ const AdminAttendance: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; accountId?: string; name: string; email?: string; type: 'student' | 'officer' } | null>(null);
   const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; accountId?: string; name: string; email?: string; type: 'student' | 'officer' }[]>([]);
   const [attendanceLabel, setAttendanceLabel] = useState('Morning Check-in');
-  const [notifyAttendee, setNotifyAttendee] = useState(false);
+  const [notifyAttendee, setNotifyAttendee] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Tab & non-member states
@@ -630,15 +630,13 @@ const AdminAttendance: React.FC = () => {
   }, [students, attendanceRecords]);
 
   // Tell a member their attendance was recorded (in-app notification + push). Members only: non-members have no account.
+  // The server writes the message and records who scanned and when, from the signed-in officer's own account.
   const sendAttendanceNotice = async (accountId: string, memberName: string) => {
     try {
-      const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-      const dateStr = new Date(selectedEvent?.date_to_held || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       await api.notifications.notifyMember({
         userId: accountId,
-        title: `Attendance recorded: ${activeSessionName}`.slice(0, 100),
-        body: `Hi ${memberName}, you were marked present for ${activeSessionName} on ${dateStr} at ${timeStr}.`.slice(0, 500),
+        kind: 'attendance',
+        meta: { event: activeSessionName, label: attendanceLabel },
       });
       addToast({ type: 'info', title: 'Member Notified', message: `${memberName} was notified.` });
     } catch (err: any) {
@@ -2848,7 +2846,7 @@ const AdminAttendance: React.FC = () => {
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
                     <label htmlFor="notifyAttendeeCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Notify attendee in the app (push alert)
+                      Notify attendee (in-app and push)
                     </label>
                   </div>
 
@@ -2889,7 +2887,7 @@ const AdminAttendance: React.FC = () => {
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
                     <label htmlFor="notifyAttendeeCheckQr" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Notify attendee in the app (push alert)
+                      Notify attendee (in-app and push)
                     </label>
                   </div>
 

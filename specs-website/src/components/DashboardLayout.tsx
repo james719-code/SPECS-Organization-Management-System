@@ -6,6 +6,7 @@ import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_OFFICERS, BUCKET_ID_
 import { ID } from 'appwrite';
 import { useAuth } from '../shared/AuthContext';
 import NotificationBell from './notifications/NotificationBell';
+import PushPermissionBanner from './notifications/PushPermissionBanner';
 
 interface LinkItem {
   to: string;
@@ -300,6 +301,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ title, role, links, t
 
         {/* Page content via Outlet */}
         <div className="flex-1 overflow-y-auto">
+          <PushPermissionBanner />
           {officerDoc && !officerDoc.pictureId && (
             <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl flex items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top duration-200">
               <div className="flex items-center gap-3">

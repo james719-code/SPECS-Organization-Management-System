@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, BellRing, Check, ExternalLink, Loader2 } from 'lucide-react';
 import { cachedApi, api, CacheTags } from '../../shared/api';
-import { account } from '../../shared/appwrite';
 import { dataCache } from '../../shared/cache.js';
-import { disablePush, enablePush, getPushStatus, onForegroundPush, syncPush, type PushStatus } from '../../shared/pushNotifications';
+import { onForegroundPush } from '../../shared/pushNotifications';
+import { usePush } from '../../shared/usePush';
 import { useToast } from '../ui/Toast';
 import type { NotificationDoc } from '../../types/database';
 
@@ -19,8 +19,7 @@ const NotificationBell: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
-  const [pushStatus, setPushStatus] = useState<PushStatus>(() => getPushStatus());
-  const [pushBusy, setPushBusy] = useState(false);
+  const { status: pushStatus, busy: pushBusy, enable: enablePush, disable: disablePush } = usePush();
 
   const load = async () => {
     try { setNotifications(await cachedApi.notifications.listForCurrentUser()); }
@@ -30,41 +29,29 @@ const NotificationBell: React.FC = () => {
 
   useEffect(() => { void load(); }, []);
 
-  // Keep the push token fresh after sign-in (never prompts), and surface pushes that arrive while the site is open.
+  // Surface pushes that arrive while the site is open.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const user = await account.get();
-        if (user?.$id) await syncPush(user.$id);
-      } catch { /* signed out or push unavailable */ }
-      if (!cancelled) setPushStatus(getPushStatus());
-    })();
     const stop = onForegroundPush((message) => {
       addToast({ type: message.priority === 'urgent' ? 'warning' : 'info', title: message.title, message: message.body, duration: 8000 });
       dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
       void load();
     });
-    return () => { cancelled = true; stop(); };
+    return stop;
   }, []);
 
   const togglePush = async () => {
-    setPushBusy(true);
     try {
       if (pushStatus === 'enabled') {
-        setPushStatus(await disablePush());
+        await disablePush();
       } else {
-        const user = await account.get();
-        const status = await enablePush(user.$id);
-        setPushStatus(status);
+        const status = await enablePush();
         if (status === 'enabled') addToast({ type: 'success', title: 'Push enabled', message: 'You will get alerts even when this tab is closed.' });
         if (status === 'blocked') addToast({ type: 'warning', title: 'Notifications blocked', message: 'Allow notifications for this site in your browser settings.' });
       }
     } catch (error: any) {
       console.warn('[NotificationBell] Push toggle failed', error);
       addToast({ type: 'error', title: 'Push notifications', message: error?.message || 'Could not update push notifications.' });
-      setPushStatus(getPushStatus());
-    } finally { setPushBusy(false); }
+    }
   };
 
   const unread = useMemo(() => notifications.filter((notification) => !notification.readAt), [notifications]);

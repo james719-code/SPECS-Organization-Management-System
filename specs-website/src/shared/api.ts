@@ -660,8 +660,15 @@ export const api = {
             dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
             return result;
         },
-        /** One-to-one in-app + push notice to a member's account (officers and admins). */
-        async notifyMember(input: { userId: string; title: string; body: string; link?: string }): Promise<any> {
+        /** One-to-one in-app + push notice to a member's account (officers and admins). Receipt and attendance text is composed by the server. */
+        async notifyMember(input: {
+            userId: string;
+            kind?: 'general' | 'dues' | 'receipt' | 'attendance';
+            title?: string;
+            body?: string;
+            link?: string;
+            meta?: Record<string, string | number>;
+        }): Promise<any> {
             if (!functions) throw new Error('Notification service is unavailable');
             const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action: 'notify_member', payload: input }));
             let result: any = {};

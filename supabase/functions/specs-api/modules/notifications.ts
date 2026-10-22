@@ -1,11 +1,12 @@
 import { assertString } from '../http.ts';
 import { FirestoreRestClient } from '../firebase/firestore.ts';
-import { appConfig } from './officerManagement.ts';
+import { appConfig, refId } from './officerManagement.ts';
 import { sendPush } from './push.ts';
 import type { ActionResult, AuthenticatedUser, JsonMap } from '../types.ts';
 
 type Audience = 'all' | 'students' | 'officers' | 'specific';
 type Priority = 'normal' | 'important' | 'urgent';
+type MemberKind = 'general' | 'dues' | 'receipt' | 'attendance';
 
 const COLLECTIONS: Record<Exclude<Audience, 'specific'>, string> = {
   all: 'notifications_all',
@@ -20,6 +21,8 @@ const cleanText = (value: unknown, field: string, maxLength: number): string => 
   return text;
 };
 
+const shortText = (value: unknown, maxLength: number): string => (typeof value === 'string' ? value.trim().slice(0, maxLength) : '');
+
 function notificationId(): string {
   return crypto.randomUUID();
 }
@@ -33,6 +36,43 @@ async function writeInChunks(store: FirestoreRestClient, collection: string, doc
 
 function pushSuffix(pushed: { sent: number; failed: number }): string {
   return pushed.sent ? ` and pushed to ${pushed.sent} device${pushed.sent === 1 ? '' : 's'}` : '';
+}
+
+const peso = (value: number) => `PHP ${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Display name and title of an account, from its stored snapshots. */
+function describeAccount(account: JsonMap | null, fallbackName: string): { name: string; title: string } {
+  if (!account) return { name: fallbackName, title: '' };
+  const student = (account.studentSnapshot || account.students) as JsonMap | undefined;
+  const officer = account.officerSnapshot as JsonMap | undefined;
+  const admin = (account.adminSnapshot || account.admins) as JsonMap | undefined;
+  const name = [account.displayName, officer?.displayName, student?.name, admin?.fullName, admin?.name, account.username]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0) || fallbackName;
+  let title = '';
+  if (account.type === 'admin') title = 'Administrator';
+  else if (account.type === 'officer') title = typeof officer?.position === 'string' && officer.position ? officer.position : 'Officer';
+  return { name: name.trim(), title };
+}
+
+/** Who is sending, resolved server-side from the caller's own account so it cannot be spoofed. */
+async function senderFor(store: FirestoreRestClient, user: AuthenticatedUser): Promise<{ name: string; title: string }> {
+  const fallback = user.role === 'admin' ? 'Administrator' : 'SPECS Officer';
+  try {
+    return describeAccount(await store.get(appConfig().collections.accounts, user.uid), fallback);
+  } catch {
+    return { name: fallback, title: user.role === 'admin' ? 'Administrator' : '' };
+  }
+}
+
+function cleanMeta(raw: unknown): JsonMap {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const meta: JsonMap = {};
+  for (const [key, value] of Object.entries(raw as JsonMap).slice(0, 12)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,29}$/.test(key)) continue;
+    if (typeof value === 'string') meta[key] = value.trim().slice(0, 200);
+    else if (typeof value === 'number' && Number.isFinite(value)) meta[key] = value;
+  }
+  return meta;
 }
 
 async function publishDirect(store: FirestoreRestClient, base: JsonMap, userIds: string[]): Promise<ActionResult> {
@@ -67,17 +107,21 @@ export async function publishNotification(user: AuthenticatedUser, payload: Json
   const expiresAt = typeof payload.expiresAt === 'string' && payload.expiresAt.trim() ? payload.expiresAt.trim() : null;
   if (expiresAt && Number.isNaN(Date.parse(expiresAt))) throw new Error('expiresAt must be an ISO date');
 
+  const store = new FirestoreRestClient();
+  const sender = await senderFor(store, user);
   const base: JsonMap = {
     title,
     body,
     audience,
     priority,
     link,
+    kind: 'announcement',
     createdAt: new Date().toISOString(),
     expiresAt,
     createdByUid: user.uid,
+    senderName: sender.name,
+    senderTitle: sender.title,
   };
-  const store = new FirestoreRestClient();
 
   if (audience !== 'specific') {
     await store.set(COLLECTIONS[audience], notificationId(), base);
@@ -92,17 +136,76 @@ export async function publishNotification(user: AuthenticatedUser, payload: Json
   return publishDirect(store, base, userIds);
 }
 
+/** Payment receipt notice. Every figure comes from the stored payment record, not from the caller. */
+async function receiptDetails(store: FirestoreRestClient, recipientUid: string, account: JsonMap, payload: JsonMap, sender: { name: string }) {
+  const paymentId = assertString((cleanMeta(payload.meta) as JsonMap).paymentId, 'meta.paymentId');
+  const payment = await store.get(Deno.env.get('COLLECTION_ID_PAYMENTS') || 'payments', paymentId);
+  if (payment.is_paid !== true) throw new Error('This payment is not marked as paid');
+
+  const accountIds = [refId(account.students), refId(account.studentId), refId((account.studentSnapshot as JsonMap | undefined)?.id), recipientUid].filter(Boolean);
+  const paymentStudent = refId(payment.students) || refId(payment.studentId) || refId((payment.studentSnapshot as JsonMap | undefined)?.id);
+  if (paymentStudent && !accountIds.includes(paymentStudent)) throw new Error('This payment does not belong to the recipient');
+
+  const quantity = Math.max(1, Number(payment.quantity) || 1);
+  const unit = Number(payment.price) || 0;
+  const total = unit * quantity;
+  const item = shortText(payment.item_name, 120) || 'Payment';
+  const receiptNo = paymentId.slice(-8).toUpperCase();
+  const verifiedBy = shortText(payment.verified_by_name, 120) || sender.name;
+  const paidAt = typeof payment.date_paid === 'string' && !Number.isNaN(Date.parse(payment.date_paid)) && Date.parse(payment.date_paid) > 0
+    ? payment.date_paid : new Date().toISOString();
+  return {
+    title: `Payment received: ${item}`.slice(0, 100),
+    body: `We received your payment of ${peso(total)} for ${item}${quantity > 1 ? ` (x${quantity})` : ''}. Receipt no. ${receiptNo}. Verified by ${verifiedBy}.`,
+    meta: {
+      paymentId, receiptNo, item, quantity, amount: unit, total, paidAt, verifiedBy,
+      method: shortText(payment.modal_paid, 40) || 'Collected by staff',
+      activity: shortText(payment.activity, 120),
+    } as JsonMap,
+  };
+}
+
 /**
- * One-to-one notice to a single member, e.g. "attendance recorded" or a dues reminder.
- * Officers may send these (they record attendance and payments), but the shape is
- * deliberately narrow: one recipient, normal priority, short text, internal links only.
+ * One-to-one notice to a single member: payment receipts, attendance confirmations and dues reminders.
+ * Officers may send these (they record attendance and payments), but the shape is deliberately narrow:
+ * one recipient, normal priority, short text, in-app links only. Receipt and attendance text and figures
+ * are composed here; the sender is always the authenticated caller.
  */
 export async function notifyMember(user: AuthenticatedUser, payload: JsonMap): Promise<ActionResult> {
   if (user.role !== 'admin' && user.role !== 'officer') throw new Error('Only officers and administrators can notify members');
   const recipient = assertString(payload.userId, 'userId');
-  const title = cleanText(payload.title, 'title', 100);
-  const body = cleanText(payload.body, 'body', 500);
-  const link = typeof payload.link === 'string' && payload.link.trim() ? payload.link.trim().slice(0, 200) : null;
+  const kind = (typeof payload.kind === 'string' ? payload.kind : 'general') as MemberKind;
+  if (!['general', 'dues', 'receipt', 'attendance'].includes(kind)) throw new Error('Invalid notification kind');
+
+  const store = new FirestoreRestClient();
+  const account = await store.get(appConfig().collections.accounts, recipient);
+  const sender = await senderFor(store, user);
+  const recipientName = describeAccount(account, 'Member').name;
+  const ownPage = `/dashboard/${typeof account.type === 'string' && account.type ? account.type : 'student'}/announcements`;
+
+  let title: string;
+  let body: string;
+  let meta: JsonMap = {};
+  let link: string | null = typeof payload.link === 'string' && payload.link.trim() ? payload.link.trim().slice(0, 200) : null;
+
+  if (kind === 'receipt') {
+    const details = await receiptDetails(store, recipient, account, payload, sender);
+    ({ title, body } = details);
+    meta = { ...details.meta, studentName: recipientName };
+    link = ownPage;
+  } else if (kind === 'attendance') {
+    const input = cleanMeta(payload.meta);
+    const event = shortText(input.event, 120) || 'an event';
+    const label = shortText(input.label, 80);
+    title = `Attendance recorded: ${event}`.slice(0, 100);
+    body = `You were marked present for ${event}${label && label !== event ? ` (${label})` : ''}. Recorded by ${sender.name}.`;
+    meta = { event, label, status: 'Present', recordedBy: sender.name, studentName: recipientName };
+    link = ownPage;
+  } else {
+    title = cleanText(payload.title, 'title', 100);
+    body = cleanText(payload.body, 'body', 500);
+    meta = cleanMeta(payload.meta);
+  }
   if (link && (!link.startsWith('/') || link.startsWith('//'))) throw new Error('Invalid link: only in-app paths are allowed');
 
   const base: JsonMap = {
@@ -111,9 +214,13 @@ export async function notifyMember(user: AuthenticatedUser, payload: JsonMap): P
     audience: 'specific',
     priority: 'normal',
     link,
+    kind,
+    meta,
     createdAt: new Date().toISOString(),
     expiresAt: null,
     createdByUid: user.uid,
+    senderName: sender.name,
+    senderTitle: sender.title,
   };
-  return publishDirect(new FirestoreRestClient(), base, [recipient]);
+  return publishDirect(store, base, [recipient]);
 }

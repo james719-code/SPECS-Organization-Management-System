@@ -394,6 +394,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     const payment = paidConfirm.payment;
     const studentProfile = selectedStudent?.students as any;
     const sName = studentProfile?.name || selectedStudent?.username || 'Student';
+    const studentAccountId = selectedStudent?.$id || '';
 
     const officerId = currentUserProfile && currentUserProfile.type === 'officer'
       ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
@@ -423,7 +424,15 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       try {
         await api.payments.markPaid(payment, recorderId, sName, modalPaid, officerId, verifierName);
         addToast({ type: 'success', title: 'Paid', message: `Outstanding due marked as paid via ${modalPaid.toUpperCase()}.` });
-        
+
+        // Send the student their receipt as a notification they can print. The server builds it from the stored payment.
+        try {
+          await api.notifications.notifyMember({ userId: studentAccountId, kind: 'receipt', meta: { paymentId: payment.$id } });
+        } catch (notifyErr: any) {
+          console.error('[AdminPayments] Failed to send receipt notification:', notifyErr);
+          addToast({ type: 'warning', title: 'Receipt Not Sent', message: `${sName} was marked as paid, but the receipt notification could not be sent.` });
+        }
+
         loadData(true);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to process payment.' });

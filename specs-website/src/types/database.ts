@@ -23,6 +23,12 @@ export interface NotificationDoc extends ModelsDocument {
   createdByUid: string;
   recipientUid?: string | null;
   readAt?: string | null;
+  /** announcement | general | dues | receipt | attendance. Older documents have none. */
+  kind?: string | null;
+  /** Structured details for receipt and attendance notices. */
+  meta?: Record<string, any> | null;
+  senderName?: string | null;
+  senderTitle?: string | null;
 }
 
 export interface StudentSnapshot {

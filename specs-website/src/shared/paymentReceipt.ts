@@ -1,30 +1,83 @@
 import type { PaymentDoc } from '../types/database';
 import { formatCurrency } from './formatters';
 
-const displayDate = (value: unknown): string => {
+/** Everything a receipt shows. Built from a payment record or from a receipt notification. */
+export interface ReceiptData {
+  receiptNo: string;
+  transactionId: string;
+  studentName: string;
+  item: string;
+  quantity: number;
+  amount: number;
+  total: number;
+  paidAt: string;
+  method: string;
+  verifiedBy: string;
+}
+
+const displayDateTime = (value: unknown): string => {
   const date = new Date(String(value || ''));
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
 const safeFilenamePart = (value: string): string => value.replace(/[^a-z0-9_-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'payment';
 
-export async function downloadPaymentReceipt(payment: PaymentDoc, studentName: string): Promise<void> {
-  if (!payment.is_paid) throw new Error('Only paid payments have receipts');
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
+
+export function receiptFromPayment(payment: PaymentDoc, studentName: string): ReceiptData {
+  const paidAt = payment.date_paid && payment.date_paid !== new Date(0).toISOString() ? payment.date_paid : payment.$createdAt;
+  const quantity = Number(payment.quantity || 1);
+  const amount = Number(payment.price || 0);
+  return {
+    receiptNo: payment.$id.slice(-8).toUpperCase(),
+    transactionId: payment.$id,
+    studentName: studentName || 'Student',
+    item: payment.item_name || 'Payment',
+    quantity,
+    amount,
+    total: amount * quantity,
+    paidAt,
+    method: payment.modal_paid || 'Collected by staff',
+    verifiedBy: payment.verified_by_name || '—',
+  };
+}
+
+/** Receipt details stored on a "receipt" notification (written by the Edge Function from the payment record). */
+export function receiptFromNotification(meta: Record<string, any>, senderName?: string | null): ReceiptData {
+  return {
+    receiptNo: String(meta.receiptNo || ''),
+    transactionId: String(meta.paymentId || ''),
+    studentName: String(meta.studentName || 'Student'),
+    item: String(meta.item || 'Payment'),
+    quantity: Number(meta.quantity || 1),
+    amount: Number(meta.amount || 0),
+    total: Number(meta.total || 0),
+    paidAt: String(meta.paidAt || ''),
+    method: String(meta.method || 'Collected by staff'),
+    verifiedBy: String(meta.verifiedBy || senderName || '—'),
+  };
+}
+
+const receiptRows = (receipt: ReceiptData): Array<[string, string]> => [
+  ['Receipt no.', receipt.receiptNo || '—'],
+  ['Student', receipt.studentName],
+  ['Payment item', receipt.item],
+  ['Quantity', String(receipt.quantity)],
+  ['Amount', formatCurrency(receipt.amount)],
+  ['Total', formatCurrency(receipt.total)],
+  ['Payment date', displayDateTime(receipt.paidAt)],
+  ['Payment method', receipt.method],
+  ['Verified by', receipt.verifiedBy],
+  ['Transaction ID', receipt.transactionId],
+  ['Status', 'PAID'],
+];
+
+export async function downloadReceiptPdf(receipt: ReceiptData): Promise<void> {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const total = Number(payment.price || 0) * Number(payment.quantity || 1);
-  const paidDate = payment.date_paid && payment.date_paid !== new Date(0).toISOString() ? payment.date_paid : payment.$createdAt;
-  const rows = [
-    ['Student', studentName || 'Student'],
-    ['Payment item', payment.item_name || 'Payment'],
-    ['Quantity', String(payment.quantity || 1)],
-    ['Amount', formatCurrency(Number(payment.price || 0))],
-    ['Total', formatCurrency(total)],
-    ['Payment date', displayDate(paidDate)],
-    ['Payment method', payment.modal_paid || 'Collected by Staff'],
-    ['Transaction ID', payment.$id],
-    ['Status', 'PAID'],
-  ];
 
   pdf.setTextColor(13, 107, 102);
   pdf.setFontSize(18);
@@ -38,7 +91,7 @@ export async function downloadPaymentReceipt(payment: PaymentDoc, studentName: s
 
   let y = 53;
   pdf.setFontSize(10);
-  for (const [label, value] of rows) {
+  for (const [label, value] of receiptRows(receipt)) {
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(100, 116, 139);
     pdf.text(label, 20, y);
@@ -54,5 +107,49 @@ export async function downloadPaymentReceipt(payment: PaymentDoc, studentName: s
   pdf.setFontSize(9);
   pdf.setTextColor(100, 116, 139);
   pdf.text('Keep this receipt for your records. Generated from the SPECS payment ledger.', 20, y + 14);
-  pdf.save(`specs-receipt-${safeFilenamePart(payment.$id)}.pdf`);
+  pdf.save(`specs-receipt-${safeFilenamePart(receipt.transactionId || receipt.receiptNo)}.pdf`);
+}
+
+/** Print one receipt through the browser's print dialog, using a hidden frame so no popup is needed. */
+export function printReceipt(receipt: ReceiptData): void {
+  const rows = receiptRows(receipt)
+    .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+    .join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(receipt.receiptNo)}</title>
+<style>
+  @page { size: A5; margin: 14mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; }
+  h1 { color: #0d6b66; font-size: 20px; margin: 0; }
+  h2 { font-size: 14px; margin: 4px 0 14px; font-weight: 600; }
+  .rule { border-top: 1px solid #e2e8f0; margin: 12px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: #64748b; font-weight: 700; padding: 6px 12px 6px 0; width: 34%; vertical-align: top; }
+  td { padding: 6px 0; word-break: break-word; }
+  .paid { display: inline-block; border: 2px solid #059669; color: #059669; padding: 2px 10px; font-weight: 800; letter-spacing: 2px; }
+  .foot { color: #64748b; font-size: 10px; margin-top: 14px; }
+</style></head><body>
+  <h1>SPECS Organization</h1><h2>Official Payment Receipt</h2><div class="rule"></div>
+  <table>${rows}</table><div class="rule"></div>
+  <span class="paid">PAID</span>
+  <p class="foot">Keep this receipt for your records. Generated from the SPECS payment ledger.</p>
+</body></html>`;
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(frame);
+  const cleanup = () => setTimeout(() => frame.remove(), 1000);
+  frame.onload = () => {
+    const win = frame.contentWindow;
+    if (!win) return cleanup();
+    win.onafterprint = cleanup;
+    win.focus();
+    win.print();
+  };
+  frame.srcdoc = html;
+}
+
+export async function downloadPaymentReceipt(payment: PaymentDoc, studentName: string): Promise<void> {
+  if (!payment.is_paid) throw new Error('Only paid payments have receipts');
+  await downloadReceiptPdf(receiptFromPayment(payment, studentName));
 }

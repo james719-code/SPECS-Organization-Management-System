@@ -23,7 +23,7 @@ export function appConfig(): AppConfig {
   };
 }
 
-function refId(value: unknown): string | undefined {
+export function refId(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (!value || typeof value !== 'object') return undefined;
   const object = value as JsonMap;

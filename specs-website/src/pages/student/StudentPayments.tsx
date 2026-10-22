@@ -4,11 +4,11 @@ import { formatCurrency } from '../../shared/formatters';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Printer } from 'lucide-react';
 import { account, databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
 import type { PaymentDoc } from '../../types/database';
-import { downloadPaymentReceipt } from '../../shared/paymentReceipt';
+import { downloadPaymentReceipt, printReceipt, receiptFromPayment } from '../../shared/paymentReceipt';
 
 const StudentPayments: React.FC = () => {
   const [payments, setPayments] = useState<PaymentDoc[]>([]);
@@ -41,6 +41,14 @@ const StudentPayments: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to load transaction history.' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePrintReceipt = (payment: PaymentDoc) => {
+    try {
+      printReceipt(receiptFromPayment(payment, studentName));
+    } catch (error: any) {
+      addToast({ type: 'error', title: 'Receipt Failed', message: error?.message || 'Unable to print the receipt.' });
     }
   };
 
@@ -129,7 +137,7 @@ const StudentPayments: React.FC = () => {
                           {payment.is_paid ? (payment.modal_paid || 'Collected by Staff') : '-'}
                         </td>
                         <td className="px-6 py-3.5 text-right">
-                          {payment.is_paid && <button type="button" onClick={() => void handleDownloadReceipt(payment)} disabled={downloadingId === payment.$id} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-2.5 py-1.5 text-xs font-semibold text-[#0d6b66] hover:bg-teal-50 disabled:opacity-50"><Download className="h-3.5 w-3.5" />{downloadingId === payment.$id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Download Receipt'}</button>}
+                          {payment.is_paid && <button type="button" onClick={() => handlePrintReceipt(payment)} className="mr-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Printer className="h-3.5 w-3.5" />Print</button>}{payment.is_paid && <button type="button" onClick={() => void handleDownloadReceipt(payment)} disabled={downloadingId === payment.$id} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-2.5 py-1.5 text-xs font-semibold text-[#0d6b66] hover:bg-teal-50 disabled:opacity-50"><Download className="h-3.5 w-3.5" />{downloadingId === payment.$id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Download Receipt'}</button>}
                         </td>
                       </tr>
                     );
@@ -189,6 +197,7 @@ const StudentPayments: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  {payment.is_paid && <button type="button" onClick={() => handlePrintReceipt(payment)} className="mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Printer className="h-3.5 w-3.5" />Print Receipt</button>}
                   {payment.is_paid && <button type="button" onClick={() => void handleDownloadReceipt(payment)} disabled={downloadingId === payment.$id} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-[#0d6b66] hover:bg-teal-50 disabled:opacity-50"><Download className="h-3.5 w-3.5" />{downloadingId === payment.$id ? 'Generating…' : 'Download Receipt'}</button>}
                 </div>
               );
