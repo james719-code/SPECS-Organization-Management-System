@@ -221,8 +221,19 @@ const AdminStudents: React.FC = () => {
   const fetchStudents = async (isRefresh = false) => {
     try {
       if (!isRefresh) setLoading(true);
-      const res = await cachedApi.students.listAllProfiles({ orderDesc: '$createdAt' }, isRefresh ? 0 : 2 * 60 * 1000);
-      setStudents(res.documents);
+      const ttl = isRefresh ? 0 : 2 * 60 * 1000;
+      const [res, accountsRes] = await Promise.all([
+        cachedApi.students.listAllProfiles({ orderDesc: '$createdAt' }, ttl),
+        cachedApi.users.listAllAccounts({}, ttl)
+      ]);
+      // Students whose account has not been accepted yet stay out of the directory.
+      const pendingStudentIds = new Set<string>();
+      accountsRes.documents.forEach((account: AccountDoc) => {
+        if (account.verified || account.type === 'admin') return;
+        const linkedId = relationId(account.students) || (account as any).studentId;
+        if (linkedId) pendingStudentIds.add(String(linkedId));
+      });
+      setStudents(res.documents.filter(student => !pendingStudentIds.has(student.$id)));
     } catch (err: any) {
       addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to load students' });
     } finally {
