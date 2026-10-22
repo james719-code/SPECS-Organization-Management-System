@@ -287,7 +287,7 @@ async function assignToOfficer(store: FirestoreRestClient, config: AppConfig, pa
   const studentId = assertString(payload.student_id, 'student_id');
   const student = await store.get(config.collections.students, studentId);
   const account = await accountForStudent(store, config, studentId);
-  const officerId = account?.$id || crypto.randomUUID();
+  const officerId = refId(account) || crypto.randomUUID();
   const studentProjection = studentSnapshot(student);
   const officerProjection = officerSnapshot(officerId, payload.position, student);
   await store.set(config.collections.officers, officerId, {
