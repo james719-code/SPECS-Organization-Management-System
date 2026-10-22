@@ -55,6 +55,8 @@ const NotificationBell: React.FC = () => {
   };
 
   const unread = useMemo(() => notifications.filter((notification) => !notification.readAt), [notifications]);
+  // The bell only lists what still needs attention; read items stay on the Announcements page.
+  const unreadList = unread;
 
   const markRead = async (notification: NotificationDoc) => {
     if (notification.readAt) return;
@@ -116,9 +118,9 @@ const NotificationBell: React.FC = () => {
           <div className="max-h-[min(65vh,28rem)] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-4 py-10 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading notifications…</div>
-            ) : notifications.length === 0 ? (
-              <div className="px-4 py-10 text-center text-xs text-slate-400">No notifications yet.</div>
-            ) : notifications.map((notification) => (
+            ) : unreadList.length === 0 ? (
+              <div className="px-4 py-10 text-center text-xs text-slate-400">{notifications.length ? 'You are all caught up. Read notifications are on the Announcements page.' : 'No notifications yet.'}</div>
+            ) : unreadList.map((notification) => (
               <button
                 type="button"
                 key={notification.$id}

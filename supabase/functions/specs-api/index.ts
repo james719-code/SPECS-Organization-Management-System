@@ -2,7 +2,7 @@ import { errorStatus, asPayload, corsHeaders, jsonResponse } from './http.ts';
 import { requireFirebaseUser } from './auth/firebaseToken.ts';
 import { executeOfficerAction, resolveRole } from './modules/officerManagement.ts';
 import { publicAsset, storageAction } from './modules/storage.ts';
-import { notifyMember, publishNotification } from './modules/notifications.ts';
+import { dismissNotifications, notifyMember, publishNotification } from './modules/notifications.ts';
 import { registerPushToken, unregisterPushToken } from './modules/push.ts';
 import type { JsonMap } from './types.ts';
 
@@ -39,5 +39,6 @@ Deno.serve(async (request) => {
   }
 });
   if (action === 'notify_member') return jsonResponse(await notifyMember(user, payload));
+  if (action === 'dismiss_notifications') return jsonResponse(await dismissNotifications(user, payload));
   if (action === 'register_push_token') return jsonResponse(await registerPushToken(user, payload));
   if (action === 'unregister_push_token') return jsonResponse(await unregisterPushToken(user, payload));

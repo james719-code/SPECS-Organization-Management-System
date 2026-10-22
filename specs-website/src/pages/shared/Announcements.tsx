@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarCheck, Check, Download, ExternalLink, Loader2, Megaphone, Printer, Receipt, Wallet } from 'lucide-react';
+import { CalendarCheck, Check, Download, ExternalLink, Loader2, Megaphone, Printer, Receipt, Trash2, Wallet } from 'lucide-react';
 import { cachedApi, api, CacheTags } from '../../shared/api';
 import { dataCache } from '../../shared/cache.js';
 import { formatCurrency, formatRelativeTime } from '../../shared/formatters';
 import { downloadReceiptPdf, printReceipt, receiptFromNotification } from '../../shared/paymentReceipt';
 import EmptyState from '../../components/ui/EmptyState';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useToast } from '../../components/ui/Toast';
 import type { NotificationDoc } from '../../types/database';
 
@@ -72,6 +73,8 @@ const Announcements: React.FC = () => {
   const [filter, setFilter] = useState<Filter>('all');
   const [marking, setMarking] = useState(false);
   const [busyReceipt, setBusyReceipt] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
@@ -133,6 +136,27 @@ const Announcements: React.FC = () => {
     }
   };
 
+  // Remove from the list right away, then delete on the server; reload if that fails.
+  const deleteItems = async (targets: NotificationDoc[]) => {
+    if (!targets.length) return;
+    const ids = targets.map(item => item.$id);
+    const previous = items;
+    setItems(current => current.filter(item => !ids.includes(item.$id)));
+    setDeleting(true);
+    try {
+      for (let index = 0; index < ids.length; index += 100) await api.notifications.dismiss(ids.slice(index, index + 100));
+      addToast({ type: 'success', title: 'Deleted', message: ids.length === 1 ? 'Notification deleted.' : `${ids.length} notifications deleted.` });
+    } catch (err: any) {
+      setItems(previous);
+      addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Could not delete the notification.' });
+    } finally {
+      setDeleting(false);
+      setConfirmClear(false);
+    }
+  };
+
+  const readItems = useMemo(() => items.filter(item => item.readAt), [items]);
+
   const onPrint = (item: NotificationDoc) => {
     void markRead(item);
     printReceipt(receiptFromNotification(item.meta || {}, item.senderName));
@@ -156,7 +180,7 @@ const Announcements: React.FC = () => {
     if (kind === 'receipt') {
       return (
         <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/10">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
             <Field label="Receipt no." value={meta.receiptNo} />
             <Field label="Item" value={`${meta.item || 'Payment'}${Number(meta.quantity) > 1 ? ` x${meta.quantity}` : ''}`} />
             <Field label="Total paid" value={formatCurrency(Number(meta.total || 0))} />
@@ -180,7 +204,7 @@ const Announcements: React.FC = () => {
     if (kind === 'attendance') {
       return (
         <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-4 dark:border-sky-900/40 dark:bg-sky-950/10">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
             <Field label="Event / session" value={meta.event} />
             <Field label="Attendance label" value={meta.label} />
             <Field label="Status" value={<span className="text-sky-600 dark:text-sky-400">{meta.status || 'Present'}</span>} />
@@ -194,20 +218,30 @@ const Announcements: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Announcements</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Announcements, payment receipts and attendance confirmations, newest first.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Announcements, payment receipts and attendance confirmations, newest first.</p>
         </div>
-        <button
-          type="button"
-          onClick={markAllRead}
-          disabled={!unreadCount || marking}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#0d6b66] transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-slate-800"
-        >
-          {marking ? 'Marking…' : `Mark all read${unreadCount ? ` (${unreadCount})` : ''}`}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={markAllRead}
+            disabled={!unreadCount || marking}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#0d6b66] transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-slate-800"
+          >
+            {marking ? 'Marking…' : `Mark all read${unreadCount ? ` (${unreadCount})` : ''}`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmClear(true)}
+            disabled={!readItems.length || deleting}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/20"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete read{readItems.length ? ` (${readItems.length})` : ''}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter announcements">
@@ -244,7 +278,7 @@ const Announcements: React.FC = () => {
           {groups.map(group => (
             <section key={group.key} className="space-y-3">
               <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{group.key}</h2>
-              <ul className="space-y-3">
+              <ul className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
                 {group.entries.map(item => {
                   const kind = kindOf(item);
                   const style = KIND_STYLE[kind];
@@ -255,7 +289,7 @@ const Announcements: React.FC = () => {
                     <li
                       key={item.$id}
                       onClick={() => void markRead(item)}
-                      className={`relative overflow-hidden rounded-2xl border p-5 pl-6 shadow-xs transition-colors ${unread
+                      className={`relative overflow-hidden rounded-xl border p-5 pl-6 shadow-xs transition-colors ${unread
                         ? 'cursor-pointer border-teal-200 bg-white dark:border-teal-900 dark:bg-slate-900'
                         : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}
                     >
@@ -293,7 +327,19 @@ const Announcements: React.FC = () => {
                             </a>
                           )}
                         </div>
-                        {item.readAt && <Check className="h-4 w-4 shrink-0 text-emerald-500" aria-label="Read" />}
+                        <div className="flex shrink-0 flex-col items-center gap-2">
+                          {item.readAt && <Check className="h-4 w-4 text-emerald-500" aria-label="Read" />}
+                          <button
+                            type="button"
+                            onClick={(event) => { event.stopPropagation(); void deleteItems([item]); }}
+                            disabled={deleting}
+                            aria-label="Delete notification"
+                            title="Delete"
+                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-950/30 dark:hover:text-rose-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );
@@ -303,6 +349,16 @@ const Announcements: React.FC = () => {
           ))}
         </div>
       )}
+      <ConfirmModal
+        isOpen={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={() => void deleteItems(readItems)}
+        title="Delete read notifications?"
+        message={`This permanently removes ${readItems.length} read notification${readItems.length === 1 ? '' : 's'} from your list. Unread ones are kept.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 };

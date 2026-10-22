@@ -224,3 +224,55 @@ export async function notifyMember(user: AuthenticatedUser, payload: JsonMap): P
   };
   return publishDirect(store, base, [recipient]);
 }
+
+/**
+ * Delete notifications from the signed-in user's own view.
+ * - Direct notices (addressed only to this user) are removed for good.
+ * - Shared ones (everyone / students / officers) cannot be deleted for others, so they are hidden for this user
+ *   by stamping deletedAt on that user's read-state document.
+ * Runs through the service account because clients may not write these collections.
+ */
+export async function dismissNotifications(user: AuthenticatedUser, payload: JsonMap): Promise<ActionResult> {
+  const ids = payload.ids;
+  if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids is required');
+  const unique = [...new Set(ids.filter((value): value is string => typeof value === 'string' && value.trim().length > 0 && value.length < 200).map((value) => value.trim()))];
+  if (unique.length > 100) throw new Error('You can delete up to 100 notifications at a time');
+
+  const store = new FirestoreRestClient();
+  const sharedCollections = ['notifications_all', user.role === 'student' ? 'notifications_students' : 'notifications_officers'];
+  const now = new Date().toISOString();
+  let removed = 0;
+
+  const dismissOne = async (id: string) => {
+    const readId = `${user.uid}__${id}`;
+    if (id.startsWith(`${user.uid}__`)) {
+      try {
+        const direct = await store.get('notifications_direct', id);
+        if (direct.recipientUid === user.uid) {
+          await store.delete('notifications_direct', id);
+          await store.delete('notification_reads', readId).catch(() => {});
+          removed += 1;
+        }
+      } catch (error) {
+        if (!String(error).includes('404')) throw error;
+      }
+      return;
+    }
+    for (const collection of sharedCollections) {
+      try {
+        await store.get(collection, id);
+      } catch (error) {
+        if (String(error).includes('404')) continue;
+        throw error;
+      }
+      await store.update('notification_reads', readId, { userUid: user.uid, notificationId: id, deletedAt: now });
+      removed += 1;
+      return;
+    }
+  };
+
+  for (let index = 0; index < unique.length; index += 10) {
+    await Promise.all(unique.slice(index, index + 10).map(dismissOne));
+  }
+  return { success: true, message: `Deleted ${removed} notification${removed === 1 ? '' : 's'}`, removed };
+}

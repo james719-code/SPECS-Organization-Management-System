@@ -619,8 +619,11 @@ export const api = {
                 databases.listDocuments(DATABASE_ID, COLLECTION_ID_NOTIFICATION_READS, [Query.equal('userUid', user.$id), Query.limit(200)])
             ]);
             const readById = new Map<string, string | null>((reads.documents || []).map((read: any) => [String(read.notificationId), read.readAt || null]));
+            // Notifications the user deleted are hidden through a deletedAt stamp on their read-state document.
+            const deletedIds = new Set<string>((reads.documents || []).filter((read: any) => read.deletedAt).map((read: any) => String(read.notificationId)));
             const now = Date.now();
             const merged = [...(all.documents || []), ...(role.documents || []), ...(direct.documents || [])]
+                .filter((document: any) => !deletedIds.has(document.$id))
                 .map((document: any) => ({ ...document, readAt: readById.get(document.$id) || null }))
                 .filter((document: any) => !document.expiresAt || Date.parse(String(document.expiresAt)) > now)
                 .filter((document: any, index: number, list: any[]) => list.findIndex((item) => item.$id === document.$id) === index)
@@ -657,6 +660,16 @@ export const api = {
             let result: any = {};
             try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* handled below */ }
             if (execution?.status === 'failed' || result.success === false) throw new Error(result.error || 'Failed to publish notification');
+            dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
+            return result;
+        },
+        /** Delete notifications from the current user's own list (direct ones are removed, shared ones are hidden for them). */
+        async dismiss(ids: string[]): Promise<any> {
+            if (!functions) throw new Error('Notification service is unavailable');
+            const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action: 'dismiss_notifications', payload: { ids } }));
+            let result: any = {};
+            try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* handled below */ }
+            if (execution?.status === 'failed' || result.success === false) throw new Error(result.error || 'Failed to delete notifications');
             dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
             return result;
         },
