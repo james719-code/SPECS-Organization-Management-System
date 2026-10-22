@@ -1,9 +1,9 @@
 import { errorStatus, asPayload, corsHeaders, jsonResponse } from './http.ts';
 import { requireFirebaseUser } from './auth/firebaseToken.ts';
-import { emailAction } from './modules/email.ts';
 import { executeOfficerAction, resolveRole } from './modules/officerManagement.ts';
 import { publicAsset, storageAction } from './modules/storage.ts';
-import { publishNotification } from './modules/notifications.ts';
+import { notifyMember, publishNotification } from './modules/notifications.ts';
+import { registerPushToken, unregisterPushToken } from './modules/push.ts';
 import type { JsonMap } from './types.ts';
 
 async function route(request: Request): Promise<Response> {
@@ -20,7 +20,6 @@ async function route(request: Request): Promise<Response> {
   const payload = asPayload(body);
 
   if (action === 'storage') return jsonResponse(await storageAction(user, { ...payload, action: payload.action || 'download' }));
-  if (action === 'send_email' || action === 'send_announcement') return jsonResponse(await emailAction(user, { ...body, payload }));
   if (action === 'publish_notification') return jsonResponse(await publishNotification(user, payload));
   if (action === 'admin') {
     const nestedAction = typeof payload.action === 'string' ? payload.action : '';
@@ -39,3 +38,6 @@ Deno.serve(async (request) => {
     return jsonResponse({ success: false, error: message }, errorStatus(error));
   }
 });
+  if (action === 'notify_member') return jsonResponse(await notifyMember(user, payload));
+  if (action === 'register_push_token') return jsonResponse(await registerPushToken(user, payload));
+  if (action === 'unregister_push_token') return jsonResponse(await unregisterPushToken(user, payload));

@@ -34,6 +34,12 @@ async function initFirebase(config: any) {
     return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };
 }
 
+/** Return the shared Firebase app (used by Cloud Messaging for web push). */
+export async function getFirebaseApp(config: any): Promise<any> {
+    const { app } = await initFirebase(config);
+    return app;
+}
+
 /** Return the shared Firebase Auth instance for function/storage requests. */
 export async function getFirebaseIdToken(config: any): Promise<string | null> {
     const { auth } = await initFirebase(config);

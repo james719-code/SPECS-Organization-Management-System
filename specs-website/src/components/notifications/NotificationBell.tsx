@@ -1,13 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, Check, ExternalLink, Loader2 } from 'lucide-react';
-import { cachedApi, api } from '../../shared/api';
+import { Bell, BellRing, Check, ExternalLink, Loader2 } from 'lucide-react';
+import { cachedApi, api, CacheTags } from '../../shared/api';
+import { account } from '../../shared/appwrite';
+import { dataCache } from '../../shared/cache.js';
+import { disablePush, enablePush, getPushStatus, onForegroundPush, syncPush, type PushStatus } from '../../shared/pushNotifications';
+import { useToast } from '../ui/Toast';
 import type { NotificationDoc } from '../../types/database';
 
 const NotificationBell: React.FC = () => {
+  const { addToast } = useToast();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
+  const [pushStatus, setPushStatus] = useState<PushStatus>(() => getPushStatus());
+  const [pushBusy, setPushBusy] = useState(false);
 
   const load = async () => {
     try { setNotifications(await cachedApi.notifications.listForCurrentUser()); }
@@ -16,6 +23,43 @@ const NotificationBell: React.FC = () => {
   };
 
   useEffect(() => { void load(); }, []);
+
+  // Keep the push token fresh after sign-in (never prompts), and surface pushes that arrive while the site is open.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await account.get();
+        if (user?.$id) await syncPush(user.$id);
+      } catch { /* signed out or push unavailable */ }
+      if (!cancelled) setPushStatus(getPushStatus());
+    })();
+    const stop = onForegroundPush((message) => {
+      addToast({ type: message.priority === 'urgent' ? 'warning' : 'info', title: message.title, message: message.body, duration: 8000 });
+      dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
+      void load();
+    });
+    return () => { cancelled = true; stop(); };
+  }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (pushStatus === 'enabled') {
+        setPushStatus(await disablePush());
+      } else {
+        const user = await account.get();
+        const status = await enablePush(user.$id);
+        setPushStatus(status);
+        if (status === 'enabled') addToast({ type: 'success', title: 'Push enabled', message: 'You will get alerts even when this tab is closed.' });
+        if (status === 'blocked') addToast({ type: 'warning', title: 'Notifications blocked', message: 'Allow notifications for this site in your browser settings.' });
+      }
+    } catch (error: any) {
+      console.warn('[NotificationBell] Push toggle failed', error);
+      addToast({ type: 'error', title: 'Push notifications', message: error?.message || 'Could not update push notifications.' });
+      setPushStatus(getPushStatus());
+    } finally { setPushBusy(false); }
+  };
 
   const unread = useMemo(() => notifications.filter((notification) => !notification.readAt), [notifications]);
 
@@ -61,6 +105,21 @@ const NotificationBell: React.FC = () => {
               {marking ? 'Marking…' : 'Mark all read'}
             </button>
           </div>
+          {pushStatus !== 'unavailable' && (
+            <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/40">
+              <BellRing className="h-4 w-4 shrink-0 text-[#0d6b66] dark:text-teal-400" />
+              <p className="min-w-0 flex-1 text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                {pushStatus === 'enabled' && 'Push alerts are on for this device.'}
+                {pushStatus === 'blocked' && 'Notifications are blocked. Allow them for this site in your browser settings.'}
+                {(pushStatus === 'prompt' || pushStatus === 'off') && 'Get alerts on this device even when the tab is closed.'}
+              </p>
+              {pushStatus !== 'blocked' && (
+                <button type="button" onClick={togglePush} disabled={pushBusy} className="shrink-0 rounded-lg bg-[#0d6b66] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50 dark:bg-teal-600">
+                  {pushBusy ? '…' : pushStatus === 'enabled' ? 'Turn off' : 'Enable'}
+                </button>
+              )}
+            </div>
+          )}
           <div className="max-h-[min(65vh,28rem)] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-4 py-10 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading notifications…</div>

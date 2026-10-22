@@ -10,11 +10,10 @@ import Pagination from '../../components/ui/Pagination';
 import { SkeletonCard } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, PaymentDoc, AccountDoc, OfficerDoc, StudentDoc } from '../../types/database';
-import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Mail, Printer } from 'lucide-react';
-import { functions, databases } from '../../shared/appwrite';
-import { EMAIL_FUNCTION_ID, DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
+import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Bell, Printer } from 'lucide-react';
+import { databases } from '../../shared/appwrite';
+import { DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
 import { ID } from 'appwrite';
-import { getPaymentReminderHtml } from '../../shared/emailTemplates';
 
 interface AdminPaymentsProps {
   isCreateView?: boolean;
@@ -452,17 +451,11 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     })();
   };
 
-  // Send Outstanding Dues Notification
+  // Send Outstanding Dues Notification (in-app + push; no email)
   const handleNotifyDues = async () => {
     if (!selectedStudent) return;
     const studentProfile = selectedStudent.students as any;
-    const sEmail = studentProfile?.email;
     const sName = studentProfile?.name || selectedStudent.username || 'Student';
-
-    if (!sEmail) {
-      addToast({ type: 'warning', title: 'No Email Address', message: 'This student does not have an email address associated with their profile.' });
-      return;
-    }
 
     const pendingDues = currentStudentPayments.filter(p => !p.is_paid);
     if (pendingDues.length === 0) {
@@ -470,57 +463,23 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       return;
     }
 
-    // Immediately show info toast and run the execution in the background
-    addToast({ 
-      type: 'info', 
-      title: 'Sending Notification', 
-      message: `Outstanding dues notification is being sent to ${sEmail} in the background.` 
-    });
+    addToast({ type: 'info', title: 'Sending Notification', message: `Notifying ${sName} about outstanding dues in the background.` });
 
     (async () => {
       try {
-        const formattedDues = pendingDues.map(p => {
-          const linkedEvent = p.is_event && p.events
-            ? (events.find(e => e.$id === p.events || e.$id === (p.events as any).$id)?.event_name || 'Linked Event')
-            : p.activity;
-          return {
-            itemName: p.item_name,
-            price: p.price,
-            quantity: p.quantity,
-            activity: linkedEvent || 'General Collection'
-          };
+        const total = pendingDues.reduce((sum, p) => sum + Number(p.price || 0) * Number(p.quantity || 1), 0);
+        const items = pendingDues.slice(0, 4).map(p => p.item_name).join(', ');
+        const more = pendingDues.length > 4 ? ` and ${pendingDues.length - 4} more` : '';
+        await api.notifications.notifyMember({
+          userId: selectedStudent.$id,
+          title: 'Outstanding dues notice',
+          body: `Hi ${sName}, you have ${pendingDues.length} unpaid item${pendingDues.length === 1 ? '' : 's'} totalling PHP ${total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}: ${items}${more}. Please settle with an officer.`,
+          link: '/dashboard/student/payments',
         });
-
-        const htmlBody = getPaymentReminderHtml(sName, formattedDues, window.location.origin);
-
-        const response = await functions.createExecution(
-          EMAIL_FUNCTION_ID,
-          JSON.stringify({
-            action: 'send_email',
-            payload: {
-              to: sEmail,
-              subject: 'Action Required: Outstanding Dues Notice',
-              body: htmlBody,
-              html: true
-            }
-          })
-        );
-
-        let result;
-        try {
-          result = JSON.parse(response.responseBody);
-        } catch (e) {
-          result = { success: false, error: 'Failed to parse response body' };
-        }
-
-        if (response.status === 'failed' || !result.success) {
-          throw new Error(result.error || 'Execution failed');
-        }
-
-        addToast({ type: 'success', title: 'Dues Notified', message: `Email notifications successfully dispatched to ${sEmail}.` });
+        addToast({ type: 'success', title: 'Dues Notified', message: `${sName} was notified in the app.` });
       } catch (err: any) {
         console.error('[AdminPayments] Failed to notify student dues:', err);
-        addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to dispatch email notice.' });
+        addToast({ type: 'error', title: 'Notification Failed', message: err.message || 'Failed to send the notification.' });
       }
     })();
   };
@@ -2199,10 +2158,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                   onClick={handleNotifyDues}
                   disabled={notifying}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white font-bold text-xs px-3.5 py-2.5 shadow-sm disabled:opacity-50 transition-all duration-200"
-                  title="Send Personal Email about outstanding payments"
+                  title="Send an in-app and push notice about outstanding payments"
                 >
-                  {notifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-                  Send Personal Email
+                  {notifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bell className="h-3.5 w-3.5" />}
+                  Notify Student
                 </button>
               )}
             </div>
@@ -2715,3 +2674,22 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 };
 
 export default AdminPayments;
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    setPrintModalOpen(false);
+                    setTimeout(() => {
+                      if (activeTab === 'outside') {
+                        handlePrintOutsideActivityLedger(printSignatory, printScope, true);
+                      } else {
+                        handlePrintActivityLedger(printSignatory, printScope, true);
+                      }
+                    }, 50);
+                  }}
+                  className="flex-1 rounded-lg border border-[#0d6b66] text-[#0d6b66] hover:bg-teal-50 px-4 py-2.5 text-sm font-bold transition-colors"
+                >
+                  Download Word
+                </button>

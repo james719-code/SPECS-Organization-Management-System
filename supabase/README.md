@@ -7,8 +7,8 @@ The old `appwrites-functions/` directory was empty. The replacement runtime is i
 - `auth/firebaseToken.ts` verifies Firebase ID tokens.
 - `firebase/serviceAccount.ts`, `firebase/firestore.ts`, and `firebase/auth.ts` provide the privileged Firebase REST boundary without bundling the Firebase Admin SDK into Deno.
 - `modules/officerManagement.ts` ports the Python Appwrite workflow: account acceptance, bulk acceptance, officer promotion/demotion, activation, password reset, deletion, volunteer decisions, and dual story approval.
-- `modules/email.ts` sends explicitly initiated one-to-one email through an HTTP provider; bulk announcements are rejected.
-- `modules/notifications.ts` publishes role-wide or direct in-app notifications in bounded batches.
+- `modules/notifications.ts` publishes role-wide or direct in-app notifications in bounded batches (`publish_notification`, admin only) and one-to-one member notices (`notify_member`, officers and admins), then triggers push delivery.
+- `modules/push.ts` stores browser push tokens (`register_push_token` / `unregister_push_token`, collection `push_tokens`) and delivers notifications through Firebase Cloud Messaging (HTTP v1) with the existing service account. Delivery is best-effort: a push failure never fails the publish, and dead tokens are deleted automatically.
 - `modules/storage.ts` handles signed uploads/downloads/deletes and the public asset redirect used by existing image tags.
 
 ## What belongs in Git
@@ -40,20 +40,13 @@ TEAM_ID_OFFICERS=officers
 TEAM_ID_VOLUNTEERS=volunteers
 FIREBASE_TEAM_COLLECTION=team_memberships
 
-# Email provider: Brevo is recommended; Resend and SendGrid are also supported.
-EMAIL_PROVIDER=brevo
-BREVO_API_KEY=...
-EMAIL_FROM=verified-sender@example.org
-EMAIL_FROM_NAME=SPECS Organization
 ```
 
 `FIREBASE_PASSWORD_RESET_CONTINUE_URL` must use a domain authorized in Firebase Authentication. Set it to the local login URL while testing locally, and to the production login URL after deployment. The admin reset action accepts only an account UID and resolves the email from canonical account/snapshot data server-side.
 
-The email action accepts exactly one `to` address and rejects `cc`, `bcc`, recipient arrays, and `send_announcement`. Use `publish_notification` for organization-wide announcements.
+The Edge Function no longer sends email. Announcements and member notices are in-app notifications plus Firebase Cloud Messaging web push (free). Push needs no extra secret here: it reuses `FIREBASE_SERVICE_ACCOUNT_JSON`, and the "Firebase Cloud Messaging API" must be enabled for the Firebase project. The browser needs `VITE_FIREBASE_VAPID_KEY` (Firebase Console > Project settings > Cloud Messaging > Web Push certificates).
 
 Student payment receipts are generated in the `StudentPayments` frontend using the existing PDF dependency. The Edge Function does not create, upload, or email receipt files. Firebase's hosted password-reset handler is the canonical recovery flow; the frontend only requests the reset email and returns the user to the login page.
-
-The old `SMTP_EMAIL`/`SMTP_PASSWORD` request fields are deliberately not accepted. Supabase Edge Functions cannot make outbound SMTP connections on ports 25/465/587 on the free runtime; use the provider HTTP API instead. Do not accept provider credentials from the browser.
 
 ## Frontend variables
 

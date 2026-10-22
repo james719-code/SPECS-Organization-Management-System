@@ -172,4 +172,4 @@ const trackedFunctions = new Proxy(functions, {
     }
 });
 
-export { client, account, trackedDatabases as databases, storage, Query, ID, trackedFunctions as functions };
+export { client, account, trackedDatabases as databases, storage, Query, ID, trackedFunctions as functions, firebaseConfig };

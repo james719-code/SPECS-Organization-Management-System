@@ -229,7 +229,7 @@ Admins hold the highest privilege, controlling accounts, databases, global setti
 
 ### 📢 Announcements Composer
 * **View File:** [announcements.js](file:///c:/Users/James/WebstormProjects/SPECS-Organization-Management-System/specs-website/src/dashboard-admin/views/announcements.js)
-* **Description:** Publish in-app announcements to targeted groups; email is reserved for deliberate one-to-one messages.
+* **Description:** Publish in-app announcements to targeted groups; delivered in-app and as browser push notifications; the app does not send email.
 * **Key Features:**
   * Select target audiences: `All`, `Students`, `Officers`, or custom groupings.
   * Targets `all`, `students`, `officers`, or specific accounts and writes notifications through the `publish_notification` Edge action.

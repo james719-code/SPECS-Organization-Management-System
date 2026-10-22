@@ -40,7 +40,6 @@ export const BUCKET_ID_PICTURES = migrateId(import.meta.env.VITE_BUCKET_ID_PICTU
 export const BUCKET_ID_HIGHLIGHT_IMAGES = migrateId(import.meta.env.VITE_BUCKET_ID_HIGHLIGHT_IMAGES, 'specs-highlights', { '68fd9e87001e8e745fd3a': 'specs-highlights', '68fd9e87001fad8811cc': 'specs-highlights' });
 
 export const FUNCTION_ID = import.meta.env.VITE_FUNCTION_ID as string;
-export const EMAIL_FUNCTION_ID = import.meta.env.VITE_EMAIL_FUNCTION_ID as string;
 
 export const TEAM_ID_STUDENTS = import.meta.env.VITE_TEAM_ID_STUDENTS as string;
 export const TEAM_ID_OFFICERS = import.meta.env.VITE_TEAM_ID_OFFICERS as string;

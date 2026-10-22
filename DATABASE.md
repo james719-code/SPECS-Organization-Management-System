@@ -409,7 +409,7 @@ Task management collection for tracking to-do items with file attachments and co
 
 ## In-App Notification Collections
 
-Announcements are stored in Firestore rather than sent as bulk email:
+Announcements are stored in Firestore and pushed to subscribed browsers (no email):
 
 | Collection | Purpose |
 | --- | --- |
@@ -418,6 +418,7 @@ Announcements are stored in Firestore rather than sent as bulk email:
 | `notifications_officers` | Notifications visible to officers and administrators |
 | `notifications_direct` | Direct notifications keyed by `recipientUid` |
 | `notification_reads` | Per-user read state keyed by user UID and notification ID |
+| `push_tokens` | Web push (FCM) tokens keyed by SHA-256 of the token, with `uid`, `role`, `updatedAt`. Server-only: no Firestore rule grants client access |
 
 Publishing is restricted to administrators through the `publish_notification`
 Supabase Edge Function action. Read state is user-owned and does not require a
@@ -446,7 +447,7 @@ Payment receipts are generated in the browser for download and are not persisted
 | --- | --- | --- |
 | **Firebase Authentication** | Firebase project configuration | Sign-up, sign-in, verification, and password recovery |
 | **Firestore Security Rules** | `firestore.rules` | Client read/write isolation by authentication and role |
-| **Supabase Edge Function** | `supabase/functions/specs-api/` | Account management, notifications, email, and signed storage operations |
+| **Supabase Edge Function** | `supabase/functions/specs-api/` | Account management, notifications and push delivery, and signed storage operations |
 | **Student role** | `accounts.type == "student"` | Firestore role policy and UI routing |
 | **Officer role** | `accounts.type == "officer"` | Firestore role policy and UI routing |
 | **Admin role** | `accounts.type == "admin"` | Privileged administrative operations |

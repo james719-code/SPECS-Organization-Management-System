@@ -659,6 +659,15 @@ export const api = {
             if (execution?.status === 'failed' || result.success === false) throw new Error(result.error || 'Failed to publish notification');
             dataCache.invalidateTags([CacheTags.NOTIFICATIONS]);
             return result;
+        },
+        /** One-to-one in-app + push notice to a member's account (officers and admins). */
+        async notifyMember(input: { userId: string; title: string; body: string; link?: string }): Promise<any> {
+            if (!functions) throw new Error('Notification service is unavailable');
+            const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action: 'notify_member', payload: input }));
+            let result: any = {};
+            try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* handled below */ }
+            if (execution?.status === 'failed' || result.success === false) throw new Error(result.error || 'Failed to notify member');
+            return result;
         }
     },
 

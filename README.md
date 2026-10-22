@@ -103,7 +103,7 @@ In building this application, specific architectural and technical choices were 
 
 ### 2. Firebase and Supabase
 * **Decision:** Firebase Authentication and Firestore are the canonical identity and data services. Supabase Edge Functions and Storage provide the privileged server boundary and file storage.
-* **Reasoning:** Firestore rules handle normal reads and role isolation, while the Edge Function keeps service-account credentials, account mutations, email dispatch, and signed storage operations off the client.
+* **Reasoning:** Firestore rules handle normal reads and role isolation, while the Edge Function keeps service-account credentials, account mutations, push delivery, and signed storage operations off the client.
 
 ### 3. TailwindCSS for Styling
 * **Decision:** Replaced Plain CSS/SCSS with TailwindCSS.
@@ -159,7 +159,7 @@ In building this application, specific architectural and technical choices were 
 - **Volunteer Management:** Full volunteer lifecycle management.
 - **Stories Management:** Full CRUD, approval workflow, filtering by status, and statistics.
 - **Task Management:** Create and track admin/officer tasks with completion state.
-- **Announcements:** Draft and publish in-app notifications for all students, officers, or selected accounts; bulk announcement email is not used.
+- **Announcements:** Draft and publish in-app notifications for all students, officers, or selected accounts; delivered in-app and as browser push notifications (Firebase Cloud Messaging); no email is sent.
 - **Settings:** Admin profile and preferences.
 
 ---

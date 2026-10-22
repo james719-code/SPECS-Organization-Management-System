@@ -8,9 +8,6 @@ import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import type { EventDoc, AttendanceDoc, AccountDoc, OfficerDoc, StudentDoc, CustomSessionStub } from '../../types/database';
 import { createPortal } from 'react-dom';
-import { functions } from '../../shared/appwrite';
-import { EMAIL_FUNCTION_ID } from '../../shared/constants';
-import { getAttendanceHtml } from '../../shared/emailTemplates';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface SignatoryRow {
@@ -172,10 +169,10 @@ const AdminAttendance: React.FC = () => {
 
   // Student search autocomplete states
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string; email?: string; type: 'student' | 'officer' } | null>(null);
-  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; name: string; email?: string; type: 'student' | 'officer' }[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; accountId?: string; name: string; email?: string; type: 'student' | 'officer' } | null>(null);
+  const [autocompleteResults, setAutocompleteResults] = useState<{ id: string; accountId?: string; name: string; email?: string; type: 'student' | 'officer' }[]>([]);
   const [attendanceLabel, setAttendanceLabel] = useState('Morning Check-in');
-  const [notifyViaEmail, setNotifyViaEmail] = useState(false);
+  const [notifyAttendee, setNotifyAttendee] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Tab & non-member states
@@ -596,6 +593,7 @@ const AdminAttendance: React.FC = () => {
         const stdIdLabel = profile?.student_id ? ` (ID: ${profile.student_id})` : '';
         return {
           id: profile?.$id || acc.$id,
+          accountId: acc.$id,
           name: `${profile?.name || acc.username || 'Unknown Student'}${stdIdLabel}`,
           email: profile?.email || '',
           type: acc.type as 'student' | 'officer'
@@ -606,8 +604,8 @@ const AdminAttendance: React.FC = () => {
     setAutocompleteResults(matches);
   };
 
-  const handleSelectAutocomplete = (id: string, name: string, email?: string, type?: 'student' | 'officer') => {
-    setSelectedStudent({ id, name, email, type: type || 'student' });
+  const handleSelectAutocomplete = (id: string, name: string, email?: string, type?: 'student' | 'officer', accountId?: string) => {
+    setSelectedStudent({ id, accountId, name, email, type: type || 'student' });
     setStudentSearchTerm(name);
     setAutocompleteResults([]);
   };
@@ -630,6 +628,24 @@ const AdminAttendance: React.FC = () => {
     const rate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
     return { totalCount, presentCount, absentCount, rate };
   }, [students, attendanceRecords]);
+
+  // Tell a member their attendance was recorded (in-app notification + push). Members only: non-members have no account.
+  const sendAttendanceNotice = async (accountId: string, memberName: string) => {
+    try {
+      const selectedEvent = events.find(ev => ev.$id === selectedEventId);
+      const dateStr = new Date(selectedEvent?.date_to_held || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      await api.notifications.notifyMember({
+        userId: accountId,
+        title: `Attendance recorded: ${activeSessionName}`.slice(0, 100),
+        body: `Hi ${memberName}, you were marked present for ${activeSessionName} on ${dateStr} at ${timeStr}.`.slice(0, 500),
+      });
+      addToast({ type: 'info', title: 'Member Notified', message: `${memberName} was notified.` });
+    } catch (err: any) {
+      console.error('[AdminAttendance] Failed to notify member:', err);
+      addToast({ type: 'warning', title: 'Notification Failed', message: `Attendance recorded, but ${memberName} could not be notified.` });
+    }
+  };
 
   // Submit attendance record
   const handleAddAttendance = async (e: React.FormEvent) => {
@@ -670,56 +686,8 @@ const AdminAttendance: React.FC = () => {
         }
         addToast({ type: 'success', title: 'Recorded', message: `Attendance marked for ${selectedStudent.name}.` });
         
-        // Dispatch email notification if toggled and email is present (Background)
-        if (notifyViaEmail && selectedStudent.email) {
-          const studentEmail = selectedStudent.email;
-          const studentName = selectedStudent.name;
-          (async () => {
-            try {
-              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-              const dateStr = selectedEvent?.date_to_held 
-                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })
-                : new Date().toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  });
-
-              const timeStr = new Date().toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-
-              const htmlBody = getAttendanceHtml(
-                studentName,
-                activeSessionName,
-                dateStr,
-                'Present',
-                timeStr,
-                window.location.origin
-              );
-
-              await functions.createExecution(
-                EMAIL_FUNCTION_ID,
-                JSON.stringify({
-                  action: 'send_email',
-                  payload: {
-                    to: studentEmail,
-                    subject: `Attendance Recorded: ${activeSessionName}`,
-                    body: htmlBody,
-                    html: true
-                  }
-                })
-              );
-              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${studentEmail}.` });
-            } catch (emailErr: any) {
-              console.error('[AdminAttendance] Failed to send email notification:', emailErr);
-            }
-          })();
+        if (notifyAttendee && selectedStudent.accountId) {
+          void sendAttendanceNotice(selectedStudent.accountId, selectedStudent.name);
         }
 
         // Reset form
@@ -735,56 +703,6 @@ const AdminAttendance: React.FC = () => {
           await api.attendance.create(selectedEventId, 'non-member', null, { name, email }, recorderId, attendanceLabel);
         }
         addToast({ type: 'success', title: 'Recorded', message: `Non-Member: ${name} is marked present.` });
-
-        // Dispatch email notification if toggled and email is present (Background)
-        if (notifyViaEmail && email) {
-          (async () => {
-            try {
-              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-              const dateStr = selectedEvent?.date_to_held 
-                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })
-                : new Date().toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  });
-
-              const timeStr = new Date().toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-
-              const htmlBody = getAttendanceHtml(
-                name,
-                activeSessionName,
-                dateStr,
-                'Present',
-                timeStr,
-                window.location.origin
-              );
-
-              await functions.createExecution(
-                EMAIL_FUNCTION_ID,
-                JSON.stringify({
-                  action: 'send_email',
-                  payload: {
-                    to: email,
-                    subject: `Attendance Recorded: ${activeSessionName}`,
-                    body: htmlBody,
-                    html: true
-                  }
-                })
-              );
-              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${email}.` });
-            } catch (emailErr: any) {
-              console.error('[AdminAttendance] Failed to send email notification to non-member:', emailErr);
-            }
-          })();
-        }
 
         // Reset form
         setNonMemberName('');
@@ -1060,44 +978,6 @@ const AdminAttendance: React.FC = () => {
         setScanFlash('success');
         setTimeout(() => setScanFlash(null), 1000);
 
-        if (notifyViaEmail && email) {
-          (async () => {
-            try {
-              const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-              const dateStr = selectedEvent?.date_to_held 
-                ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-              const formattedTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-              const htmlBody = getAttendanceHtml(
-                name,
-                activeSessionName,
-                dateStr,
-                'Present',
-                formattedTimeStr,
-                window.location.origin
-              );
-
-              await functions.createExecution(
-                EMAIL_FUNCTION_ID,
-                JSON.stringify({
-                  action: 'send_email',
-                  payload: {
-                    to: email,
-                    subject: `Attendance Recorded: ${activeSessionName}`,
-                    body: htmlBody,
-                    html: true
-                  }
-                })
-              );
-              addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${email}.` });
-            } catch (emailErr) {
-              console.error('[AdminAttendance Non-Member QR] Failed to send email:', emailErr);
-            }
-          })();
-        }
-
         loadAttendanceRecords(attendanceContext, activeSessionId);
       } catch (err: any) {
         addToast({ type: 'error', title: 'Scan Error', message: 'Failed to parse non-member data.' });
@@ -1159,7 +1039,6 @@ const AdminAttendance: React.FC = () => {
     }
 
     const attendeeName = attendeeAccount ? (attendeeAccount.students as any)?.name || attendeeAccount.username : 'Unknown Member';
-    const attendeeEmail = attendeeAccount ? (attendeeAccount.students as any)?.email : '';
 
     if (!studentProfileId) {
       setScanCooldown(true);
@@ -1289,43 +1168,8 @@ const AdminAttendance: React.FC = () => {
       setScanFlash('success');
       setTimeout(() => setScanFlash(null), 1000);
 
-      if (notifyViaEmail && attendeeEmail) {
-        (async () => {
-          try {
-            const selectedEvent = events.find(ev => ev.$id === selectedEventId);
-            const dateStr = selectedEvent?.date_to_held 
-              ? new Date(selectedEvent.date_to_held).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-              : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-            const formattedTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-            const htmlBody = getAttendanceHtml(
-              attendeeName,
-              activeSessionName,
-              dateStr,
-              'Present',
-              formattedTimeStr,
-              window.location.origin
-            );
-
-            await functions.createExecution(
-              EMAIL_FUNCTION_ID,
-              JSON.stringify({
-                action: 'send_email',
-                payload: {
-                  to: attendeeEmail,
-                  subject: `Attendance Recorded: ${activeSessionName}`,
-                  body: htmlBody,
-                  html: true
-                }
-              })
-            );
-            addToast({ type: 'info', title: 'Notification Sent', message: `Attendance email sent to ${attendeeEmail}.` });
-          } catch (emailErr) {
-            console.error('[AdminAttendance QR] Failed to send email:', emailErr);
-            addToast({ type: 'warning', title: 'Notification Failed', message: `Attendance recorded, but email to ${attendeeEmail} failed.` });
-          }
-        })();
+      if (notifyAttendee && attendeeAccount) {
+        void sendAttendanceNotice(attendeeAccount.$id, attendeeName);
       }
 
       loadAttendanceRecords(attendanceContext, activeSessionId);
@@ -2923,7 +2767,7 @@ const AdminAttendance: React.FC = () => {
                             <button
                               key={match.id}
                               type="button"
-                              onClick={() => handleSelectAutocomplete(match.id, match.name, match.email, match.type)}
+                              onClick={() => handleSelectAutocomplete(match.id, match.name, match.email, match.type, match.accountId)}
                               className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors border-b last:border-b-0 flex items-center justify-between"
                             >
                               <span>{match.name}</span>
@@ -2986,13 +2830,13 @@ const AdminAttendance: React.FC = () => {
                   <div className="flex items-center gap-2 py-1">
                     <input
                       type="checkbox"
-                      id="notifyViaEmailCheck"
-                      checked={notifyViaEmail}
-                      onChange={e => setNotifyViaEmail(e.target.checked)}
+                      id="notifyAttendeeCheck"
+                      checked={notifyAttendee}
+                      onChange={e => setNotifyAttendee(e.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
-                    <label htmlFor="notifyViaEmailCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Send Personal Email to Attendee
+                    <label htmlFor="notifyAttendeeCheck" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                      Notify attendee in the app (push alert)
                     </label>
                   </div>
 
@@ -3027,13 +2871,13 @@ const AdminAttendance: React.FC = () => {
                   <div className="flex items-center gap-2 py-1">
                     <input
                       type="checkbox"
-                      id="notifyViaEmailCheckQr"
-                      checked={notifyViaEmail}
-                      onChange={e => setNotifyViaEmail(e.target.checked)}
+                      id="notifyAttendeeCheckQr"
+                      checked={notifyAttendee}
+                      onChange={e => setNotifyAttendee(e.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-[#0d6b66] focus:ring-[#0d6b66] cursor-pointer"
                     />
-                    <label htmlFor="notifyViaEmailCheckQr" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                      Send Personal Email to Attendee
+                    <label htmlFor="notifyAttendeeCheckQr" className="text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                      Notify attendee in the app (push alert)
                     </label>
                   </div>
 
