@@ -14,7 +14,7 @@ interface CacheConfig {
 const CACHE_CONFIG: CacheConfig = {
   IMAGE_CACHE_KEY: 'specs_image_cache',
   DATA_CACHE_KEY: 'specs_data_cache',
-  DEFAULT_IMAGE_TTL: 7 * 24 * 60 * 60 * 1000,
+  DEFAULT_IMAGE_TTL: 30 * 24 * 60 * 60 * 1000,
   DEFAULT_DATA_TTL: 5 * 60 * 1000,
   DEFAULT_STALE_TTL: 0,
   MAX_CACHE_SIZE: 50 * 1024 * 1024,

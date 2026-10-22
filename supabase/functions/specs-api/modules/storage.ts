@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { assertString } from '../http.ts';
+import { assertString, corsHeaders } from '../http.ts';
 import type { ActionResult, AuthenticatedUser, JsonMap } from '../types.ts';
+
+const ASSET_CACHE_SECONDS = 30 * 24 * 60 * 60;
 
 function storageClient() {
   const url = Deno.env.get('SUPABASE_URL');
@@ -77,8 +79,24 @@ export async function publicAsset(request: Request, url: URL): Promise<Response>
   if (!publicBuckets.includes(bucket)) return new Response('Asset bucket is not public', { status: 403 });
   const supabase = storageClient();
   const path = await resolvePath(supabase, assertBucket(bucket), fileId);
-  const expiresIn = Math.min(Math.max(Number(url.searchParams.get('expiresIn') || 300), 60), 3600);
-  const result = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+  const result = await supabase.storage.from(bucket).createSignedUrl(path, 60);
   if (result.error) return new Response(result.error.message, { status: 404 });
-  return Response.redirect(result.data.signedUrl, 302);
+
+  // Proxy the bytes instead of redirecting to the signed URL: every signed URL
+  // is unique, so a redirect gave browsers nothing stable to cache and images
+  // reloaded on every visit. File ids are unique per upload, so the response
+  // for a given URL never changes and can be cached for a month.
+  const upstream = await fetch(result.data.signedUrl);
+  if (!upstream.ok || !upstream.body) return new Response('Asset not found', { status: 404 });
+
+  const headers = new Headers({
+    'Cache-Control': `public, max-age=${ASSET_CACHE_SECONDS}, immutable`,
+    'Access-Control-Allow-Origin': corsHeaders['Access-Control-Allow-Origin'],
+    'X-Content-Type-Options': 'nosniff',
+  });
+  for (const name of ['content-type', 'content-length', 'etag', 'last-modified']) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  return new Response(upstream.body, { status: 200, headers });
 }
