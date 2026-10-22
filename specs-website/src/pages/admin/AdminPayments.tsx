@@ -484,7 +484,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     })();
   };
 
-  const handlePrintActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
+  const handlePrintActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string, asDocx = false) => {
 
     const origin = window.location.origin;
 
@@ -847,6 +847,12 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
       </html>
     `;
 
+    if (asDocx) {
+      const { downloadDocxFromHtml } = await import('../../shared/docxExport');
+      await downloadDocxFromHtml(htmlContent, `Payment_Ledger_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.docx`, addToast);
+      return;
+    }
+
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
       const { downloadPdfFromHtml } = await import('../../shared/utils');
@@ -864,7 +870,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     printWindow.document.close();
   };
 
-  const handlePrintOutsideActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string) => {
+  const handlePrintOutsideActivityLedger = async (selectedRole: 'treasurer' | 'asst-treasurer', selectedScope: string, asDocx = false) => {
 
     const origin = window.location.origin;
 
@@ -1209,6 +1215,12 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         </body>
       </html>
     `;
+
+    if (asDocx) {
+      const { downloadDocxFromHtml } = await import('../../shared/docxExport');
+      await downloadDocxFromHtml(htmlContent, `Outside_Payment_Ledger_${selectedScope === 'all' ? 'All_Activities' : selectedScope.replace(/\s+/g, '_')}.docx`, addToast);
+      return;
+    }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
@@ -2663,17 +2675,6 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
                 >
                   {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Download PDF' : 'Print Report'}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-};
-
-export default AdminPayments;
                 <button
                   type="button"
                   onClick={() => {
@@ -2693,3 +2694,14 @@ export default AdminPayments;
                 >
                   Download Word
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
+export default AdminPayments;

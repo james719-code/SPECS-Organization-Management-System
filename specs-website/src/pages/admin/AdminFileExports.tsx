@@ -2195,6 +2195,19 @@ const AdminFileExports: React.FC = () => {
     }
   };
 
+  const handleDownloadDocx = async () => {
+    const htmlContent = getCompiledHtml();
+    setGenerating(true);
+    try {
+      const { downloadDocxFromHtml } = await import('../../shared/docxExport');
+      await downloadDocxFromHtml(htmlContent, `${REPORT_LABELS[activeReport].replace(/\s+/g, '_')}_Report.docx`, addToast);
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to download Word file.' });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const chunkImages = (arr: any[], size: number) => {
     const chunks = [];
     for (let i = 0; i < arr.length; i += size) {
@@ -2306,7 +2319,7 @@ const AdminFileExports: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">File Exports</h1>
-          <p className="text-sm text-slate-500 mt-1">Generate reports and manage signatory layouts for PDF exports.</p>
+          <p className="text-sm text-slate-500 mt-1">Generate reports and manage signatory layouts for PDF and Word exports.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -2315,6 +2328,14 @@ const AdminFileExports: React.FC = () => {
           >
             <Users className="h-4 w-4" />
             Manage Signatories
+          </button>
+          <button
+            onClick={handleDownloadDocx}
+            disabled={generating}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#0d6b66] text-[#0d6b66] hover:bg-[#0d6b66]/5 disabled:opacity-50 px-4 py-2 text-xs font-semibold transition-colors"
+          >
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download Word (.docx)
           </button>
           <button
             onClick={handlePrint}
@@ -3399,6 +3420,14 @@ const AdminFileExports: React.FC = () => {
             Print Preview
           </h3>
           <div className="flex gap-2">
+            <button
+              onClick={handleDownloadDocx}
+              disabled={generating}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0d6b66] text-[#0d6b66] hover:bg-[#0d6b66]/5 disabled:opacity-50 px-3 py-1.5 text-xs font-bold transition-colors"
+            >
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              Download Word
+            </button>
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d6b66] hover:bg-[#0b5c58] text-white px-3 py-1.5 text-xs font-bold transition-colors"

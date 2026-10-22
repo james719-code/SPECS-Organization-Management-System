@@ -1433,7 +1433,7 @@ const AdminAttendance: React.FC = () => {
     }
   };
 
-  const handlePrintReport = async (selectedSignatory: 'secretary' | 'asst-secretary') => {
+  const handlePrintReport = async (selectedSignatory: 'secretary' | 'asst-secretary', asDocx = false) => {
     if (!activeSessionId) {
       addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
       return;
@@ -1878,6 +1878,12 @@ const AdminAttendance: React.FC = () => {
       </html>
     `;
 
+    if (asDocx) {
+      const { downloadDocxFromHtml } = await import('../../shared/docxExport');
+      await downloadDocxFromHtml(htmlContent, `Attendance_Report_${eventNameDisplay.replace(/\s+/g, '_')}.docx`, addToast);
+      return;
+    }
+
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
       const { downloadPdfFromHtml } = await import('../../shared/utils');
@@ -1895,7 +1901,7 @@ const AdminAttendance: React.FC = () => {
     printWindow.document.close();
   };
 
-  const handlePrintBlankSheet = async () => {
+  const handlePrintBlankSheet = async (asDocx = false) => {
     if (!activeSessionId) {
       addToast({ type: 'warning', title: 'Session Required', message: `Please select ${attendanceContext === 'custom' ? 'a custom session' : 'an event'} first.` });
       return;
@@ -2312,6 +2318,12 @@ const AdminAttendance: React.FC = () => {
         </body>
       </html>
     `;
+
+    if (asDocx) {
+      const { downloadDocxFromHtml } = await import('../../shared/docxExport');
+      await downloadDocxFromHtml(htmlContent, `Blank_Attendance_${eventNameDisplay.replace(/\s+/g, '_')}_60_Rows.docx`, addToast);
+      return;
+    }
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
@@ -3293,6 +3305,38 @@ const AdminAttendance: React.FC = () => {
                     className="flex-1 rounded-lg border border-[#0d6b66] text-[#0d6b66] hover:bg-teal-50 px-3 py-2 text-xs font-bold transition-colors"
                   >
                     Blank Sheet (60 Rows)
+                  </button>
+                </div>
+                <div className="flex w-full gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      setPrintModalOpen(false);
+                      setTimeout(() => {
+                        handlePrintBlankSheet(true);
+                      }, 50);
+                    }}
+                    className="flex-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs font-semibold transition-colors"
+                  >
+                    Blank Sheet (.docx)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      setPrintModalOpen(false);
+                      setTimeout(() => {
+                        handlePrintReport(printSignatory, true);
+                      }, 50);
+                    }}
+                    className="flex-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs font-semibold transition-colors"
+                  >
+                    Attendance Report (.docx)
                   </button>
                 </div>
                 <button
