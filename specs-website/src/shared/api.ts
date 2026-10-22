@@ -26,6 +26,7 @@ import {
 } from './constants.js';
 import { Query, ID } from 'appwrite';
 import { dataCache, imageCache, generateCacheKey } from './cache.js';
+import { compressImage } from './imageCompression';
 import { createApiError, ErrorCodes, ApiError } from './errors.js';
 import { 
   EventDoc, 
@@ -1155,7 +1156,8 @@ export const api = {
         },
         async uploadEventImage(file: any): Promise<any> {
             try {
-                const result = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), file);
+                const optimized = await compressImage(file);
+                const result = await storage.createFile(BUCKET_ID_EVENT_IMAGES, ID.unique(), optimized);
                 dataCache.invalidateTags([CacheTags.FILES, CacheTags.EVENTS, CacheTags.LANDING]);
                 return result;
             } catch (error) {

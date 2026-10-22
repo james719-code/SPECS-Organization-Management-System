@@ -203,7 +203,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           <img src="/logo.webp" alt="SPECS Logo" className="h-10 w-10 object-contain rounded-xl shadow-md" />
           <div className="flex flex-col">
             <span className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white leading-none">SPECS Portal</span>
-            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-505 tracking-wider uppercase mt-0.5">College of Engineering and Computational Sciences</span>
+            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 tracking-wider uppercase mt-0.5">College of Engineering and Computational Sciences</span>
           </div>
         </div>
 
@@ -406,19 +406,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             <div className="flex bg-slate-200/60 dark:bg-slate-800 rounded-2xl p-1 mt-10 max-w-lg mx-auto gap-1 border border-slate-300 dark:border-slate-700">
               <button 
                 onClick={() => setAboutTab('mission')}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'mission' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'mission' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 Our Identity
               </button>
               <button 
                 onClick={() => setAboutTab('officers')}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'officers' ? 'bg-white dark:bg-slate-900 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'officers' ? 'bg-white dark:bg-slate-900 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 Student Leadership
               </button>
               <button 
                 onClick={() => setAboutTab('team')}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'team' ? 'bg-white dark:bg-slate-900 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${aboutTab === 'team' ? 'bg-white dark:bg-slate-900 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 Creative Media & Tech Team
               </button>
@@ -556,7 +556,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                   </div>
 
                   <div className="mt-8 pt-4 border-t border-teal-500/10 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                    <span className="text-[9px] font-mono text-teal-200/50 dark:text-slate-500">
+                    <span className="text-[9px] font-mono text-teal-100/90 dark:text-slate-400">
                       Query executed via Appwrite API nodes
                     </span>
                     <button 
@@ -582,7 +582,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h5 className="text-xs font-bold text-slate-800 dark:text-white">Open Source Philosophy</h5>
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Open Source Philosophy</h4>
                             <a 
                               href="https://github.com/james719-code/SPECS-Organization-Management-System" 
                               target="_blank" 
@@ -603,7 +603,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           <Check className="h-3 w-3" />
                         </div>
                         <div>
-                          <h5 className="text-xs font-bold text-slate-800 dark:text-white">Active Peer Mentorship</h5>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-white">Active Peer Mentorship</h4>
                           <p className="text-[11px] text-slate-550 dark:text-slate-400 leading-relaxed mt-0.5">
                             Lower and upperclassmen collaborate in hands-on workshops, sharing coding knowledge and project guidance.
                           </p>
@@ -615,7 +615,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           <Check className="h-3 w-3" />
                         </div>
                         <div>
-                          <h5 className="text-xs font-bold text-slate-800 dark:text-white">Practical & Hands-on</h5>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-white">Practical & Hands-on</h4>
                           <p className="text-[11px] text-slate-550 dark:text-slate-400 leading-relaxed mt-0.5">
                             We focus on building real projects, solving algorithmic challenges, and creating tangible value for our local student community.
                           </p>
@@ -695,7 +695,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                   <div className="relative flex-shrink-0">
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-[#0d6b66] to-teal-400 opacity-20 blur-md group-hover:opacity-30 transition-opacity duration-300 pointer-events-none"></div>
                     {adviserUrl ? (
-                      <img 
+                      <img loading="lazy" decoding="async" 
                         src={adviserUrl} 
                         alt={SITE_LEADERSHIP.adviser.name} 
                         className="h-32 w-32 rounded-2xl object-cover relative z-10 border-2 border-white dark:border-slate-800 shadow-lg ring-4 ring-teal-500/20 group-hover:ring-teal-500/45 transition-all duration-305 group-hover:scale-105"
@@ -713,7 +713,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                       {SITE_LEADERSHIP.adviser.name}
                     </h4>
                     
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-505 tracking-wider uppercase mb-4">
+                    <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 tracking-wider uppercase mb-4">
                       {SITE_LEADERSHIP.adviser.position}
                     </p>
 
@@ -752,7 +752,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                           className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 p-5 text-center shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 duration-200"
                         >
                           {avatarUrl && (
-                            <img
+                            <img loading="lazy" decoding="async"
                               src={avatarUrl}
                               alt={off.name}
                               className="h-20 w-20 rounded-full object-cover mx-auto mb-3 border border-[#0d6b66]"
@@ -797,7 +797,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                         className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 shadow-sm flex flex-col md:flex-row items-center gap-6 hover:shadow-md transition-shadow"
                       >
                         {devPic ? (
-                          <img 
+                          <img loading="lazy" decoding="async" 
                             src={devPic} 
                             alt={dev.name} 
                             className="h-24 w-24 rounded-full object-cover border-4 border-teal-500 dark:border-teal-400 p-0.5 flex-shrink-0"
@@ -835,7 +835,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                         className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-805/85 p-4 text-center shadow-sm hover:shadow-md transition-all"
                       >
                           {avatarUrl && (
-                            <img
+                            <img loading="lazy" decoding="async"
                               src={avatarUrl}
                               alt={pub.name}
                               className="h-16 w-16 rounded-full object-cover mx-auto mb-3 border border-[#0d6b66]"
@@ -879,19 +879,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             <div className="flex bg-slate-100 dark:bg-slate-900 rounded-xl p-1 mt-6 md:mt-0 gap-1 self-start md:self-auto border border-slate-200 dark:border-slate-800">
               <button 
                 onClick={() => setActiveTab('all')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 All Events
               </button>
               <button 
                 onClick={() => setActiveTab('upcoming')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'upcoming' ? 'bg-white dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'upcoming' ? 'bg-white dark:bg-slate-800 text-[#0d6b66] dark:text-teal-400 shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 Upcoming
               </button>
               <button 
                 onClick={() => setActiveTab('completed')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
               >
                 Completed
               </button>
@@ -932,7 +932,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                      {/* Event Image Banner / Left Block */}
                      <div className="w-full md:w-44 h-48 md:h-full relative flex-shrink-0 bg-slate-100 dark:bg-slate-800">
                        {eventPic ? (
-                         <img 
+                         <img loading="lazy" decoding="async" 
                            src={eventPic} 
                            alt={event.event_name || 'Event image'} 
                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" 
@@ -1193,7 +1193,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
       <section className="py-16 px-6 sm:px-12 md:px-20 bg-white dark:bg-slate-950 transition-colors duration-300">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 border-b border-slate-100 dark:border-slate-900 pb-16">
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
-            <h4 className="text-xs font-bold tracking-widest uppercase text-slate-400 dark:text-slate-505 mb-2">OFFICIAL CHAPTER</h4>
+            <h4 className="text-xs font-bold tracking-widest uppercase text-slate-600 dark:text-slate-400 mb-2">OFFICIAL CHAPTER</h4>
             <p className="text-xl font-bold text-slate-905 dark:text-white max-w-lg">
               Aligned with the College of Engineering and Computational Sciences of Partido State University.
             </p>
@@ -1202,9 +1202,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             {/* PSU Logo */}
             <div className="flex flex-col items-center text-center">
               <div className="h-24 w-24 flex items-center justify-center rounded-2xl shadow-md border border-slate-100 dark:border-slate-800/40 mb-3 overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
-                <img src="/parsu_logo.png" alt="Partido State University Logo" className="h-full w-full object-contain p-2.5" />
+                <img loading="lazy" decoding="async" src="/parsu_logo.png" width="320" height="320" alt="Partido State University Logo" className="h-full w-full object-contain p-2.5" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">Partido State University</span>
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 tracking-wider uppercase">Partido State University</span>
             </div>
 
             <div className="hidden sm:block h-16 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -1212,9 +1212,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             {/* College Logo */}
             <div className="flex flex-col items-center text-center">
               <div className="h-24 w-24 flex items-center justify-center rounded-2xl shadow-md border border-slate-100 dark:border-slate-800/40 mb-3 overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
-                <img src="/cec_logo.png" alt="College Logo" className="h-full w-full object-contain p-1.5 scale-110" />
+                <img loading="lazy" decoding="async" src="/cec_logo.png" width="320" height="314" alt="College Logo" className="h-full w-full object-contain p-1.5 scale-110" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">College of Engineering & Comp. Sciences</span>
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 tracking-wider uppercase">College of Engineering & Comp. Sciences</span>
             </div>
 
 
@@ -1228,10 +1228,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg" />
+              <img loading="lazy" decoding="async" src="/logo.webp" alt="SPECS Logo" className="h-9 w-9 object-contain rounded-lg" />
               <span className="text-lg font-bold text-white tracking-tight">SPECS Portal</span>
             </div>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-slate-400">
               Official organization management portal for the Society of Programmers and Enthusiasts in Computer Science at the College of Engineering and Computational Sciences.
             </p>
           </div>
@@ -1273,7 +1273,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
             <ul className="space-y-2 text-xs space-y-3">
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-teal-400 flex-shrink-0" />
-                <a href="mailto:parsu.specs@gmail.com" className="text-[11px] text-slate-500 hover:text-teal-400 transition-colors truncate">
+                <a href="mailto:parsu.specs@gmail.com" className="text-[11px] text-slate-400 hover:text-teal-400 transition-colors truncate">
                   parsu.specs@gmail.com
                 </a>
               </li>
@@ -1281,24 +1281,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ theme, toggleTheme }) => {
                 <svg className="h-4 w-4 text-teal-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
                 </svg>
-                <a href="https://www.facebook.com/parsu.specs" target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-500 hover:text-teal-400 transition-colors truncate">
+                <a href="https://www.facebook.com/parsu.specs" target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-400 hover:text-teal-400 transition-colors truncate">
                   facebook.com/parsu.specs
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-teal-400 flex-shrink-0" />
-                <span className="text-[11px] text-slate-500">+63 912 345 6780</span>
+                <span className="text-[11px] text-slate-400">+63 912 345 6780</span>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-teal-400 flex-shrink-0" />
-                <span className="text-[11px] text-slate-500 leading-normal">Partido State University, Goa Campus, Camarines Sur, Philippines</span>
+                <span className="text-[11px] text-slate-400 leading-normal">Partido State University, Goa Campus, Camarines Sur, Philippines</span>
               </li>
             </ul>
           </div>
         </div>
 
         {/* copyright */}
-        <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pt-8 border-t border-slate-900 text-center text-xs text-slate-600 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pt-8 border-t border-slate-900 text-center text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p>© {new Date().getFullYear()} Society of Programmers and Enthusiasts in Computer Science (SPECS). All Rights Reserved.</p>
           <div className="flex gap-4">
             <Link to="/privacy" className="hover:text-slate-200 transition-colors">Privacy Policy</Link>

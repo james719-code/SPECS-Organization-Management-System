@@ -24,11 +24,17 @@ async function initFirebase(config: any) {
     }
 
     const { initializeApp } = await import('firebase/app');
-    const { getAuth } = await import('firebase/auth');
+    const { initializeAuth, getAuth, indexedDBLocalPersistence, browserLocalPersistence } = await import('firebase/auth');
     const { getFirestore } = await import('firebase/firestore');
 
     firebaseApp = initializeApp(config);
-    firebaseAuth = getAuth(firebaseApp);
+    // Email/password only: initialising Auth without the popup/redirect resolver avoids downloading
+    // Firebase's hosted auth iframe and the Google API script on every page load.
+    try {
+        firebaseAuth = initializeAuth(firebaseApp, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
+    } catch {
+        firebaseAuth = getAuth(firebaseApp);
+    }
     firebaseDb = getFirestore(firebaseApp);
 
     return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb };

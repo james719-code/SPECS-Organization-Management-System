@@ -1,0 +1,16 @@
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/logo.webp
+  Cache-Control: public, max-age=604800
+/parsu_logo.png
+  Cache-Control: public, max-age=604800
+/cec_logo.png
+  Cache-Control: public, max-age=604800
+/header.png
+  Cache-Control: public, max-age=604800
+/footer.png
+  Cache-Control: public, max-age=604800
+
+/firebase-messaging-sw.js
+  Cache-Control: no-cache
