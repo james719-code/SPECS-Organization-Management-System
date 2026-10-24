@@ -6,9 +6,25 @@ const ASSET_URL_SECONDS = 3600;
 const ASSET_REDIRECT_SECONDS = 300;
 const ASSET_EXPIRY_MARGIN_SECONDS = 60;
 const MAX_ASSET_URLS = 500;
+// Public buckets have permanent URLs, so the redirect itself can be cached for a day. File IDs are
+// unique and never overwritten, which makes the target stable.
+const PUBLIC_ASSET_REDIRECT_SECONDS = 24 * 60 * 60;
+const BUCKET_VISIBILITY_SECONDS = 10 * 60;
 // Warm isolates reuse the same Storage URL so requests share a CDN cache key.
 // This is an optimization only: cold starts can safely issue a new signed URL.
-const assetUrls = new Map<string, { url: string; bucket: string; path: string; expiresAt: number }>();
+const assetUrls = new Map<string, { url: string; bucket: string; path: string; expiresAt: number; redirectSeconds: number; fixed: boolean }>();
+const bucketVisibility = new Map<string, { isPublic: boolean; checkedAt: number }>();
+
+// A bucket marked public in Supabase is served from stable /object/public/ URLs, which the Storage CDN
+// and browsers can cache for as long as the object's cacheControl allows. Private buckets keep signed URLs.
+async function isPublicBucket(supabase: ReturnType<typeof storageClient>, bucket: string): Promise<boolean> {
+  const known = bucketVisibility.get(bucket);
+  if (known && Date.now() - known.checkedAt < BUCKET_VISIBILITY_SECONDS * 1000) return known.isPublic;
+  const result = await supabase.storage.getBucket(bucket);
+  const isPublic = !result.error && result.data?.public === true;
+  bucketVisibility.set(bucket, { isPublic, checkedAt: Date.now() });
+  return isPublic;
+}
 
 function storageClient() {
   const url = Deno.env.get('SUPABASE_URL');
@@ -91,23 +107,30 @@ export async function publicAsset(_request: Request, url: URL): Promise<Response
   assertBucket(bucket);
   const key = JSON.stringify([bucket, assertPath(fileId)]);
   let cached = assetUrls.get(key);
-  if (!cached || cached.expiresAt - Date.now() <= ASSET_EXPIRY_MARGIN_SECONDS * 1000) {
+  if (!cached || cached.expiresAt - Date.now() <= (cached.fixed ? 0 : ASSET_EXPIRY_MARGIN_SECONDS * 1000)) {
     assetUrls.delete(key);
     const supabase = storageClient();
     const path = await resolvePath(supabase, bucket, fileId);
-    // Start the lifetime before signing so network latency cannot extend it.
-    const expiresAt = Date.now() + ASSET_URL_SECONDS * 1000;
-    const result = await supabase.storage.from(bucket).createSignedUrl(path, ASSET_URL_SECONDS);
-    if (result.error) return new Response('Asset not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
-    cached = { url: result.data.signedUrl, bucket, path, expiresAt };
+    if (await isPublicBucket(supabase, bucket)) {
+      cached = {
+        url: supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl, bucket, path,
+        expiresAt: Date.now() + PUBLIC_ASSET_REDIRECT_SECONDS * 1000, redirectSeconds: PUBLIC_ASSET_REDIRECT_SECONDS, fixed: true,
+      };
+    } else {
+      // Start the lifetime before signing so network latency cannot extend it.
+      const expiresAt = Date.now() + ASSET_URL_SECONDS * 1000;
+      const result = await supabase.storage.from(bucket).createSignedUrl(path, ASSET_URL_SECONDS);
+      if (result.error) return new Response('Asset not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+      cached = { url: result.data.signedUrl, bucket, path, expiresAt, redirectSeconds: ASSET_REDIRECT_SECONDS, fixed: false };
+    }
     if (assetUrls.size >= MAX_ASSET_URLS) assetUrls.delete(assetUrls.keys().next().value!);
     assetUrls.set(key, cached);
   }
 
   // Keep file bytes on Storage's CDN instead of sending them through Functions
   // too. Cache the redirect for less than the remaining signed URL lifetime.
-  const maxAge = Math.max(0, Math.min(ASSET_REDIRECT_SECONDS,
-    Math.floor((cached.expiresAt - Date.now()) / 1000) - ASSET_EXPIRY_MARGIN_SECONDS));
+  const maxAge = Math.max(0, Math.min(cached.redirectSeconds,
+    Math.floor((cached.expiresAt - Date.now()) / 1000) - (cached.fixed ? 0 : ASSET_EXPIRY_MARGIN_SECONDS)));
   return new Response(null, { status: 307, headers: {
     Location: cached.url,
     'Cache-Control': `public, max-age=${maxAge}, must-revalidate`,

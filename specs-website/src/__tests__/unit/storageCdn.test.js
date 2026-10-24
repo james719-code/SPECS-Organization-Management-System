@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     remove: vi.fn(),
     from: vi.fn(),
+    getBucket: vi.fn(),
+    getPublicUrl: vi.fn(),
 }));
 vi.mock('npm:@supabase/supabase-js@2', () => ({
-    createClient: () => ({ storage: { from: mocks.from } }),
+    createClient: () => ({ storage: { from: mocks.from, getBucket: mocks.getBucket } }),
 }));
 
 let publicAsset;
@@ -37,6 +39,8 @@ beforeEach(async () => {
     mocks.from.mockReturnValue(mocks);
     mocks.list.mockResolvedValue({ data: [{ name: 'photo.jpg' }], error: null });
     mocks.remove.mockResolvedValue({ error: null });
+    mocks.getBucket.mockResolvedValue({ data: { public: false }, error: null });
+    mocks.getPublicUrl.mockImplementation((path) => ({ data: { publicUrl: `https://project.test/storage/v1/object/public/specs-events/${path}` } }));
     mocks.createSignedUrl.mockImplementation(async (path) => ({
         data: { signedUrl: `https://project.test/storage/v1/object/sign/${path}?token=${Date.now()}` },
         error: null,
@@ -112,6 +116,26 @@ describe('Storage CDN delivery', () => {
         for (let i = 0; i < 501; i++) await asset('specs-events', `file-${i}/photo.jpg`);
         await asset('specs-events', 'file-0/photo.jpg');
         expect(mocks.createSignedUrl).toHaveBeenCalledTimes(502);
+    });
+
+    it('redirects public buckets to their permanent Storage URL with a long redirect cache', async () => {
+        mocks.getBucket.mockResolvedValue({ data: { public: true }, error: null });
+        const first = await asset();
+        vi.advanceTimersByTime(3_600_000 * 5);
+        const second = await asset();
+        expect(first.status).toBe(307);
+        expect(first.headers.get('location')).toBe('https://project.test/storage/v1/object/public/specs-events/image-id/photo.jpg');
+        expect(second.headers.get('location')).toBe(first.headers.get('location'));
+        expect(first.headers.get('cache-control')).toBe('public, max-age=86400, must-revalidate');
+        expect(mocks.createSignedUrl).not.toHaveBeenCalled();
+        expect(mocks.getBucket).toHaveBeenCalledTimes(1);
+        expect(mocks.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to signed URLs when the bucket visibility cannot be read', async () => {
+        mocks.getBucket.mockResolvedValue({ data: null, error: { message: 'Unavailable' } });
+        const response = await asset();
+        expect(response.headers.get('location')).toContain('/object/sign/');
     });
 
     it('prevents shared caching of authenticated JSON and signed operations', () => {
