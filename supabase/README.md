@@ -9,7 +9,7 @@ The old `appwrites-functions/` directory was empty. The replacement runtime is i
 - `modules/officerManagement.ts` ports the Python Appwrite workflow: account acceptance, bulk acceptance, officer promotion/demotion, activation, password reset, deletion, volunteer decisions, and dual story approval.
 - `modules/notifications.ts` publishes role-wide or direct in-app notifications in bounded batches (`publish_notification`, admin only) and one-to-one member notices (`notify_member`, officers and admins), then triggers push delivery.
 - `modules/push.ts` stores browser push tokens (`register_push_token` / `unregister_push_token`, collection `push_tokens`) and delivers notifications through Firebase Cloud Messaging (HTTP v1) with the existing service account. Delivery is best-effort: a push failure never fails the publish, and dead tokens are deleted automatically.
-- `modules/storage.ts` handles signed uploads/downloads/deletes and the public asset redirect used by existing image tags.
+- `modules/storage.ts` handles signed uploads/downloads/deletes and the CDN asset redirect used by existing image tags.
 
 ## What belongs in Git
 
@@ -59,6 +59,18 @@ npx supabase functions deploy specs-api
 ```
 
 The function intentionally uses `verify_jwt = false` in `supabase/config.toml` because the app sends Firebase ID tokens, not Supabase Auth JWTs. The function verifies the Firebase token itself on every protected request.
+
+## Cached Storage egress
+
+Asset views, previews, and downloads use the existing `/asset?bucket=...&fileId=...` resolver. It returns a `307` redirect to Supabase Storage instead of proxying the file bytes through the Edge Function. A warm function instance reuses each signed Storage URL for up to one hour, renewing it at least one minute before expiry. Reusing the exact URL lets repeat requests share a Storage CDN cache entry. Browser redirects are cached for up to five minutes, bounded by the remaining URL lifetime. The URL cache holds at most 500 entries per instance; cold starts or separate instances can issue different URLs and incur fresh cache misses.
+
+Browser uploads explicitly set `cacheControl: '3600'` and disallow overwrites. Existing objects retain their current cache metadata. Replace files with new file IDs/paths so browsers receive a new URL. Deletion clears matching URL aliases in the current instance; browser caches can still retain previously downloaded bytes until their cache lifetime ends.
+
+This preserves the existing bucket configuration and `STORAGE_PUBLIC_ASSET_BUCKETS`/`STORAGE_ALLOWED_BUCKETS` checks. Only buckets already exposed by the public asset resolver use its shared redirect cache. Authenticated JSON responses, including upload tokens and private download links, use `Cache-Control: no-store`.
+
+Supabase's [Storage CDN](https://supabase.com/docs/guides/storage/cdn/fundamentals) serves Storage requests through its CDN. [Smart CDN](https://supabase.com/docs/guides/storage/cdn/smart-cdn), including signed-URL caching, is automatically enabled on Pro plans and above. Each distinct signed token has its own cache entry. Browser caching reduces downloads entirely; cached egress is recorded only when a network response actually hits Supabase's CDN cache. Adding cache headers to an Edge Function does not by itself guarantee cached-egress billing.
+
+After deploying `specs-api` and rebuilding/deploying the frontend, verify an image in browser DevTools with browser caching disabled: follow the resolver's `Location` to Storage and repeat that exact Storage URL. Inspect `cf-cache-status` on the **Storage response** for `HIT` (the first request may show `MISS`). Check the Supabase usage dashboard over time for cached versus uncached Storage egress. Local tests cannot confirm the live plan, regional CDN cache hits, or billing totals. Signed URL expiry alone does not purge an existing CDN entry; see Supabase's Smart CDN documentation for invalidation behavior.
 
 ## Free-tier operating budget
 

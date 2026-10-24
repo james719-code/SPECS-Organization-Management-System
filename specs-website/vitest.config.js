@@ -26,6 +26,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
+            'npm:@supabase/supabase-js@2': resolve(__dirname, './node_modules/@supabase/supabase-js/dist/index.mjs'),
             '@': resolve(__dirname, './src'),
             '@shared': resolve(__dirname, './src/shared')
         }

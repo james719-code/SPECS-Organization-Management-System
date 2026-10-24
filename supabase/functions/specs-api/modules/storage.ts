@@ -2,7 +2,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { assertString, corsHeaders } from '../http.ts';
 import type { ActionResult, AuthenticatedUser, JsonMap } from '../types.ts';
 
-const ASSET_CACHE_SECONDS = 30 * 24 * 60 * 60;
+const ASSET_URL_SECONDS = 3600;
+const ASSET_REDIRECT_SECONDS = 300;
+const ASSET_EXPIRY_MARGIN_SECONDS = 60;
+const MAX_ASSET_URLS = 500;
+// Warm isolates reuse the same Storage URL so requests share a CDN cache key.
+// This is an optimization only: cold starts can safely issue a new signed URL.
+const assetUrls = new Map<string, { url: string; bucket: string; path: string; expiresAt: number }>();
 
 function storageClient() {
   const url = Deno.env.get('SUPABASE_URL');
@@ -58,6 +64,11 @@ export async function storageAction(user: AuthenticatedUser, body: JsonMap): Pro
     const path = await resolvePath(supabase, bucket, requestedPath);
     const result = await supabase.storage.from(bucket).remove([path]);
     if (result.error) throw result.error;
+    for (const [key, cached] of assetUrls) {
+      if (cached.bucket === bucket && cached.path === path) {
+        assetUrls.delete(key);
+      }
+    }
     return { success: true, path, userId: user.uid };
   }
 
@@ -70,33 +81,37 @@ export async function storageAction(user: AuthenticatedUser, body: JsonMap): Pro
   throw new Error(`Unsupported storage action: ${action}`);
 }
 
-export async function publicAsset(request: Request, url: URL): Promise<Response> {
+export async function publicAsset(_request: Request, url: URL): Promise<Response> {
   const bucket = url.searchParams.get('bucket');
   const fileId = url.searchParams.get('fileId') || url.searchParams.get('path');
   if (!bucket || !fileId) return new Response('bucket and fileId are required', { status: 400 });
   const publicBuckets = (Deno.env.get('STORAGE_PUBLIC_ASSET_BUCKETS') || 'specs-events,specs-picture,specs-highlights,specs-public-files,specs-files,specs-schedule')
     .split(',').map((value) => value.trim()).filter(Boolean);
   if (!publicBuckets.includes(bucket)) return new Response('Asset bucket is not public', { status: 403 });
-  const supabase = storageClient();
-  const path = await resolvePath(supabase, assertBucket(bucket), fileId);
-  const result = await supabase.storage.from(bucket).createSignedUrl(path, 60);
-  if (result.error) return new Response(result.error.message, { status: 404 });
+  assertBucket(bucket);
+  const key = JSON.stringify([bucket, assertPath(fileId)]);
+  let cached = assetUrls.get(key);
+  if (!cached || cached.expiresAt - Date.now() <= ASSET_EXPIRY_MARGIN_SECONDS * 1000) {
+    assetUrls.delete(key);
+    const supabase = storageClient();
+    const path = await resolvePath(supabase, bucket, fileId);
+    // Start the lifetime before signing so network latency cannot extend it.
+    const expiresAt = Date.now() + ASSET_URL_SECONDS * 1000;
+    const result = await supabase.storage.from(bucket).createSignedUrl(path, ASSET_URL_SECONDS);
+    if (result.error) return new Response('Asset not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    cached = { url: result.data.signedUrl, bucket, path, expiresAt };
+    if (assetUrls.size >= MAX_ASSET_URLS) assetUrls.delete(assetUrls.keys().next().value!);
+    assetUrls.set(key, cached);
+  }
 
-  // Proxy the bytes instead of redirecting to the signed URL: every signed URL
-  // is unique, so a redirect gave browsers nothing stable to cache and images
-  // reloaded on every visit. File ids are unique per upload, so the response
-  // for a given URL never changes and can be cached for a month.
-  const upstream = await fetch(result.data.signedUrl);
-  if (!upstream.ok || !upstream.body) return new Response('Asset not found', { status: 404 });
-
-  const headers = new Headers({
-    'Cache-Control': `public, max-age=${ASSET_CACHE_SECONDS}, immutable`,
+  // Keep file bytes on Storage's CDN instead of sending them through Functions
+  // too. Cache the redirect for less than the remaining signed URL lifetime.
+  const maxAge = Math.max(0, Math.min(ASSET_REDIRECT_SECONDS,
+    Math.floor((cached.expiresAt - Date.now()) / 1000) - ASSET_EXPIRY_MARGIN_SECONDS));
+  return new Response(null, { status: 307, headers: {
+    Location: cached.url,
+    'Cache-Control': `public, max-age=${maxAge}, must-revalidate`,
     'Access-Control-Allow-Origin': corsHeaders['Access-Control-Allow-Origin'],
     'X-Content-Type-Options': 'nosniff',
-  });
-  for (const name of ['content-type', 'content-length', 'etag', 'last-modified']) {
-    const value = upstream.headers.get(name);
-    if (value) headers.set(name, value);
-  }
-  return new Response(upstream.body, { status: 200, headers });
+  } });
 }

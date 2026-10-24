@@ -21,6 +21,10 @@ async function route(request: Request): Promise<Response> {
 
   if (action === 'storage') return jsonResponse(await storageAction(user, { ...payload, action: payload.action || 'download' }));
   if (action === 'publish_notification') return jsonResponse(await publishNotification(user, payload));
+  if (action === 'notify_member') return jsonResponse(await notifyMember(user, payload));
+  if (action === 'dismiss_notifications') return jsonResponse(await dismissNotifications(user, payload));
+  if (action === 'register_push_token') return jsonResponse(await registerPushToken(user, payload));
+  if (action === 'unregister_push_token') return jsonResponse(await unregisterPushToken(user, payload));
   if (action === 'admin') {
     const nestedAction = typeof payload.action === 'string' ? payload.action : '';
     if (!nestedAction) throw new Error('admin action is required');
@@ -38,7 +42,3 @@ Deno.serve(async (request) => {
     return jsonResponse({ success: false, error: message }, errorStatus(error));
   }
 });
-  if (action === 'notify_member') return jsonResponse(await notifyMember(user, payload));
-  if (action === 'dismiss_notifications') return jsonResponse(await dismissNotifications(user, payload));
-  if (action === 'register_push_token') return jsonResponse(await registerPushToken(user, payload));
-  if (action === 'unregister_push_token') return jsonResponse(await unregisterPushToken(user, payload));

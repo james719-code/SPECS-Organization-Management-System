@@ -71,7 +71,10 @@ export class SupabaseStorageProvider extends IStorageProvider {
         const path = `${id}/${safeName(file.name)}`;
         const signed = await this.request({ action: 'upload', bucket: bucketId, path });
         if (!this.client) throw new Error('VITE_SUPABASE_ANON_KEY is required for uploads');
-        const result = await this.client.storage.from(bucketId).uploadToSignedUrl(path, signed.token, file);
+        const result = await this.client.storage.from(bucketId).uploadToSignedUrl(path, signed.token, file, {
+            cacheControl: '3600',
+            upsert: false,
+        });
         if (result.error) throw result.error;
         return {
             $id: id,
