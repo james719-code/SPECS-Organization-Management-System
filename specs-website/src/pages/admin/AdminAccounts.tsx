@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { cachedApi, api } from '../../shared/api';
 import { createPortal } from 'react-dom';
 import { formatDateTime, formatRelativeTime } from '../../shared/formatters';
@@ -10,6 +10,7 @@ import { useToast } from '../../components/ui/Toast';
 import { functions } from '../../shared/appwrite';
 import { FUNCTION_ID } from '../../shared/constants';
 import type { AccountDoc, StudentDoc } from '../../types/database';
+import { approveAccounts } from '../../shared/bulkApproval';
 
 const PAGE_SIZE = 20;
 
@@ -44,6 +45,7 @@ const DetailRow: React.FC<{ label: string; value?: React.ReactNode }> = ({ label
 );
 
 const AdminAccounts: React.FC = () => {
+  const bulkAccepting = useRef(false);
   const [accounts, setAccounts] = useState<AccountDoc[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -301,7 +303,8 @@ const AdminAccounts: React.FC = () => {
   /** Calls bulk_accept_students for all selected pending accounts in the background */
   const handleBulkAccept = async () => {
     const ids = Array.from(selectedIds);
-    if (!ids.length) return;
+    if (!ids.length || bulkAccepting.current) return;
+    bulkAccepting.current = true;
     
     // Clear selection immediately
     setSelectedIds(new Set());
@@ -313,30 +316,27 @@ const AdminAccounts: React.FC = () => {
       try {
         const currentUser = await cachedApi.users.getCurrent();
         await logDebugContext('bulk_accept_students', ids.join(', '));
-        const execution = await functions.createExecution(
-          FUNCTION_ID,
-          JSON.stringify({
-            action: 'bulk_accept_students',
-            payload: { userIds: ids },
-            requestingUserId: currentUser?.$id,
-          }),
-          false
-        );
-        let result: any = {};
-        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-        if (result.success === false) throw new Error(result.error || 'Bulk accept failed');
-        const accepted = result.accepted_count ?? ids.length;
-        const failed = result.failed_ids?.length ?? 0;
+        const result = await approveAccounts(ids, async (batch) => {
+          const execution = await functions.createExecution(FUNCTION_ID, JSON.stringify({
+            action: 'bulk_accept_students', payload: { userIds: batch }, requestingUserId: currentUser?.$id,
+          }), false);
+          return JSON.parse(execution.responseBody);
+        });
+        const accepted = result.successCount;
+        const failed = result.failedIds.length;
+        setSelectedIds((previous) => new Set([...previous, ...result.failedIds]));
         addToast({
           type: failed > 0 ? 'error' : 'success',
           title: failed > 0 ? 'Partial Success' : 'Bulk Accepted',
           message: `Accepted ${accepted} of ${ids.length} accounts.${ failed > 0 ? ` ${failed} failed.` : '' }`,
         });
         api.cache.clearTags(['accounts', 'students', 'dashboard']);
-        fetchAccounts();
+        await fetchAccounts();
       } catch (err: any) {
+        setSelectedIds((previous) => new Set([...previous, ...ids]));
         addToast({ type: 'error', title: 'Error', message: err.message || 'Bulk accept failed' });
       } finally {
+        bulkAccepting.current = false;
         setProcessingIds(prev => {
           const next = new Set(prev);
           ids.forEach(id => next.delete(id));
