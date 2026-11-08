@@ -191,6 +191,12 @@ const AdminFileExports: React.FC = () => {
     activeReport === 'documentation' ? docDate : 
     activeReport === 'rating' ? ratingDate : '';
 
+  const setReportDate = (value: string) => {
+    if (activeReport === 'narrative') setNarrativeDate(value);
+    else if (activeReport === 'documentation') setDocDate(value);
+    else if (activeReport === 'rating') setRatingDate(value);
+  };
+
   const reportImages = activeReport === 'narrative' ? narrativeImages : docImages;
 
   const handleEventChange = (eventId: string) => {
