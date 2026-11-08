@@ -2,6 +2,7 @@ import { assertString } from '../http.ts';
 import { FirebaseAuthAdmin } from '../firebase/auth.ts';
 import { FirestoreRestClient, matchesRef } from '../firebase/firestore.ts';
 import { STUDENT_NUMBER_COLLECTION } from './registration.ts';
+import { storyAction } from './stories.ts';
 import type { ActionResult, AppConfig, JsonMap, AuthenticatedUser } from '../types.ts';
 
 const env = (key: string, fallback: string) => Deno.env.get(key) || fallback;
@@ -367,16 +368,6 @@ async function volunteerBackout(store: FirestoreRestClient, config: AppConfig, p
   return { success: true, message: approve ? 'Volunteer backout approved - removed from volunteer program' : 'Volunteer backout rejected - volunteer remains active' };
 }
 
-async function story(store: FirestoreRestClient, config: AppConfig, payload: JsonMap, userRole: string, approve: boolean): Promise<ActionResult> {
-  const storyId = assertString(payload.story_id, 'story_id');
-  if (approve) {
-    await store.update(config.collections.stories, storyId, userRole === 'admin' ? { adminApproval: true, isAccepted: true } : { officerApproval: true });
-    return { success: true, message: userRole === 'admin' ? 'Story approved and published' : 'Story approved by officer, awaiting admin approval' };
-  }
-  await store.delete(config.collections.stories, storyId);
-  return { success: true, message: 'Story rejected and deleted' };
-}
-
 async function deleteAccount(store: FirestoreRestClient, auth: FirebaseAuthAdmin, config: AppConfig, payload: JsonMap, requesterUid: string, requesterRole: string): Promise<ActionResult> {
   const uid = accountId(payload);
   const selfDelete = uid === requesterUid;
@@ -423,8 +414,8 @@ export async function executeOfficerAction(user: AuthenticatedUser, action: stri
     case 'reject_volunteer': return volunteer(store, config, payload, false);
     case 'approve_volunteer_backout': return volunteerBackout(store, config, payload, true);
     case 'reject_volunteer_backout': return volunteerBackout(store, config, payload, false);
-    case 'approve_story': return story(store, config, payload, user.role, true);
-    case 'reject_story': return story(store, config, payload, user.role, false);
+    case 'approve_story': return storyAction(user, { operation: 'approve', storyId: payload.story_id, expectedRevision: payload.expectedRevision }, config, store);
+    case 'reject_story': return storyAction(user, { operation: 'reject', storyId: payload.story_id, expectedRevision: payload.expectedRevision }, config, store);
     case 'delete_account': return deleteAccount(store, auth, config, payload, user.uid, user.role);
     default: throw new Error(`Unsupported admin action: ${action}`);
   }

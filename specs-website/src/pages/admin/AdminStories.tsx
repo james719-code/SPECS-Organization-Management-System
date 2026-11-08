@@ -207,23 +207,18 @@ const AdminStories: React.FC = () => {
       const story = stories.find(s => s.$id === publishConfirm.id);
       if (!story) return;
 
-      // Optimistic approval update
-      if (userRole === 'admin') {
-        setStories(prev => prev.map(s => s.$id === publishConfirm.id ? { ...s, adminApproval: true, officerApproval: true, isAccepted: true } : s));
-      } else {
-        setStories(prev => prev.map(s => s.$id === publishConfirm.id ? { ...s, officerApproval: true } : s));
-      }
-
-      if (FUNCTION_ID) {
-        await functions.createExecution(
+      if (import.meta.env.VITE_DB_PROVIDER === 'firebase' || FUNCTION_ID) {
+        const execution = await functions.createExecution(
           FUNCTION_ID,
           JSON.stringify({
             action: 'approve_story',
-            payload: { story_id: publishConfirm.id },
+            payload: { story_id: publishConfirm.id, expectedRevision: (story as any).revision || 0 },
             requestingUserId: currentUser?.$id
           }),
           false
         );
+        const result = JSON.parse(execution.responseBody);
+        if (!result.success) throw new Error(result.error || 'Story approval failed');
       } else {
         const updates: any = {};
         if (userRole === 'admin') {
@@ -261,35 +256,31 @@ const AdminStories: React.FC = () => {
       // Optimistic delete
       setStories(prev => prev.filter(s => s.$id !== deleteConfirm.id));
 
-      // Clean up image from storage bucket before deleting the story record
-      if (story?.image_bucket) {
-        try {
-          await storage.deleteFile(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket);
-        } catch (e) {
-          console.warn('Failed to delete cover image:', e);
-        }
-      }
-
       const currentUser = await cachedApi.users.getCurrent();
 
-      if (FUNCTION_ID) {
+      if (import.meta.env.VITE_DB_PROVIDER === 'firebase' || FUNCTION_ID) {
         const execution = await functions.createExecution(
           FUNCTION_ID,
           JSON.stringify({
             action: 'reject_story',
-            payload: { story_id: deleteConfirm.id },
+            payload: { story_id: deleteConfirm.id, expectedRevision: (story as any)?.revision || 0 },
             requestingUserId: currentUser?.$id,
           }),
           false
         );
-        let result: any = {};
-        try { result = JSON.parse(execution?.responseBody || '{}'); } catch { /* ignore */ }
-        if (result.success === false) {
+        const result = JSON.parse(execution.responseBody);
+        if (!result.success) {
           throw new Error(result.error || 'Failed to reject/delete story');
         }
       } else {
         // Fallback: direct delete if function ID not configured
         await api.stories.delete(deleteConfirm.id);
+      }
+
+      // Remove the cover only after the reviewed story deletion commits.
+      if (story?.image_bucket) {
+        try { await storage.deleteFile(BUCKET_ID_HIGHLIGHT_IMAGES, story.image_bucket); }
+        catch { /* the story is deleted; staff can clean up an orphaned cover */ }
       }
 
       api.cache.clearTags(['stories', 'landing']);
@@ -311,7 +302,7 @@ const AdminStories: React.FC = () => {
       if (statusFilter === 'pending_officer') {
         matchesStatus = !s.officerApproval && !s.isAccepted;
       } else if (statusFilter === 'pending_admin') {
-        matchesStatus = s.officerApproval && !s.isAccepted;
+        matchesStatus = s.officerApproval === true && !s.isAccepted;
       } else if (statusFilter === 'published') {
         matchesStatus = s.isAccepted;
       }
@@ -483,7 +474,7 @@ const AdminStories: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStories.map(story => {
-            const studentId = story.students?.$id || story.students || '';
+            const studentId = typeof story.students === 'object' ? story.students?.$id || '' : story.students || '';
             const authorName = story.author || (story.students as any)?.name || studentLookup[studentId] || 'SPECS Contributor';
             
             // Get cover image URL

@@ -1152,6 +1152,11 @@ export const api = {
         },
         async create(data: Partial<StoryDoc>): Promise<StoryDoc> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('story', { operation: 'create', storyId: ID.unique(), data });
+                    dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                    return result;
+                }
                 const projectedData = await withRelationshipProjections(data, {
                     studentIdField: 'authorId',
                     studentSnapshotField: 'authorSnapshot',
@@ -1168,6 +1173,11 @@ export const api = {
         },
         async update(storyId: string, data: Partial<StoryDoc>): Promise<StoryDoc> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('story', { operation: 'update', storyId, data });
+                    dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                    return result;
+                }
                 const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId, data);
                 dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
                 return result;
@@ -1177,6 +1187,11 @@ export const api = {
         },
         async delete(storyId: string): Promise<any> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('story', { operation: 'delete', storyId });
+                    dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
+                    return result;
+                }
                 const result = await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STORIES, storyId);
                 dataCache.invalidateTags([CacheTags.STORIES, CacheTags.LANDING]);
                 return result;

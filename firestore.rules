@@ -141,8 +141,9 @@ service cloud.firestore {
     match /stories/{documentId} {
       // Published stories are shown on the public landing page. Pending
       // stories remain visible only to signed-in dashboard users.
-      allow read: if isVerifiedMember() || resource.data.isAccepted == true;
-      allow write: if isOfficerOrAdmin();
+      allow read: if resource.data.isAccepted == true || isOfficerOrAdmin()
+        || (isVerifiedMember() && (ownsStudentReference(resource.data.get('authorId', '')) || ownsStudentReference(resource.data.get('students', ''))));
+      allow write: if false;
     }
 
     match /files/{documentId} {

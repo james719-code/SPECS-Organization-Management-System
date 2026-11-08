@@ -226,6 +226,8 @@ export interface RevenueDoc extends ModelsDocument {
 }
 
 export interface StoryDoc extends ModelsDocument {
+  revision?: number;
+  author?: string | null;
   post_description?: string | null;
   image_bucket?: string | null;
   isAccepted: boolean;

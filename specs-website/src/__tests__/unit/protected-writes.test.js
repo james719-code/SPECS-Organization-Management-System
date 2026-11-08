@@ -35,6 +35,18 @@ describe('Firebase protected writes', () => {
     expect(mocks.databases.updateDocument).not.toHaveBeenCalled();
     expect(mocks.databases.deleteDocument).not.toHaveBeenCalled();
   });
+  it('routes volunteer story writes through the backend and preserves document aliases', async () => {
+    const result = await api.stories.create({ title: 'Draft' });
+    expect(result.$createdAt).toBe('2026-11-08T00:00:00Z');
+    await api.stories.update('story-a', { post_details: 'Changed' });
+    await api.stories.delete('story-a');
+    const calls = mocks.functions.createExecution.mock.calls.map(([, body]) => JSON.parse(body));
+    expect(calls.map((entry) => entry.action)).toEqual(['story', 'story', 'story']);
+    expect(calls.map((entry) => entry.payload.operation)).toEqual(['create', 'update', 'delete']);
+    expect(mocks.databases.createDocument).not.toHaveBeenCalled();
+    expect(mocks.databases.updateDocument).not.toHaveBeenCalled();
+    expect(mocks.databases.deleteDocument).not.toHaveBeenCalled();
+  });
   it('surfaces server rejections without falling back to unprotected writes', async () => {
     mocks.functions.createExecution.mockResolvedValue({ responseBody: JSON.stringify({ success: false, error: 'Legacy reconciliation required' }) });
     await expect(api.payments.delete('legacy')).rejects.toThrow('Legacy reconciliation required');

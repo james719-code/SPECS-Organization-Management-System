@@ -3,6 +3,7 @@ import { requireFirebaseUser } from './auth/firebaseToken.ts';
 import { appConfig, executeOfficerAction, resolveRole } from './modules/officerManagement.ts';
 import { completeRegistration, updateStudentProfile } from './modules/registration.ts';
 import { paymentAction } from './modules/payments.ts';
+import { storyAction } from './modules/stories.ts';
 import { publicAsset, storageAction } from './modules/storage.ts';
 import { dismissNotifications, notifyMember, publishNotification } from './modules/notifications.ts';
 import { registerPushToken, unregisterPushToken } from './modules/push.ts';
@@ -24,6 +25,7 @@ async function route(request: Request): Promise<Response> {
 
   if (action === 'update_student_profile') return jsonResponse(await updateStudentProfile(user, payload, appConfig()));
   if (action === 'payment') return jsonResponse(await paymentAction(user, payload));
+  if (action === 'story') return jsonResponse(await storyAction(user, payload, appConfig()));
 
   if (action === 'storage') return jsonResponse(await storageAction(user, { ...payload, action: payload.action || 'download' }));
   if (action === 'publish_notification') return jsonResponse(await publishNotification(user, payload));
