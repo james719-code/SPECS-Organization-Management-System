@@ -121,12 +121,16 @@ service cloud.firestore {
 
     match /payments/{documentId} {
       allow read: if isOfficerOrAdmin() || (isVerifiedMember() && ownsStudentRecord());
-      allow write: if isOfficerOrAdmin();
+      allow write: if false;
     }
 
     match /revenue/{documentId} {
       allow read: if isOfficerOrAdmin();
-      allow write: if isOfficerOrAdmin();
+      allow create: if isOfficerOrAdmin() && !request.resource.data.keys().hasAny(['paymentId']);
+      allow update: if isOfficerOrAdmin()
+        && !resource.data.keys().hasAny(['paymentId'])
+        && !request.resource.data.keys().hasAny(['paymentId']);
+      allow delete: if isOfficerOrAdmin() && !resource.data.keys().hasAny(['paymentId']);
     }
 
     match /expenses/{documentId} {

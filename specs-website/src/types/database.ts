@@ -169,6 +169,7 @@ export interface CustomSessionStub {
 }
 
 export interface PaymentDoc extends ModelsDocument {
+  revenueId?: string | null;
   students?: StudentDoc | string | null;
   studentId?: string | null;
   eventId?: string | null;
@@ -209,6 +210,7 @@ export interface ExpenseDoc extends ModelsDocument {
 }
 
 export interface RevenueDoc extends ModelsDocument {
+  paymentId?: string;
   name?: string | null;
   isEvent: boolean;
   event?: string | null;

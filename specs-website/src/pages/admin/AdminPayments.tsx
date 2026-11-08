@@ -14,6 +14,7 @@ import { ArrowLeft, RotateCw, Search, Plus, Edit, Trash2, X, Loader2, Bell, Prin
 import { databases } from '../../shared/appwrite';
 import { DATABASE_ID, COLLECTION_ID_REVENUE } from '../../shared/constants';
 import { ID } from 'appwrite';
+import LegacyRevenueLink from '../../components/payments/LegacyRevenueLink';
 
 interface AdminPaymentsProps {
   isCreateView?: boolean;
@@ -75,6 +76,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   // Actions confirmations
   const [paidConfirm, setPaidConfirm] = useState<{ open: boolean; payment: PaymentDoc | null }>({ open: false, payment: null });
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; payment: PaymentDoc | null }>({ open: false, payment: null });
+  const [legacyPayment, setLegacyPayment] = useState<PaymentDoc | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<AccountDoc | null>(null);
@@ -311,10 +313,10 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         };
 
         // 1. Create payment document
-        const paymentDoc = await api.payments.create(payload);
+        await api.payments.create(payload);
 
-        // 2. Create revenue document
-        await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
+        // Firebase creates the linked revenue in the same payment transaction.
+        if (import.meta.env.VITE_DB_PROVIDER !== 'firebase') await databases.createDocument(DATABASE_ID, COLLECTION_ID_REVENUE, ID.unique(), {
           name: `${item.name} (Paid by ${nonBscsName}) [Outside Civilian]`,
           isEvent: isEventLink,
           event: (isEventLink && selectedEventId) ? selectedEventId : null,
@@ -352,6 +354,11 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
 
   // Edit payment due logic
   const handleOpenEdit = (p: PaymentDoc) => {
+    if (import.meta.env.VITE_DB_PROVIDER === 'firebase' && p.is_paid && !p.revenueId) {
+      if (currentUserProfile?.type === 'admin') setLegacyPayment(p);
+      else addToast({ type: 'info', title: 'Legacy Payment', message: 'Ask an administrator to match this older payment to its original revenue entry before editing.' });
+      return;
+    }
     setEditingPayment(p);
     setEditItemName(p.item_name || '');
     setEditPrice(p.price || 0);
@@ -399,7 +406,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
     const officerId = currentUserProfile && currentUserProfile.type === 'officer'
       ? (typeof currentUserProfile.officers === 'object' ? currentUserProfile.officers?.$id : currentUserProfile.officers)
       : null;
-    const recorderId = officerId;
+    const recorderId = currentUserProfile?.$id || officerId || 'admin';
 
     let verifierName = 'Admin';
     if (currentUserProfile) {
@@ -444,6 +451,12 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
   const handleDeletePayment = async () => {
     if (!deleteConfirm.payment) return;
     const payment = deleteConfirm.payment;
+    if (import.meta.env.VITE_DB_PROVIDER === 'firebase' && payment.is_paid && !payment.revenueId) {
+      setDeleteConfirm({ open: false, payment: null });
+      if (currentUserProfile?.type === 'admin') setLegacyPayment(payment);
+      else addToast({ type: 'info', title: 'Legacy Payment', message: 'Ask an administrator to match this older payment to its original revenue entry before deletion.' });
+      return;
+    }
     
     // Close modal immediately to avoid UI blocking
     setDeleteConfirm({ open: false, payment: null });
@@ -2600,6 +2613,12 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ isCreateView = false, isO
         variant="danger"
         loading={actionLoading}
       />
+
+      {legacyPayment && <LegacyRevenueLink payment={legacyPayment} onClose={() => setLegacyPayment(null)} onLinked={() => {
+        setLegacyPayment(null);
+        addToast({ type: 'success', title: 'Revenue Linked', message: 'The original revenue entry is linked. You can now review, edit, or delete this payment.' });
+        loadData(true);
+      }} />}
 
       {printModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">

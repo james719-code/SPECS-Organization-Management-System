@@ -659,6 +659,11 @@ const AdminFinance: React.FC<AdminFinanceProps> = ({ isDetailsView = false }) =>
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm.id || !deleteConfirm.type) return;
     const { id, type } = deleteConfirm;
+    if (type === 'revenue' && (revenue.find((entry) => entry.$id === id) as any)?.paymentId) {
+      setDeleteConfirm({ open: false, id: null, type: null });
+      addToast({ type: 'info', title: 'Linked Payment', message: 'Delete the payment from Payment Records so its finance entry is removed together.' });
+      return;
+    }
     
     // Close modal immediately to avoid UI blocking
     setDeleteConfirm({ open: false, id: null, type: null });

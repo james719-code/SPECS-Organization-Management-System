@@ -54,6 +54,14 @@ const MAX_PAGE_SIZE = 500;
 // the runtime Firebase-only query workarounds out of that mocked environment.
 const USE_FIREBASE_DATABASE = import.meta.env.VITE_DB_PROVIDER === 'firebase' && import.meta.env.MODE !== 'test';
 
+async function protectedMutation(action: string, payload: Record<string, unknown>): Promise<any> {
+    const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({ action, payload }));
+    const result = JSON.parse(execution.responseBody);
+    if (!result.success) throw new Error(result.error || 'The operation could not be completed');
+    const document = result.payment || result.story;
+    return document ? adaptReadModelDocument({ ...document, $createdAt: document.$createdAt || document.createdAt, $updatedAt: document.$updatedAt || document.updatedAt }) : result;
+}
+
 async function syncStudentProjection(studentId: string): Promise<void> {
     if (!USE_FIREBASE_DATABASE || !functions) return;
     const execution = await functions.createExecution(
@@ -465,6 +473,14 @@ export const api = {
 
     // --- PAYMENTS ---
     payments: {
+        async legacyRevenueCandidates(paymentId: string, cursor?: string): Promise<any> {
+            return protectedMutation('payment', { operation: 'legacy_candidates', paymentId, cursor });
+        },
+        async linkLegacyRevenue(paymentId: string, revenueId: string): Promise<PaymentDoc> {
+            const result = await protectedMutation('payment', { operation: 'link_revenue', paymentId, revenueId });
+            dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+            return result;
+        },
         async list(options: ListOptions = {}): Promise<PaginatedResponse<PaymentDoc>> {
             try {
                 const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = normalizeListOptions(options);
@@ -502,6 +518,11 @@ export const api = {
         },
         async create(data: Partial<PaymentDoc>): Promise<PaymentDoc> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('payment', { operation: 'create', paymentId: ID.unique(), data });
+                    dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                    return result;
+                }
                 const projectedData = await withRelationshipProjections(data, {
                     eventField: 'events',
                 });
@@ -517,6 +538,11 @@ export const api = {
         },
         async update(paymentId: string, data: Partial<PaymentDoc>): Promise<PaymentDoc> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('payment', { operation: 'update', paymentId, data });
+                    dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                    return result;
+                }
                 const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId, data);
                 dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
                 return result;
@@ -526,6 +552,11 @@ export const api = {
         },
         async delete(paymentId: string): Promise<any> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('payment', { operation: 'delete', paymentId });
+                    dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                    return result;
+                }
                 // Fetch the payment document first to check if it was paid
                 const payment = await databases.getDocument<PaymentDoc>(DATABASE_ID, COLLECTION_ID_PAYMENTS, paymentId);
                 
@@ -568,6 +599,11 @@ export const api = {
         },
         async markPaid(payment: PaymentDoc, recorderId: string, studentName: string, modalPaid?: 'cash' | 'gcash' | null, officerId?: string | null, verifierName?: string | null): Promise<PaymentDoc> {
             try {
+                if (USE_FIREBASE_DATABASE) {
+                    const result = await protectedMutation('payment', { operation: 'mark_paid', paymentId: payment.$id, data: { modal_paid: modalPaid || null } });
+                    dataCache.invalidateTags([CacheTags.PAYMENTS, CacheTags.FINANCE, CacheTags.DASHBOARD]);
+                    return result;
+                }
                 if (!payment.is_paid) {
                     const targetName = `${payment.item_name} (Paid by ${studentName.trim()})`;
                     const revenueData = {
