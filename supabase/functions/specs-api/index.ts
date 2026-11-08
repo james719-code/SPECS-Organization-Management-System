@@ -1,6 +1,7 @@
 import { errorStatus, asPayload, corsHeaders, jsonResponse } from './http.ts';
 import { requireFirebaseUser } from './auth/firebaseToken.ts';
-import { executeOfficerAction, resolveRole } from './modules/officerManagement.ts';
+import { appConfig, executeOfficerAction, resolveRole } from './modules/officerManagement.ts';
+import { completeRegistration, updateStudentProfile } from './modules/registration.ts';
 import { publicAsset, storageAction } from './modules/storage.ts';
 import { dismissNotifications, notifyMember, publishNotification } from './modules/notifications.ts';
 import { registerPushToken, unregisterPushToken } from './modules/push.ts';
@@ -16,8 +17,11 @@ async function route(request: Request): Promise<Response> {
   if (!action) throw new Error('action is required');
 
   const claims = await requireFirebaseUser(request);
+  if (action === 'complete_registration') return jsonResponse(await completeRegistration(claims, asPayload(body), appConfig()));
   const user = await resolveRole(claims);
   const payload = asPayload(body);
+
+  if (action === 'update_student_profile') return jsonResponse(await updateStudentProfile(user, payload, appConfig()));
 
   if (action === 'storage') return jsonResponse(await storageAction(user, { ...payload, action: payload.action || 'download' }));
   if (action === 'publish_notification') return jsonResponse(await publishNotification(user, payload));

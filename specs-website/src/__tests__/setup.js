@@ -74,7 +74,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock localStorage
-const localStorageMock = (() => {
+const createStorageMock = () => {
     let store = {};
     return {
         getItem: vi.fn((key) => store[key] || null),
@@ -95,7 +95,9 @@ const localStorageMock = (() => {
             return keys[index] || null;
         })
     };
-})();
+};
+const localStorageMock = createStorageMock();
+const sessionStorageMock = createStorageMock();
 
 Object.defineProperty(window, 'localStorage', {
     value: localStorageMock
@@ -103,7 +105,7 @@ Object.defineProperty(window, 'localStorage', {
 
 // Mock sessionStorage
 Object.defineProperty(window, 'sessionStorage', {
-    value: localStorageMock
+    value: sessionStorageMock
 });
 
 // Mock scrollTo
@@ -122,4 +124,5 @@ global.cancelIdleCallback = (id) => {
 beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    sessionStorageMock.clear();
 });

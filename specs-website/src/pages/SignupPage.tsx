@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { account, databases, ID } from '../shared/appwrite';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, User, Sun, Moon, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../shared/constants';
 import { useAuth } from '../shared/AuthContext';
-import { api } from '../shared/api';
+import { authErrorMessage, needsVerification } from '../shared/registration';
 
 interface SignupPageProps {
   theme: 'light' | 'dark';
@@ -13,11 +11,12 @@ interface SignupPageProps {
 }
 
 const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
-  const { status, profile } = useAuth();
+  const { status, profile, user, register } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(location.state?.email || '');
   const [studentId, setStudentId] = useState('');
   const [yearLevel, setYearLevel] = useState('1');
   const [section, setSection] = useState('A');
@@ -29,6 +28,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState('');
 
   usePageMeta({
@@ -38,158 +39,32 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
 
   useEffect(() => {
     if (status === 'authenticated' && profile) {
-      if (!profile.verified && profile.type !== 'admin') {
+      if (needsVerification(user, profile)) {
         navigate('/pending');
       } else {
         navigate(`/dashboard/${profile.type}`);
       }
     }
-  }, [status, profile, navigate]);
+  }, [status, profile, user, navigate]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setLoading(true);
     setError('');
-
-    let createdStudentDocId: string | null = null;
-    let createdAccountDocId: string | null = null;
-    let sessionCreated = false;
-
     try {
-      // 1. Client-side validations — run ALL before touching the database
-      if (!name.trim()) {
-        throw new Error('Full name is required.');
-      }
-      if (!username.trim()) {
-        throw new Error('Username is required.');
-      }
-      if (!email.toLowerCase().endsWith('@parsu.edu.ph')) {
-        throw new Error('Registration requires your official PSU email (@parsu.edu.ph)');
-      }
-      if (!studentId.trim()) {
-        throw new Error('Student ID is required.');
-      }
-      if (!/^\d+$/.test(studentId.trim())) {
-        throw new Error('Student ID must contain only numbers (no letters, spaces, or dashes).');
-      }
-      if (password.length < 8) {
-        throw new Error('Password must be at least 8 characters long.');
-      }
-      if (password !== confirmPassword) {
-        throw new Error('Passwords do not match.');
-      }
-      if (!consent) {
-        throw new Error('Please consent to the Data Privacy terms.');
-      }
-
-      // 2. Create Auth account (only reached if all validations pass)
-      const user = await account.create(ID.unique(), email, password, name);
-
-      // 3. Initiate temp login session to authorize database writes
-      await account.createEmailPasswordSession(email, password);
-      sessionCreated = true;
-
-      // 4. Create Student profile document
-      //    NOTE: username is NOT a field on StudentDoc — it lives on AccountDoc
-      const studentDoc = await databases.createDocument(
-        DATABASE_ID,
-        COLLECTION_ID_STUDENTS,
-        user.$id,
-        {
-          name: name,
-          email: email,
-          student_id: Number(studentId.trim()),
-          yearLevel: parseInt(yearLevel, 10),
-          section: section,
-          address: address,
-          is_volunteer: false
-        }
-      );
-      createdStudentDocId = studentDoc.$id;
-
-      // 5. Create Account relation document
-      //    - `username` belongs here on AccountDoc
-      //    - relationship field is `students` (not `student`)
-      // Firebase also stores a compact read-model projection so account lists
-      // do not need to resolve the student relation on every render. Keep the
-      // Appwrite payload unchanged because its collection schema is strict.
-      const accountData: Record<string, any> = {
-        username: username,
-        type: 'student',
-        students: studentDoc.$id,
-        verified: false,
-        deactivated: false
-      };
-      if (import.meta.env.VITE_DB_PROVIDER === 'firebase') {
-        accountData.studentId = studentDoc.$id;
-        accountData.displayName = name;
-        accountData.email = email;
-        accountData.studentSnapshot = {
-          id: studentDoc.$id,
-          $id: studentDoc.$id,
-          name,
-          email,
-          section,
-          yearLevel: parseInt(yearLevel, 10),
-          student_id: Number(studentId.trim()),
-          is_volunteer: false
-        };
-        accountData.dataModelVersion = 2;
-        accountData.snapshotUpdatedAt = new Date();
-      }
-      const accountDoc = await databases.createDocument(
-        DATABASE_ID,
-        COLLECTION_ID_ACCOUNTS,
-        user.$id,
-        accountData
-      );
-      createdAccountDocId = accountDoc.$id;
-
-      // 6. Send verification email
-      try {
-        const verificationRedirect = import.meta.env.VITE_AUTH_PROVIDER === 'firebase'
-          ? `${window.location.origin}/login?verified=1`
-          : `${window.location.origin}/verify`;
-        await account.createVerification(verificationRedirect);
-      } catch (err) {
-        console.warn('Could not trigger verification email automatically:', err);
-      }
-
-      // 7. Delete the temporary session
-      await account.deleteSession('current');
-
-      api.cache.clearTags(['students', 'accounts', 'dashboard']);
+      if (password !== confirmPassword) throw new Error('Passwords do not match.');
+      const result = await register({
+        name, username, email, password, student_id: studentId,
+        yearLevel: Number(yearLevel), section, address, consent,
+      });
+      setVerificationSent(result.verificationSent);
       setSuccess(true);
-      setLoading(false);
     } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'An error occurred during registration.');
-
-      // Cleanup created DB documents on error
-      if (createdAccountDocId) {
-        try {
-          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, createdAccountDocId);
-        } catch (cleanErr) {
-          console.warn('Failed to delete account document during rollback:', cleanErr);
-        }
-      }
-      if (createdStudentDocId) {
-        try {
-          await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, createdStudentDocId);
-        } catch (cleanErr) {
-          console.warn('Failed to delete student document during rollback:', cleanErr);
-        }
-      }
-
-      // End temp session if it was created
-      if (sessionCreated) {
-        try {
-          await account.deleteSession('current');
-        } catch (cleanErr) {
-          // Ignore session deletion errors
-        }
-      }
-
+      setError(authErrorMessage(err));
+    } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -203,12 +78,14 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Registration Successful</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-            Your SPECS account was created. A verification link has been sent to <span className="font-bold text-slate-900 dark:text-white">{email}</span>.
+            {verificationSent
+              ? <>Your SPECS account was created. A verification link has been sent to <span className="font-bold text-slate-900 dark:text-white">{email.trim().toLowerCase()}</span>.</>
+              : <>Your SPECS account was created, but the verification email could not be sent. Sign in to resend the verification email.</>}
           </p>
           <div className="bg-amber-50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 mb-6 text-left text-xs text-amber-800 dark:text-amber-400 flex items-start gap-2.5">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
-              <span className="font-bold">Next Step:</span> After verifying, your account needs to be cleared and approved by a class representative or SPECS officer before you can log in.
+              <span className="font-bold">Next Step:</span> Verify your email and wait for account approval before accessing the dashboard. You can sign in now to check your status or resend the email.
             </div>
           </div>
           <Link 
@@ -245,6 +122,9 @@ const SignupPage: React.FC<SignupPageProps> = ({ theme, toggleTheme }) => {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Join the SPECS organization community portal</p>
         </div>
 
+        {location.state?.registrationIncomplete && !error && (
+          <p role="status" className="mb-5 text-sm text-amber-700 dark:text-amber-400">Finish your registration using the same email and password. Your existing account will be recovered.</p>
+        )}
         {error && (
           <div className="mb-5 rounded-xl bg-red-50 dark:bg-red-950/20 p-4 text-xs font-semibold text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-left flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />

@@ -124,6 +124,44 @@ describe('Cache Utility', () => {
     });
 
     describe('request de-duplication', () => {
+        it('does not repopulate cleared caches when an old request finishes', async () => {
+            let resolve;
+            const pending = dataCache.getOrFetch('current_user', () => new Promise(done => { resolve = done; }), { tags: ['accounts'] });
+            await Promise.resolve();
+            dataCache.clear();
+            resolve({ $id: 'former-user' });
+            await pending;
+            expect(dataCache.get('current_user')).toBeNull();
+        });
+
+        it('invalidates tagged in-flight reads and preserves a newer request for the same key', async () => {
+            let resolveOld;
+            let resolveNew;
+            const old = dataCache.getOrFetch('account', () => new Promise(done => { resolveOld = done; }), { tags: ['accounts'] });
+            await Promise.resolve();
+            dataCache.invalidateTags('accounts');
+            const fresh = dataCache.getOrFetch('account', () => new Promise(done => { resolveNew = done; }), { tags: ['accounts'] });
+            await Promise.resolve();
+            resolveOld({ $id: 'former-user' });
+            await old;
+            const duplicate = dataCache.getOrFetch('account', () => { throw new Error('must use new request'); }, { tags: ['accounts'] });
+            resolveNew({ $id: 'current-user' });
+            expect(await fresh).toEqual({ $id: 'current-user' });
+            expect(await duplicate).toEqual({ $id: 'current-user' });
+            expect(dataCache.get('account')).toEqual({ $id: 'current-user' });
+        });
+
+        it('does not restore invalidated data from a background refresh', async () => {
+            let resolve;
+            dataCache.set('account', 'old', { ttl: 0, staleTtl: 5000, tags: ['accounts'] });
+            await dataCache.getOrFetch('account', () => new Promise(done => { resolve = done; }), { ttl: 5000, staleTtl: 5000, tags: ['accounts'] });
+            await Promise.resolve();
+            dataCache.invalidateTags('accounts');
+            resolve('former-user');
+            await new Promise(done => setTimeout(done, 0));
+            expect(dataCache.get('account')).toBeNull();
+        });
+
         it('should share an in-flight request for the same key', async () => {
             const fetchFn = vi.fn().mockResolvedValue({ value: 1 });
 

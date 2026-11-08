@@ -27,6 +27,7 @@ const VerifyEmailPage: React.FC = () => {
           // Firebase uses its hosted action handler for verification. A valid
           // Firebase link is completed before the browser reaches this route.
           if (oobCode) await account.updateVerification('', oobCode);
+          else if (!(await account.get(true))?.emailVerification) throw new Error('This verification link is invalid or incomplete.');
         } else {
           if (!userId || !secret) throw new Error('This verification link is invalid or incomplete.');
           await account.updateVerification(userId, secret);

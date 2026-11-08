@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Sun, Moon, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { usePageMeta } from '../shared/seo';
 import { useAuth } from '../shared/AuthContext';
+import { authErrorMessage, needsVerification } from '../shared/registration';
 
 interface LoginPageProps {
   theme: 'light' | 'dark';
@@ -10,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
-  const { login, status, profile } = useAuth();
+  const { login, status, profile, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -33,13 +34,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
 
   useEffect(() => {
     if (status === 'authenticated' && profile) {
-      if (!profile.verified && profile.type !== 'admin') {
+      if (needsVerification(user, profile)) {
         navigate('/pending');
       } else {
         navigate(`/dashboard/${profile.type}`);
       }
     }
-  }, [status, profile, navigate]);
+  }, [status, profile, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,15 +48,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ theme, toggleTheme }) => {
     setError('');
 
     try {
-      const { profile: userProfile } = await login(email, password, rememberMe);
-      if (!userProfile.verified && userProfile.type !== 'admin') {
+      const { profile: userProfile, user: currentUser } = await login(email, password, rememberMe);
+      if (needsVerification(currentUser, userProfile)) {
         navigate('/pending');
       } else {
         navigate(`/dashboard/${userProfile.type}`);
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Invalid email or password.');
+      if (err?.code === 'REGISTRATION_INCOMPLETE') navigate('/signup', { state: { email: email.trim().toLowerCase(), registrationIncomplete: true } });
+      setError(authErrorMessage(err));
       setLoading(false);
     }
   };

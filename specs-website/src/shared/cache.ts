@@ -23,6 +23,12 @@ const CACHE_CONFIG: CacheConfig = {
 };
 
 const dataInflightRequests = new Map<string, Promise<any>>();
+const dataInflightTags = new Map<string, string[]>();
+
+function invalidateInflight(key: string): void {
+  dataInflightRequests.delete(key);
+  dataInflightTags.delete(key);
+}
 
 const dataCacheStats = {
   hits: 0,
@@ -324,6 +330,7 @@ export const dataCache = {
   },
 
   remove(key: string): void {
+    invalidateInflight(key);
     try {
       const cacheStore = this._getCache();
       delete cacheStore[key];
@@ -339,11 +346,16 @@ export const dataCache = {
       if (pattern) {
         const cacheStore = this._getCache();
         const regex = new RegExp(pattern);
+        for (const key of dataInflightRequests.keys()) {
+          if (regex.test(key)) invalidateInflight(key);
+        }
         Object.keys(cacheStore).forEach(key => {
           if (regex.test(key)) delete cacheStore[key];
         });
         this._setCache(cacheStore);
       } else {
+        dataInflightRequests.clear();
+        dataInflightTags.clear();
         memoryDataCache = {};
         localStorage.removeItem(CACHE_CONFIG.DATA_CACHE_KEY);
       }
@@ -356,6 +368,9 @@ export const dataCache = {
   invalidateTags(tags: string | string[]): number {
     const targetTags = new Set(normalizeTags(tags));
     if (targetTags.size === 0) return 0;
+    for (const [key, requestTags] of dataInflightTags) {
+      if (requestTags.some((tag) => targetTags.has(tag))) invalidateInflight(key);
+    }
 
     try {
       const cacheStore = this._getCache();
@@ -405,7 +420,7 @@ export const dataCache = {
     const request = Promise.resolve()
       .then(fetchFn)
       .then(data => {
-        this.set(key, data, options);
+        if (dataInflightRequests.get(key) === request) this.set(key, data, options);
         return data;
       })
       .catch(error => {
@@ -413,10 +428,11 @@ export const dataCache = {
         throw error;
       })
       .finally(() => {
-        dataInflightRequests.delete(key);
+        if (dataInflightRequests.get(key) === request) invalidateInflight(key);
       });
 
     dataInflightRequests.set(key, request);
+    dataInflightTags.set(key, normalizeTags(options.tags));
     return request as Promise<T>;
   },
 
@@ -464,6 +480,7 @@ export const dataCache = {
       (dataCacheStats as any)[key] = 0;
     });
     dataInflightRequests.clear();
+    dataInflightTags.clear();
   },
 
   _getCache(): Record<string, CacheItem> {
@@ -500,7 +517,7 @@ export const dataCache = {
     const request = Promise.resolve()
       .then(fetchFn)
       .then(data => {
-        this.set(key, data, options);
+        if (dataInflightRequests.get(key) === request) this.set(key, data, options);
         return data;
       })
       .catch(error => {
@@ -508,10 +525,11 @@ export const dataCache = {
         console.warn('Background cache refresh failed:', error);
       })
       .finally(() => {
-        dataInflightRequests.delete(key);
+        if (dataInflightRequests.get(key) === request) invalidateInflight(key);
       });
 
     dataInflightRequests.set(key, request);
+    dataInflightTags.set(key, normalizeTags(options.tags));
   },
 
   _checkCacheSize(): void {

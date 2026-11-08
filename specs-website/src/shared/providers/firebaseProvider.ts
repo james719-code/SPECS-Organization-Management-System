@@ -47,8 +47,10 @@ export async function getFirebaseApp(config: any): Promise<any> {
 }
 
 /** Return the shared Firebase Auth instance for function/storage requests. */
-export async function getFirebaseIdToken(config: any): Promise<string | null> {
+export async function getFirebaseIdToken(config: any, expectedUid?: string): Promise<string | null> {
     const { auth } = await initFirebase(config);
+    await auth.authStateReady();
+    if (expectedUid && auth.currentUser?.uid !== expectedUid) throw new Error('Your session changed. Please retry registration.');
     if (!auth.currentUser) return null;
     return auth.currentUser.getIdToken();
 }
@@ -74,35 +76,31 @@ export class FirebaseAuthProvider extends IAuthProvider {
         return this.auth;
     }
 
-    async getCurrentUser(): Promise<any> {
+    async getCurrentUser(refresh = false): Promise<any> {
         const auth = await this._ensureAuth();
-        const { onAuthStateChanged } = await import('firebase/auth');
-
-        return new Promise((resolve) => {
-            const unsubscribe = onAuthStateChanged(auth, (user: any) => {
-                unsubscribe();
-                if (user) {
-                    resolve({
-                        $id: user.uid,
-                        email: user.email,
-                        name: user.displayName,
-                        emailVerification: user.emailVerified
-                    });
-                } else {
-                    // A missing Firebase session is a normal signed-out state,
-                    // not a provider failure. Returning null lets the shared
-                    // API/auth cache handle it consistently with Appwrite's
-                    // 401 response.
-                    resolve(null);
-                }
-            });
-        });
+        await auth.authStateReady();
+        const user = auth.currentUser;
+        if (!user) return null;
+        if (refresh) {
+            const { reload } = await import('firebase/auth');
+            await reload(user);
+            await user.getIdToken(true);
+        }
+        if (auth.currentUser?.uid !== user.uid) return null;
+        return { $id: user.uid, email: user.email, name: user.displayName, emailVerification: user.emailVerified };
     }
 
-    async login(email: string, password: string): Promise<any> {
+    async subscribe(listener: () => void): Promise<() => void> {
         const auth = await this._ensureAuth();
-        const { signInWithEmailAndPassword } = await import('firebase/auth');
-        const result = await signInWithEmailAndPassword(auth, email, password);
+        const { onAuthStateChanged } = await import('firebase/auth');
+        return onAuthStateChanged(auth, listener);
+    }
+
+    async login(email: string, password: string, rememberMe = false): Promise<any> {
+        const auth = await this._ensureAuth();
+        const { signInWithEmailAndPassword, setPersistence, indexedDBLocalPersistence, browserSessionPersistence } = await import('firebase/auth');
+        await setPersistence(auth, rememberMe ? indexedDBLocalPersistence : browserSessionPersistence);
+        const result = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
         return {
             $id: result.user.uid,
             userId: result.user.uid
@@ -117,11 +115,19 @@ export class FirebaseAuthProvider extends IAuthProvider {
 
     async register(email: string, password: string, name: string): Promise<any> {
         const auth = await this._ensureAuth();
-        const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-
-        if (name) {
-            await updateProfile(result.user, { displayName: name });
+        const { createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, updateProfile } = await import('firebase/auth');
+        await setPersistence(auth, browserSessionPersistence);
+        let result;
+        try { result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password); } catch (error: any) {
+            // An interrupted signup already owns its Auth UID. The password
+            // must still be proven before the backend can resume its profile.
+            if (error.code !== 'auth/email-already-in-use') throw error;
+            result = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+        }
+        if (name && !result.user.displayName) {
+            // Display name is not part of the registration commit. A transient
+            // profile update must not strand an otherwise recoverable account.
+            try { await updateProfile(result.user, { displayName: name }); } catch { /* canonical profile is stored by the backend */ }
         }
 
         return {
@@ -146,11 +152,13 @@ export class FirebaseAuthProvider extends IAuthProvider {
         await confirmPasswordReset(auth, oobCode, password);
     }
 
-    async sendVerification(redirectUrl: string): Promise<void> {
+    async sendVerification(redirectUrl: string, expectedUid?: string): Promise<void> {
         const auth = await this._ensureAuth();
         const { sendEmailVerification } = await import('firebase/auth');
-        if (auth.currentUser) {
-            await sendEmailVerification(auth.currentUser, {
+        const user = auth.currentUser;
+        if (expectedUid && user?.uid !== expectedUid) throw new Error('Your session changed. Sign in again to resend your verification email.');
+        if (user) {
+            await sendEmailVerification(user, {
                 url: redirectUrl,
                 handleCodeInApp: false
             });
@@ -395,15 +403,15 @@ export class FirebaseDatabaseProvider extends IDatabaseProvider {
         };
     }
 
-    async getDocument(_databaseId: string, collectionId: string, documentId: string): Promise<any> {
+    async getDocument(_databaseId: string, collectionId: string, documentId: string, options: { fresh?: boolean } = {}): Promise<any> {
         const db = await this._ensureDb();
-        const { doc, getDoc } = await import('firebase/firestore');
+        const { doc, getDoc, getDocFromServer } = await import('firebase/firestore');
 
         const docRef = doc(db, collectionId, documentId);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await (options.fresh ? getDocFromServer(docRef) : getDoc(docRef));
 
         if (!docSnap.exists()) {
-            throw new Error(`Document not found: ${documentId}`);
+            throw Object.assign(new Error(`Document not found: ${documentId}`), { code: 404 });
         }
 
         return this._withAppwriteAliases(docSnap.id, docSnap.data());

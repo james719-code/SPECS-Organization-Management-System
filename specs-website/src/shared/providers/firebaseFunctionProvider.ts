@@ -9,8 +9,9 @@ export class FirebaseFunctionProvider {
         this.firebaseConfig = firebaseConfig;
     }
 
-    async createExecution(_functionId: string, body: string | Record<string, unknown>): Promise<any> {
-        const token = await getFirebaseIdToken(this.firebaseConfig);
+    async createExecution(_functionId: string, body: string | Record<string, unknown>, options?: { expectedUid?: string } | boolean): Promise<any> {
+        const expectedUid = typeof options === 'object' ? options?.expectedUid : undefined;
+        const token = expectedUid ? await getFirebaseIdToken(this.firebaseConfig, expectedUid) : await getFirebaseIdToken(this.firebaseConfig);
         if (!token) throw new Error('You must be signed in to call this function');
         const response = await fetch(this.functionUrl, {
             method: 'POST',

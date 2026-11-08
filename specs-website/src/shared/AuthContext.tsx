@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api, cachedApi } from './api';
 import { account } from './appwrite';
 import { AccountDoc } from '../types/database';
+import { registerStudent, type RegistrationInput, type RegistrationResult } from './registration';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -10,6 +11,7 @@ interface AuthContextType {
   profile: AccountDoc | null;
   status: AuthStatus;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<{ user: any; profile: AccountDoc }>;
+  register: (input: RegistrationInput) => Promise<RegistrationResult>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
@@ -20,159 +22,146 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<AccountDoc | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
+  const generation = useRef(0);
+  const mutating = useRef(false);
+  const pendingMutation = useRef<Promise<void>>(Promise.resolve());
 
   const clearAuthCaches = useCallback(() => {
     api.cache.clearAll();
     cachedApi.users.invalidateAuth();
   }, []);
 
-  const fetchAuth = useCallback(async () => {
-    try {
-      // Check Remember Me preference
-      const rememberFlag = localStorage.getItem('specs_remember');
-      const sessionActive = sessionStorage.getItem('specs_session');
-
-      // If user opted out of Remember Me ("0") and this is a fresh browser session (no specs_session in sessionStorage),
-      // clear the session to enforce logout on browser restart.
-      if (rememberFlag === '0' && !sessionActive) {
-        try {
-          await account.deleteSession('current');
-        } catch (e) {
-          // ignore session delete error
-        }
-        clearAuthCaches();
-        setUser(null);
-        setProfile(null);
-        setStatus('unauthenticated');
-        return;
-      }
-
-      const currentUser = await cachedApi.users.getCurrent();
-      if (!currentUser) {
-        clearAuthCaches();
-        setUser(null);
-        setProfile(null);
-        setStatus('unauthenticated');
-        return;
-      }
-
-      const userProfile = await cachedApi.users.getAccount(currentUser.$id);
-
-      if (userProfile && !userProfile.deactivated) {
-        setUser(currentUser);
-        setProfile(userProfile);
-        setStatus('authenticated');
-        // Keep session active flag in sessionStorage
-        sessionStorage.setItem('specs_session', '1');
-      } else {
-        try {
-          await account.deleteSession('current');
-        } catch (e) {
-          // ignore
-        }
-        clearAuthCaches();
-        setUser(null);
-        setProfile(null);
-        setStatus('unauthenticated');
-      }
-    } catch (error) {
-      clearAuthCaches();
-      setUser(null);
-      setProfile(null);
-      setStatus('unauthenticated');
-    }
-  }, [clearAuthCaches]);
-
-  useEffect(() => {
-    fetchAuth();
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'specs_auth_event' || e.key === 'specs_remember') {
-        clearAuthCaches();
-        fetchAuth();
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', handleStorageChange);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('storage', handleStorageChange);
-      }
-    };
-  }, [fetchAuth]);
-
-  const login = async (email: string, password: string, rememberMe: boolean = false) => {
-    // Create Appwrite session
-    await account.createEmailPasswordSession(email, password);
-
-    // Update remember me storage flags
-    localStorage.setItem('specs_remember', rememberMe ? '1' : '0');
-    localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'login', t: Date.now() }));
-    sessionStorage.setItem('specs_session', '1');
-
-    // Invalidate stale user cache so fresh user data is fetched
-    clearAuthCaches();
-
-    // Direct API fetch to get immediate fresh profile data
-    const currentUser = await api.users.getCurrent();
-    const userProfile = await api.users.getAccount(currentUser.$id);
-
-    if (userProfile.deactivated) {
-      try {
-        await account.deleteSession('current');
-      } catch (e) {
-        // ignore
-      }
-      clearAuthCaches();
-      localStorage.removeItem('specs_remember');
-      localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
-      sessionStorage.removeItem('specs_session');
-      setUser(null);
-      setProfile(null);
-      setStatus('unauthenticated');
-      throw new Error('This account has been deactivated.');
-    }
-
-    setUser(currentUser);
-    setProfile(userProfile);
-    setStatus('authenticated');
-
-    return { user: currentUser, profile: userProfile };
-  };
-
-  const logout = async () => {
-    try {
-      await account.deleteSession('current');
-    } catch (err) {
-      console.warn('[AuthContext] Failed to delete session on logout:', err);
-    }
-    clearAuthCaches();
-    localStorage.removeItem('specs_remember');
-    localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
-    sessionStorage.removeItem('specs_session');
+  const reset = useCallback(() => {
     setUser(null);
     setProfile(null);
     setStatus('unauthenticated');
-  };
+  }, []);
 
-  const refreshAuth = async () => {
+  const fetchAuth = useCallback(async (refresh = false) => {
+    if (mutating.current) return;
+    const request = ++generation.current;
+    try {
+      // Cached display data must never determine the current session/role.
+      const currentUser = await account.get(refresh);
+      if (request !== generation.current) return;
+      if (!currentUser) { clearAuthCaches(); reset(); return; }
+      const userProfile = await api.users.getAccount(currentUser.$id, true);
+      if (request !== generation.current) return;
+      if (userProfile.deactivated) {
+        await account.deleteSession('current');
+        if (request !== generation.current) return;
+        clearAuthCaches(); reset(); return;
+      }
+      setUser(currentUser);
+      setProfile(userProfile);
+      setStatus('authenticated');
+    } catch {
+      if (request !== generation.current) return;
+      // A transient read failure must not delete a recoverable signup session.
+      clearAuthCaches(); reset();
+    }
+  }, [clearAuthCaches, reset]);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void fetchAuth();
+    if (account.subscribe) {
+      void account.subscribe(() => { if (active && !mutating.current) void fetchAuth(); })
+        .then((stop: () => void) => { if (active) unsubscribe = stop; else stop(); })
+        .catch(() => { /* explicit login/refresh still reports provider failures */ });
+    }
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'specs_auth_event' && !mutating.current) {
+        clearAuthCaches();
+        void fetchAuth();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      active = false;
+      generation.current++;
+      unsubscribe?.();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchAuth, clearAuthCaches]);
+
+  const beginMutation = () => {
+    if (mutating.current) throw new Error('An account request is already in progress. Please wait.');
+    mutating.current = true;
     clearAuthCaches();
-    await fetchAuth();
+    const request = ++generation.current;
+    let release!: () => void;
+    pendingMutation.current = new Promise<void>((resolve) => { release = resolve; });
+    return { request, finish: () => {
+      if (request === generation.current) mutating.current = false;
+      release();
+    } };
   };
 
-  return (
-    <AuthContext.Provider value={{ user, profile, status, login, logout, refreshAuth }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const login = async (email: string, password: string, rememberMe = false) => {
+    const { request, finish } = beginMutation();
+    try {
+      const session = await account.createEmailPasswordSession(email.trim().toLowerCase(), password, rememberMe);
+      const currentUser = await account.get();
+      if (!currentUser) throw new Error('Your session changed. Please sign in again.');
+      if (session?.userId && currentUser.$id !== session.userId) throw new Error('Your session changed. Please sign in again.');
+      let userProfile: AccountDoc;
+      try { userProfile = await api.users.getAccount(currentUser.$id, true); } catch (error: any) {
+        if (error.code === 'NOT_FOUND') throw Object.assign(new Error('Finish registration with the same email and password.'), { code: 'REGISTRATION_INCOMPLETE' });
+        throw error;
+      }
+      if (request !== generation.current) throw new Error('Your session changed. Please sign in again.');
+      if ((await account.get())?.$id !== currentUser.$id || request !== generation.current) throw new Error('Your session changed. Please sign in again.');
+      if (userProfile.deactivated) {
+        await account.deleteSession('current');
+        throw new Error('This account has been deactivated.');
+      }
+      setUser(currentUser); setProfile(userProfile); setStatus('authenticated');
+      localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'login', t: Date.now() }));
+      localStorage.removeItem('specs_remember');
+      sessionStorage.removeItem('specs_session');
+      return { user: currentUser, profile: userProfile };
+    } catch (error) {
+      if (request === generation.current) reset();
+      throw error;
+    } finally { finish(); }
+  };
+
+  const register = async (input: RegistrationInput) => {
+    const { request, finish } = beginMutation();
+    try { return await registerStudent(input); } finally {
+      if (request === generation.current) { clearAuthCaches(); reset(); }
+      finish();
+    }
+  };
+
+  const logout = async () => {
+    // Invalidate pending reads before sign-out completes.
+    const previous = pendingMutation.current;
+    const request = ++generation.current;
+    mutating.current = true;
+    let release!: () => void;
+    pendingMutation.current = new Promise<void>((resolve) => { release = resolve; });
+    clearAuthCaches(); reset();
+    // A sign-in already sent to Firebase cannot be cancelled. Wait for it,
+    // then sign out, so it cannot restore the underlying session after logout.
+    try { await previous; await account.deleteSession('current'); } finally {
+      localStorage.removeItem('specs_remember');
+      sessionStorage.removeItem('specs_session');
+      localStorage.setItem('specs_auth_event', JSON.stringify({ type: 'logout', t: Date.now() }));
+      if (request === generation.current) mutating.current = false;
+      release();
+    }
+  };
+
+  const refreshAuth = async () => { clearAuthCaches(); await fetchAuth(true); };
+
+  return <AuthContext.Provider value={{ user, profile, status, login, register, logout, refreshAuth }}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

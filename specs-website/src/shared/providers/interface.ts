@@ -17,7 +17,7 @@ export class IAuthProvider {
     /**
      * Create a session (login)
      */
-    async login(email: string, password: string): Promise<any> {
+    async login(email: string, password: string, rememberMe?: boolean): Promise<any> {
         throw new Error('Not implemented');
     }
 

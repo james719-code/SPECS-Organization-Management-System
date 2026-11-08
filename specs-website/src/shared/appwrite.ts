@@ -99,13 +99,14 @@ if (DEV_BYPASS) {
 
     account = AUTH_PROVIDER === 'firebase' && firebaseProviders
         ? {
-            get: () => firebaseProviders.auth.getCurrentUser(),
-            createEmailPasswordSession: (email: string, password: string) => firebaseProviders.auth.login(email, password),
+            get: (refresh = false) => firebaseProviders.auth.getCurrentUser(refresh),
+            subscribe: (listener: () => void) => firebaseProviders.auth.subscribe(listener),
+            createEmailPasswordSession: (email: string, password: string, rememberMe = false) => firebaseProviders.auth.login(email, password, rememberMe),
             deleteSession: () => firebaseProviders.auth.logout(),
             createRecovery: (email: string, url: string) => firebaseProviders.auth.sendPasswordRecovery(email, url),
             updateRecovery: (_userId: string, secret: string, password: string) => firebaseProviders.auth.confirmPasswordRecovery(secret, password),
             create: (_userId: string, email: string, password: string, name: string) => firebaseProviders.auth.register(email, password, name),
-            createVerification: (url: string) => firebaseProviders.auth.sendVerification(url),
+            createVerification: (url: string, expectedUid?: string) => firebaseProviders.auth.sendVerification(url, expectedUid),
             updateVerification: (_userId: string, secret: string) => firebaseProviders.auth.confirmVerification(secret),
             updatePassword: async (password: string) => {
                 const user = await firebaseProviders.auth.getCurrentUser();
@@ -122,7 +123,7 @@ if (DEV_BYPASS) {
     databases = DB_PROVIDER === 'firebase' && firebaseProviders
         ? {
             listDocuments: (dbId: string, collectionId: string, queries?: any[]) => firebaseProviders.database.listDocuments(dbId, collectionId, queries),
-            getDocument: (dbId: string, collectionId: string, docId: string) => firebaseProviders.database.getDocument(dbId, collectionId, docId),
+            getDocument: (dbId: string, collectionId: string, docId: string, options?: { fresh?: boolean }) => firebaseProviders.database.getDocument(dbId, collectionId, docId, options),
             createDocument: (dbId: string, collectionId: string, docId: string, data: any) => firebaseProviders.database.createDocument(dbId, collectionId, docId, data),
             updateDocument: (dbId: string, collectionId: string, docId: string, data: any) => firebaseProviders.database.updateDocument(dbId, collectionId, docId, data),
             deleteDocument: (dbId: string, collectionId: string, docId: string) => firebaseProviders.database.deleteDocument(dbId, collectionId, docId)

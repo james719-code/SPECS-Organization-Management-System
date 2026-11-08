@@ -1,6 +1,7 @@
 import { assertString } from '../http.ts';
 import { FirebaseAuthAdmin } from '../firebase/auth.ts';
 import { FirestoreRestClient, matchesRef } from '../firebase/firestore.ts';
+import { STUDENT_NUMBER_COLLECTION } from './registration.ts';
 import type { ActionResult, AppConfig, JsonMap, AuthenticatedUser } from '../types.ts';
 
 const env = (key: string, fallback: string) => Deno.env.get(key) || fallback;
@@ -140,11 +141,10 @@ async function roleAction(user: AuthenticatedUser, allowed: string[]) {
   if (!allowed.includes(user.role)) throw new Error(`Only ${allowed.join(' or ')} can perform this action`);
 }
 
-async function acceptStudent(store: FirestoreRestClient, auth: FirebaseAuthAdmin, config: AppConfig, payload: JsonMap): Promise<ActionResult> {
+async function acceptStudent(store: FirestoreRestClient, _auth: FirebaseAuthAdmin, config: AppConfig, payload: JsonMap): Promise<ActionResult> {
   const uid = accountId(payload);
   const account = await accountFor(store, config, uid);
   const updated = await store.update(config.collections.accounts, uid, { verified: true, updatedAt: new Date() });
-  try { await auth.updateUser(uid, { emailVerified: true }); } catch { /* Auth may already be absent in a partial import. */ }
   await addTeamMember(store, config, config.teams.students, updated, await emailForAccount(store, config, account, await studentForAccount(store, config, account)));
   return { success: true, message: 'Student accepted successfully' };
 }
@@ -387,8 +387,14 @@ async function deleteAccount(store: FirestoreRestClient, auth: FirebaseAuthAdmin
   const officerId = refId(account.officers) || refId(account.officerId);
   await removeFromAllTeams(store, config, uid);
   if (officerId) { try { await store.delete(config.collections.officers, officerId); } catch { /* absent */ } }
-  if (studentId) { try { await store.delete(config.collections.students, studentId); } catch { /* absent */ } }
-  await store.delete(config.collections.accounts, uid);
+  await store.runTransaction(async (tx) => {
+    const student = studentId ? await tx.get(config.collections.students, studentId) : null;
+    const number = student?.student_id ? String(student.student_id) : null;
+    const reservation = number ? await tx.get(STUDENT_NUMBER_COLLECTION, number) : null;
+    if (number && reservation?.studentId === studentId) tx.delete(STUDENT_NUMBER_COLLECTION, number);
+    if (studentId) tx.delete(config.collections.students, studentId);
+    tx.delete(config.collections.accounts, uid);
+  });
   try { await auth.deleteUser(uid); } catch { /* Auth may already be absent. */ }
   return { success: true, message: 'Account and all related data deleted successfully' };
 }
@@ -431,11 +437,17 @@ export async function resolveRole(user: JsonMap): Promise<AuthenticatedUser> {
   const config = appConfig();
   const staticAdmins = (Deno.env.get('ADMIN_USER_IDS') || '').split(',').map((value) => value.trim()).filter(Boolean);
   if (staticAdmins.includes(uid)) return { ...user, uid, role: 'admin' } as AuthenticatedUser;
-  try {
-    const account = await store.get(config.collections.accounts, uid);
+  let account: JsonMap | null = null;
+  try { account = await store.get(config.collections.accounts, uid); } catch (error) {
+    if (!String(error).includes('Firestore 404:')) throw error;
+  }
+  if (account) {
+    if (account.deactivated === true) throw new Error('Permission denied: account is deactivated');
     const role = typeof account.type === 'string' ? account.type : '';
-    if (role) return { ...user, uid, role } as AuthenticatedUser;
-  } catch { /* fallback below */ }
+    if (role !== 'admin' && (account.verified !== true || user.email_verified !== true)) throw new Error('Permission denied: email verification and officer approval are required');
+    if (['admin', 'officer', 'student'].includes(role)) return { ...user, uid, role } as AuthenticatedUser;
+    throw new Error('Authenticated user has no application role');
+  }
   try {
     await store.get(config.collections.admins, uid);
     return { ...user, uid, role: 'admin' } as AuthenticatedUser;

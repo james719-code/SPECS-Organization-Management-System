@@ -897,9 +897,11 @@ export const api = {
                 throw createApiError(error, 'Failed to get current user');
             }
         },
-        async getAccount(accountId: string): Promise<AccountDoc> {
+        async getAccount(accountId: string, fresh = false): Promise<AccountDoc> {
             try {
-                const result = await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
+                const result = fresh && USE_FIREBASE_DATABASE
+                    ? await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId, { fresh: true })
+                    : await databases.getDocument(DATABASE_ID, COLLECTION_ID_ACCOUNTS, accountId);
                 return adaptReadModelDocument(result);
             } catch (error) {
                 throw createApiError(error, `Failed to get account ${accountId}`);
@@ -957,7 +959,17 @@ export const api = {
     students: {
         async updateProfile(studentId: string, data: Partial<StudentDoc>): Promise<StudentDoc> {
             try {
-                const result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId, data);
+                let result;
+                if (USE_FIREBASE_DATABASE) {
+                    const execution = await functions.createExecution(FUNCTION_ID || '', JSON.stringify({
+                        action: 'update_student_profile', payload: { studentId, data }
+                    }));
+                    const response = JSON.parse(execution.responseBody);
+                    if (!response.success) throw new Error(response.error || 'Failed to update profile');
+                    result = response.student;
+                } else {
+                    result = await databases.updateDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, studentId, data);
+                }
                 await syncStudentProjection(studentId);
                 dataCache.invalidateTags([CacheTags.STUDENTS, CacheTags.ACCOUNTS, CacheTags.DASHBOARD]);
                 return adaptReadModelDocument(result);

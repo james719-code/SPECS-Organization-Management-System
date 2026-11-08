@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../shared/AuthContext';
+import { needsVerification } from '../shared/registration';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -8,7 +9,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
-  const { profile, status } = useAuth();
+  const { profile, status, user } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') {
@@ -26,11 +27,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const isVerified = profile?.verified;
   const userType = profile?.type;
 
   // Unverified check (admins are pre-verified)
-  if (!isVerified && userType !== 'admin') {
+  if (needsVerification(user, profile)) {
     return <Navigate to="/pending" replace />;
   }
 
