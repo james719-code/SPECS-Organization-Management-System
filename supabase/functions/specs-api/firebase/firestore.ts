@@ -14,36 +14,37 @@ function encodeValue(value: unknown): JsonMap {
   return { stringValue: String(value) };
 }
 
-function decodeValue(value: JsonMap | undefined): unknown {
+function decodeValue(value: JsonMap | undefined, preserveTimestamps = false): unknown {
   if (!value) return null;
   if ('nullValue' in value) return null;
   if ('stringValue' in value) return value.stringValue;
   if ('booleanValue' in value) return value.booleanValue;
   if ('integerValue' in value) return Number(value.integerValue);
   if ('doubleValue' in value) return value.doubleValue;
-  if ('timestampValue' in value) return value.timestampValue;
-  if ('arrayValue' in value) return ((value.arrayValue as JsonMap).values as JsonMap[] || []).map(decodeValue);
+  if ('timestampValue' in value) return preserveTimestamps ? new Date(String(value.timestampValue)) : value.timestampValue;
+  if ('arrayValue' in value) return ((value.arrayValue as JsonMap).values as JsonMap[] || []).map((child) => decodeValue(child, preserveTimestamps));
   if ('mapValue' in value) {
     const fields = ((value.mapValue as JsonMap).fields || {}) as JsonMap;
-    return Object.fromEntries(Object.entries(fields).map(([key, child]) => [key, decodeValue(child as JsonMap)]));
+    return Object.fromEntries(Object.entries(fields).map(([key, child]) => [key, decodeValue(child as JsonMap, preserveTimestamps)]));
   }
   return null;
 }
 
-function decodeDocument(document: JsonMap): JsonMap {
+function decodeDocument(document: JsonMap, preserveTimestamps = false): JsonMap {
   const name = String(document.name || '');
   const id = name.split('/').pop() || '';
   const fields = (document.fields || {}) as JsonMap;
-  return { $id: id, ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, decodeValue(value as JsonMap)])) };
+  return { $id: id, ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, decodeValue(value as JsonMap, preserveTimestamps)])) };
 }
 
 export class FirestoreRestClient {
-  private baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId()}/databases/(default)/documents`;
+  private baseUrl = `${Deno.env.get('FIRESTORE_EMULATOR_HOST') ? `http://${Deno.env.get('FIRESTORE_EMULATOR_HOST')}` : 'https://firestore.googleapis.com'}/v1/projects/${firebaseProjectId()}/databases/(default)/documents`;
 
   private async request(path: string, init: RequestInit = {}): Promise<JsonMap> {
     const token = await firebaseAccessToken();
     const response = await fetch(path.startsWith(':') ? `${this.baseUrl}${path}` : `${this.baseUrl}/${path}`, {
       ...init,
+      signal: init.signal || AbortSignal.timeout(20_000),
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
     });
     const text = await response.text();
@@ -56,7 +57,16 @@ export class FirestoreRestClient {
     return data;
   }
 
-  async get(collection: string, id: string): Promise<JsonMap> {
+  async get(collection: string, id: string, transaction?: string): Promise<JsonMap> {
+    if (transaction) {
+      const name = `projects/${firebaseProjectId()}/databases/(default)/documents/${collection}/${id}`;
+      const rows = await this.request(':batchGet', { method: 'POST', body: JSON.stringify({ documents: [name], transaction }) }) as unknown as Array<{ found?: JsonMap }>;
+      const found = rows.find((row) => row.found)?.found;
+      if (!found) throw new Error(`Firestore 404: Document not found: ${id}`);
+      // Read/modify/write transactions must retain Firestore timestamp types;
+      // otherwise editing a row silently changes its date's index ordering.
+      return decodeDocument(found, true);
+    }
     return decodeDocument(await this.request(`${encodeURIComponent(collection)}/${encodeURIComponent(id)}`));
   }
 
@@ -67,7 +77,7 @@ export class FirestoreRestClient {
       const query = new URLSearchParams({ pageSize: '1000' });
       if (pageToken) query.set('pageToken', pageToken);
       const page = await this.request(`${encodeURIComponent(collection)}?${query.toString()}`);
-      documents.push(...((page.documents || []) as JsonMap[]).map(decodeDocument));
+      documents.push(...((page.documents || []) as JsonMap[]).map((document) => decodeDocument(document)));
       pageToken = String(page.nextPageToken || '');
     } while (pageToken);
     return documents;
@@ -78,7 +88,7 @@ export class FirestoreRestClient {
     if (cursor) query.set('pageToken', cursor);
     const page = await this.request(`${encodeURIComponent(collection)}?${query}`);
     return {
-      documents: ((page.documents || []) as JsonMap[]).map(decodeDocument),
+      documents: ((page.documents || []) as JsonMap[]).map((document) => decodeDocument(document)),
       nextCursor: page.nextPageToken || null,
     };
   }
@@ -111,22 +121,65 @@ export class FirestoreRestClient {
     const path = `${encodeURIComponent(collection)}/${encodeURIComponent(id)}`;
     const result = await this.request(path, {
       method: 'PATCH',
-      body: JSON.stringify({ name: `${this.baseUrl}/${path}`, fields: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encodeValue(value)])) }),
+      body: JSON.stringify({ name: `projects/${firebaseProjectId()}/databases/(default)/documents/${collection}/${id}`, fields: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encodeValue(value)])) }),
     });
     return decodeDocument(result);
   }
 
-  async update(collection: string, id: string, patch: JsonMap): Promise<JsonMap> {
-    let existing: JsonMap = {};
-    try { existing = await this.get(collection, id); } catch (error) {
-      if (!String(error).includes('404')) throw error;
-    }
-    const { $id: _id, ...data } = existing;
-    return this.set(collection, id, { ...data, ...patch });
+  async update(collection: string, id: string, patch: JsonMap, options: { upsert?: boolean } = {}): Promise<JsonMap> {
+    const params = new URLSearchParams();
+    if (!options.upsert) params.set('currentDocument.exists', 'true');
+    for (const key of Object.keys(patch)) params.append('updateMask.fieldPaths', key);
+    return decodeDocument(await this.request(`${encodeURIComponent(collection)}/${encodeURIComponent(id)}?${params}`, {
+      method: 'PATCH', body: JSON.stringify({ fields: Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, encodeValue(value)])) }),
+    }));
   }
 
   async delete(collection: string, id: string): Promise<void> {
     await this.request(`${encodeURIComponent(collection)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  // Firestore commits the reads and writes serializably. In particular, two
+  // registrations cannot both claim an absent student-number reservation.
+  async runTransaction<T>(work: (transaction: FirestoreTransaction) => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      const started = await this.request(':beginTransaction', { method: 'POST', body: JSON.stringify({ options: { readWrite: {} } }) });
+      const id = String(started.transaction);
+      const transaction = new FirestoreTransaction(this, id);
+      try {
+        const result = await work(transaction);
+        await this.request(':commit', { method: 'POST', body: JSON.stringify({ transaction: id, writes: transaction.writes }) });
+        return result;
+      } catch (error) {
+        try { await this.request(':rollback', { method: 'POST', body: JSON.stringify({ transaction: id }) }); } catch { /* already aborted/committed */ }
+        if (attempt >= 4 || !/Firestore (409|503):/.test(String(error))) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 25 * 2 ** attempt + Math.random() * 50));
+      }
+    }
+  }
+}
+
+export class FirestoreTransaction {
+  readonly writes: JsonMap[] = [];
+  constructor(private store: FirestoreRestClient, private id: string) {}
+
+  async get(collection: string, id: string): Promise<JsonMap | null> {
+    try { return await this.store.get(collection, id, this.id); } catch (error) {
+      if (String(error).includes('Firestore 404:')) return null;
+      throw error;
+    }
+  }
+
+  set(collection: string, id: string, data: JsonMap): void {
+    const { $id: _id, ...fields } = data;
+    this.writes.push({ update: {
+      name: `projects/${firebaseProjectId()}/databases/(default)/documents/${collection}/${id}`,
+      fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, encodeValue(value)])),
+    } });
+  }
+
+  delete(collection: string, id: string): void {
+    this.writes.push({ delete: `projects/${firebaseProjectId()}/databases/(default)/documents/${collection}/${id}` });
   }
 }
 

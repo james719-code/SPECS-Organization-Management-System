@@ -265,7 +265,7 @@ export async function dismissNotifications(user: AuthenticatedUser, payload: Jso
         if (String(error).includes('404')) continue;
         throw error;
       }
-      await store.update('notification_reads', readId, { userUid: user.uid, notificationId: id, deletedAt: now });
+      await store.update('notification_reads', readId, { userUid: user.uid, notificationId: id, deletedAt: now }, { upsert: true });
       removed += 1;
       return;
     }

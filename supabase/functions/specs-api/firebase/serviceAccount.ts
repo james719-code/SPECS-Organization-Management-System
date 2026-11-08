@@ -7,6 +7,7 @@ type ServiceAccount = {
 };
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
+let tokenRequest: Promise<string> | null = null;
 
 function configuredProjectId(): string | null {
   const value = Deno.env.get('FIREBASE_PROJECT_ID')?.trim();
@@ -34,6 +35,15 @@ export function firebaseProjectId(): string {
 }
 
 export async function firebaseAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && cachedToken.expiresAt - now > 60) return cachedToken.value;
+  // Coalesce cold-start/expiry requests within an Edge instance. A signup
+  // burst must not mint a separate service-account token for every DB read.
+  if (!tokenRequest) tokenRequest = refreshAccessToken().finally(() => { tokenRequest = null; });
+  return tokenRequest;
+}
+
+async function refreshAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.expiresAt - now > 60) return cachedToken.value;
 
