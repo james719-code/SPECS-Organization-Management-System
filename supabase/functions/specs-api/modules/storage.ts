@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { assertString, corsHeaders } from '../http.ts';
 import type { ActionResult, AuthenticatedUser, JsonMap } from '../types.ts';
+import { FirestoreRestClient } from '../firebase/firestore.ts';
+import { assetKey, linkedStudent, staffRole } from './access.ts';
 
 const ASSET_URL_SECONDS = 3600;
 const ASSET_REDIRECT_SECONDS = 300;
@@ -55,14 +57,37 @@ async function resolvePath(supabase: ReturnType<typeof storageClient>, bucket: s
   return `${path}/${file.name}`;
 }
 
-export async function storageAction(user: AuthenticatedUser, body: JsonMap): Promise<ActionResult> {
+const publicBuckets = () => (Deno.env.get('STORAGE_PUBLIC_ASSET_BUCKETS') || 'specs-events,specs-picture,specs-highlights,specs-public-files,specs-files,specs-schedule').split(',').map((value) => value.trim()).filter(Boolean);
+
+export async function storageAction(user: AuthenticatedUser, body: JsonMap, store?: FirestoreRestClient): Promise<ActionResult> {
+  const database = () => store ??= new FirestoreRestClient();
   const supabase = storageClient();
   const bucket = assertBucket(assertString(body.bucket, 'bucket'));
-  const requestedPath = assertString(body.path || body.fileId, 'path');
   const action = String(body.action || 'download');
+  const staff = staffRole(user.role);
+  if (!staff && user.role !== 'student') throw new Error('Permission denied for storage');
+  if (action === 'list' && !staff) throw new Error('Permission denied: only officers and administrators can list storage');
+  if (action === 'list') {
+    const result = await supabase.storage.from(bucket).list('', { limit: 1000, offset: 0 });
+    if (result.error) throw result.error;
+    return { files: result.data || [], total: result.data?.length || 0, userId: user.uid };
+  }
+  const requestedPath = assertPath(assertString(body.path || body.fileId, 'path'));
+  const fileId = requestedPath.split('/')[0];
+  if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$/.test(fileId)) throw new Error('Invalid file ID');
+  const key = await assetKey(bucket, fileId);
+  let asset: JsonMap | null = null;
+  if (!staff && (action === 'delete' || (action === 'download' && !publicBuckets().includes(bucket)))) {
+    try { asset = await database().get('storage_assets', key); } catch (error) {
+      if (!String(error).includes('Firestore 404:')) throw error;
+    }
+    if (!asset || asset.ownerUid !== user.uid || (requestedPath.includes('/') && requestedPath !== asset.path)) {
+      throw new Error('Permission denied: this file does not belong to your account');
+    }
+  }
 
   if (action === 'download') {
-    const path = await resolvePath(supabase, bucket, requestedPath);
+    const path = asset ? String(asset.path) : await resolvePath(supabase, bucket, requestedPath);
     const expiresIn = Math.min(Math.max(Number(body.expiresIn ?? 300), 60), 3600);
     const result = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
     if (result.error) throw result.error;
@@ -71,13 +96,29 @@ export async function storageAction(user: AuthenticatedUser, body: JsonMap): Pro
 
   if (action === 'upload') {
     const path = assertPath(requestedPath);
+    if (path.split('/').length !== 2) throw new Error('Invalid upload path');
+    if (!staff) {
+      if (bucket !== (Deno.env.get('BUCKET_ID_HIGHLIGHT_IMAGES') || 'specs-highlights')) throw new Error('Permission denied: students may upload their story covers only');
+      const account = await database().get(Deno.env.get('COLLECTION_ID_ACCOUNTS') || 'accounts', user.uid);
+      const studentId = linkedStudent(account);
+      const student = studentId ? await database().get(Deno.env.get('COLLECTION_ID_STUDENTS') || 'students', studentId) : null;
+      if (student?.is_volunteer !== true) throw new Error('Permission denied: only approved volunteers can upload story covers');
+    }
+    // Do not let a new caller claim the folder of an unattributed legacy file.
+    const folder = await supabase.storage.from(bucket).list(fileId, { limit: 1, offset: 0 });
+    if (folder.error) throw folder.error;
+    if (folder.data?.length) throw new Error('File ID already exists; upload with a new file ID');
+    await database().runTransaction(async (tx) => {
+      if (await tx.get('storage_assets', key)) throw new Error('File ID is already reserved; upload with a new file ID');
+      tx.set('storage_assets', key, { bucket, fileId, path, ownerUid: user.uid, createdAt: new Date() });
+    });
     const result = await supabase.storage.from(bucket).createSignedUploadUrl(path);
     if (result.error) throw result.error;
     return { path, token: result.data.token, userId: user.uid };
   }
 
   if (action === 'delete') {
-    const path = await resolvePath(supabase, bucket, requestedPath);
+    const path = asset ? String(asset.path) : await resolvePath(supabase, bucket, requestedPath);
     const result = await supabase.storage.from(bucket).remove([path]);
     if (result.error) throw result.error;
     for (const [key, cached] of assetUrls) {
@@ -86,12 +127,6 @@ export async function storageAction(user: AuthenticatedUser, body: JsonMap): Pro
       }
     }
     return { success: true, path, userId: user.uid };
-  }
-
-  if (action === 'list') {
-    const result = await supabase.storage.from(bucket).list('', { limit: 1000, offset: 0 });
-    if (result.error) throw result.error;
-    return { files: result.data || [], total: result.data?.length || 0, userId: user.uid };
   }
 
   throw new Error(`Unsupported storage action: ${action}`);

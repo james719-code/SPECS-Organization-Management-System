@@ -6,7 +6,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonTable } from '../../components/ui/SkeletonLoader';
 import { useToast } from '../../components/ui/Toast';
 import { account, databases } from '../../shared/appwrite';
-import { DATABASE_ID, COLLECTION_ID_ACCOUNTS, COLLECTION_ID_STUDENTS } from '../../shared/constants';
+import { DATABASE_ID, COLLECTION_ID_ACCOUNTS } from '../../shared/constants';
 import type { AttendanceDoc } from '../../types/database';
 
 const StudentAttendance: React.FC = () => {
@@ -16,43 +16,18 @@ const StudentAttendance: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceDoc | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [officerDetails, setOfficerDetails] = useState<{ name: string; email: string } | null>(null);
-  const [loadingOfficer, setLoadingOfficer] = useState(false);
+  const loadingOfficer = false;
   const { addToast } = useToast();
 
-  const handleViewDetails = async (record: AttendanceDoc) => {
+  const handleViewDetails = (record: AttendanceDoc) => {
     setSelectedRecord(record);
     setIsModalOpen(true);
-    setOfficerDetails(null);
-
-    const officerObj = record.officers;
-    if (!officerObj) return;
-
-    // Resolve the student profile ID of the officer
-    let officerStudentId = '';
-    if (typeof officerObj === 'object') {
-      officerStudentId = typeof officerObj.students === 'object'
-        ? officerObj.students?.$id || ''
-        : (officerObj.students || '');
-    } else {
-      officerStudentId = officerObj;
-    }
-
-    if (!officerStudentId) return;
-
-    try {
-      setLoadingOfficer(true);
-      const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID_STUDENTS, officerStudentId);
-      const name = doc.name && doc.name !== 'N/A' ? doc.name : 'Administrator';
-      const email = doc.email && doc.email !== 'N/A' ? doc.email : 'specs.parsu@gmail.com';
-      setOfficerDetails({ name, email });
-    } catch (e) {
-      console.warn('[StudentAttendance] Failed to resolve officer details:', e);
-      setOfficerDetails({ name: 'Administrator', email: 'specs.parsu@gmail.com' });
-    } finally {
-      setLoadingOfficer(false);
-    }
+    const snapshot = (record as any).officerSnapshot;
+    setOfficerDetails({
+      name: snapshot?.displayName || snapshot?.students?.name || 'SPECS Officer',
+      email: snapshot?.email || snapshot?.students?.email || 'specs.parsu@gmail.com',
+    });
   };
-
   const loadAttendance = async () => {
     try {
       setLoading(true);

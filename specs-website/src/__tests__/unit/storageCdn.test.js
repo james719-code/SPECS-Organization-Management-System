@@ -1,4 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
+vi.mock('../../../../supabase/functions/specs-api/firebase/serviceAccount.ts', () => ({
+    firebaseProjectId: () => 'demo-specs-auth', firebaseAccessToken: async () => { throw new Error('Unexpected Firebase access in public CDN test'); },
+}));
 
 const mocks = vi.hoisted(() => ({
     createSignedUrl: vi.fn(),
@@ -35,6 +39,7 @@ beforeEach(async () => {
         STORAGE_PUBLIC_ASSET_BUCKETS: 'specs-events,specs-highlights',
     };
     vi.stubGlobal('Deno', { env: { get: (key) => env[key] } });
+    vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('fetch', vi.fn());
     mocks.from.mockReturnValue(mocks);
     mocks.list.mockResolvedValue({ data: [{ name: 'photo.jpg' }], error: null });

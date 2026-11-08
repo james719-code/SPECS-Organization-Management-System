@@ -36,6 +36,15 @@ service cloud.firestore {
       );
     }
 
+    function ownsStudentReference(value) {
+      return (value is string && value != '' && isStudentOwner(value))
+        || (value is map && isStudentOwner(value.get('$id', value.get('id', ''))));
+    }
+
+    function ownsStudentRecord() {
+      return ownsStudentReference(resource.data.get('studentId', ''))
+        || ownsStudentReference(resource.data.get('students', ''));
+    }
 
     match /accounts/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isOfficerOrAdmin());
@@ -52,7 +61,7 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin() || isStudentOwner(studentId);
       allow create: if false;
       // Student numbers are changed only by the transactional backend, even
       // for officers, so a direct write cannot bypass uniqueness checks.
@@ -67,8 +76,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /storage_assets/{assetId} {
+      allow read, write: if false;
+    }
+
     match /officers/{officerId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin();
       allow write: if isAdmin();
     }
 
@@ -102,22 +115,22 @@ service cloud.firestore {
     }
 
     match /attendance/{documentId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin() || (isVerifiedMember() && ownsStudentRecord());
       allow write: if isOfficerOrAdmin();
     }
 
     match /payments/{documentId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin() || (isVerifiedMember() && ownsStudentRecord());
       allow write: if isOfficerOrAdmin();
     }
 
     match /revenue/{documentId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin();
       allow write: if isOfficerOrAdmin();
     }
 
     match /expenses/{documentId} {
-      allow read: if isVerifiedMember();
+      allow read: if isOfficerOrAdmin();
       allow write: if isOfficerOrAdmin();
     }
 
